@@ -1,3 +1,5 @@
 module github.com/SKAARHOJ/ibeam-lib-rawpanelhelpers
 
 go 1.15
+
+require github.com/SKAARHOJ/ibeam-lib-utils v0.0.0-20210106155940-a19b7739e1b7

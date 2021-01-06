@@ -1,0 +1,3 @@
+[submodule "ibeam-rawpanel-proto"]
+	path = ibeam-rawpanel-proto
+	url = git@github.com:SKAARHOJ/ibeam-rawpanel-proto.git
