@@ -9,10 +9,10 @@ import (
 	"strconv"
 	"strings"
 
-	rwp "ibeam-canvas/ibeam_rawpanel"
+	rwp "github.com/SKAARHOJ/ibeam-lib-rawpanelhelpers/ibeam_rawpanel"
 
-	monogfx "ibeam-canvas/ibeam_lib_monogfx"
-	su "ibeam-canvas/ibeam_lib_utils"
+	monogfx "github.com/SKAARHOJ/ibeam-lib-rawpanelhelpers/ibeam_lib_monogfx"
+	su "github.com/SKAARHOJ/ibeam-lib-utils"
 )
 
 type TopologyHWcomponent struct {
