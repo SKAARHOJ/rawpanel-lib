@@ -659,6 +659,12 @@ func RawPanelASCIIstringsToInboundMessages(rp20_ascii []string) []*rwp.InboundMe
 					SendPanelTopology: true,
 				},
 			}
+		case "BurninProfile?":
+			msg = &rwp.InboundMessage{
+				Command: &rwp.Command{
+					SendBurninProfile: true,
+				},
+			}
 		case "Clear":
 			msg = &rwp.InboundMessage{
 				Command: &rwp.Command{
@@ -709,6 +715,7 @@ func RawPanelASCIIstringsToInboundMessages(rp20_ascii []string) []*rwp.InboundMe
 								HWCIDs: HWCidArray,
 								HWCMode: &rwp.HWCMode{
 									State:        rwp.HWCMode_StateE(value & 0xF),
+									Output:       (value & 0x20) == 0x20,
 									BlinkPattern: uint32((value >> 8) & 0xF),
 								},
 							},
@@ -981,6 +988,7 @@ func RawPanelASCIIstringsToInboundMessages(rp20_ascii []string) []*rwp.InboundMe
 	return returnMsgs
 }
 
+// Inbound TCP commands - from external system to SKAARHOJ panel
 func InboundMessagesToRawPanelASCIIstrings(inboundMsgs []*rwp.InboundMessage) []string {
 	returnStrings := make([]string, 0)
 
@@ -1008,6 +1016,9 @@ func InboundMessagesToRawPanelASCIIstrings(inboundMsgs []*rwp.InboundMessage) []
 			}
 			if inboundMsg.Command.SendPanelTopology {
 				returnStrings = append(returnStrings, "PanelTopology?")
+			}
+			if inboundMsg.Command.SendBurninProfile {
+				returnStrings = append(returnStrings, "BurninProfile?")
 			}
 			if inboundMsg.Command.ClearAll {
 				returnStrings = append(returnStrings, "Clear")
@@ -1043,7 +1054,7 @@ func InboundMessagesToRawPanelASCIIstrings(inboundMsgs []*rwp.InboundMessage) []
 						singleHWCIDarray := []uint32{singleHWCID}
 
 						if stateRec.HWCMode != nil {
-							outputInteger := uint32(stateRec.HWCMode.State&0x7) | uint32((stateRec.HWCMode.BlinkPattern&0xF)<<8) | uint32(su.Qint(su.IsIntIn(int(stateRec.HWCMode.State), []int{4, 5}), 0b100000, 0))
+							outputInteger := uint32(stateRec.HWCMode.State&0x7) | uint32((stateRec.HWCMode.BlinkPattern&0xF)<<8) | uint32(su.Qint(stateRec.HWCMode.Output, 0b100000, 0))
 							returnStrings = append(returnStrings, fmt.Sprintf("HWC#%s=%d", su.IntImplode(singleHWCIDarray, ","), outputInteger))
 						}
 						if stateRec.HWCColor != nil {
@@ -1237,6 +1248,14 @@ func RawPanelASCIIstringsToOutboundMessages(rp20_ascii []string) []*rwp.Outbound
 			msg = &rwp.OutboundMessage{
 				FlowMessage: rwp.OutboundMessage_NACK,
 			}
+		case "BSY":
+			msg = &rwp.OutboundMessage{
+				FlowMessage: rwp.OutboundMessage_BSY,
+			}
+		case "RDY":
+			msg = &rwp.OutboundMessage{
+				FlowMessage: rwp.OutboundMessage_RDY,
+			}
 		case "list":
 			msg = &rwp.OutboundMessage{
 				FlowMessage: rwp.OutboundMessage_HELLO,
@@ -1322,8 +1341,8 @@ func RawPanelASCIIstringsToOutboundMessages(rp20_ascii []string) []*rwp.Outbound
 				origHWC := uint32(su.Intval(regex_map.FindStringSubmatch(inputString)[1]))
 				value := regex_map.FindStringSubmatch(inputString)[2]
 
-				theMap := make(map[uint32]rwp.OutboundMessage_HWCavail)
-				theMap[origHWC] = rwp.OutboundMessage_HWCavail(su.Qint(su.Intval(value) > 0, 1, 0))
+				theMap := make(map[uint32]uint32)
+				theMap[origHWC] = uint32(su.Intval(value))
 				msg = &rwp.OutboundMessage{
 					HWCavailability: theMap,
 				}
@@ -1352,6 +1371,18 @@ func RawPanelASCIIstringsToOutboundMessages(rp20_ascii []string) []*rwp.Outbound
 							SoftwareVersion: strValue,
 						},
 					}
+				case "_platform":
+					msg = &rwp.OutboundMessage{
+						PanelInfo: &rwp.PanelInfo{
+							Platform: strValue,
+						},
+					}
+				case "_name":
+					msg = &rwp.OutboundMessage{
+						PanelInfo: &rwp.PanelInfo{
+							Name: strValue,
+						},
+					}
 				case "_isSleeping":
 					msg = &rwp.OutboundMessage{
 						SleepState: &rwp.SleepState{
@@ -1376,6 +1407,12 @@ func RawPanelASCIIstringsToOutboundMessages(rp20_ascii []string) []*rwp.Outbound
 							Json: strValue,
 						},
 					}
+				case "_burninProfile":
+					msg = &rwp.OutboundMessage{
+						BurninProfile: &rwp.BurninProfile{
+							Json: strValue,
+						},
+					}
 				}
 
 			} else {
@@ -1390,6 +1427,7 @@ func RawPanelASCIIstringsToOutboundMessages(rp20_ascii []string) []*rwp.Outbound
 	return returnMsgs
 }
 
+// Outbound TCP commands - from panel to external system
 func OutboundMessagesToRawPanelASCIIstrings(outboundMsgs []*rwp.OutboundMessage) []string {
 	returnStrings := make([]string, 0)
 
@@ -1402,6 +1440,10 @@ func OutboundMessagesToRawPanelASCIIstrings(outboundMsgs []*rwp.OutboundMessage)
 			returnStrings = append(returnStrings, "nack")
 		case rwp.OutboundMessage_PING:
 			returnStrings = append(returnStrings, "ping")
+		case rwp.OutboundMessage_BSY:
+			returnStrings = append(returnStrings, "BSY")
+		case rwp.OutboundMessage_RDY:
+			returnStrings = append(returnStrings, "RDY")
 		case rwp.OutboundMessage_HELLO:
 			returnStrings = append(returnStrings, "list")
 		}
@@ -1417,6 +1459,12 @@ func OutboundMessagesToRawPanelASCIIstrings(outboundMsgs []*rwp.OutboundMessage)
 			if outboundMsg.PanelInfo.SoftwareVersion != "" {
 				returnStrings = append(returnStrings, "_version="+outboundMsg.PanelInfo.SoftwareVersion)
 			}
+			if outboundMsg.PanelInfo.Name != "" {
+				returnStrings = append(returnStrings, "_name="+outboundMsg.PanelInfo.Name)
+			}
+			if outboundMsg.PanelInfo.Platform != "" {
+				returnStrings = append(returnStrings, "_platform="+outboundMsg.PanelInfo.Platform)
+			}
 		}
 		if outboundMsg.PanelTopology != nil {
 			if outboundMsg.PanelTopology.Svgbase != "" {
@@ -1424,6 +1472,11 @@ func OutboundMessagesToRawPanelASCIIstrings(outboundMsgs []*rwp.OutboundMessage)
 			}
 			if outboundMsg.PanelTopology.Json != "" {
 				returnStrings = append(returnStrings, "_panelTopology_HWC="+outboundMsg.PanelTopology.Json)
+			}
+		}
+		if outboundMsg.BurninProfile != nil {
+			if outboundMsg.BurninProfile.Json != "" {
+				returnStrings = append(returnStrings, "_burninProfile="+outboundMsg.BurninProfile.Json)
 			}
 		}
 		if outboundMsg.SleepTimeout != nil {
