@@ -77,7 +77,7 @@ func (img *MonoImg) CreateFromImage(src image.Image) {
 		for columns := 0; columns < img.widthInBytes; columns++ {
 			for pixels := 0; pixels < 8; pixels++ {
 				pixel, _, _, _ := src.At((columns<<3)+pixels, rows).RGBA()
-				img.imgBytes[i] |= byte(su.Qint(pixel > 127, 0, 1) << (7 - pixels) & 0xFF) // A bright pixel (>127) equals a bit in our monochrome byte slice.
+				img.imgBytes[i] |= byte((su.Qint(pixel > 127, 0, 1) << (7 - pixels)) & 0xFF) // A bright pixel (>127) equals a bit in our monochrome byte slice.
 			}
 			i++
 		}
