@@ -187,7 +187,7 @@ func (img *MonoImg) SetOLEDBckgColor(color int) {
 }
 
 func (img *MonoImg) SetOLEDPixelColor(color int) {
-	fmt.Printf("%064b\n", color)
+	//fmt.Printf("%064b\n", color)
 	// input: 6 bit color for OLED display: xxrrggbb
 	// output: 16 bit color, bbbbbggg gggrrrrr
 	var r, g, b int
