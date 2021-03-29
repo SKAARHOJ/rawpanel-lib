@@ -305,6 +305,19 @@ func gfxCommandLines(newColorPixelData []byte, bytesPerLine int, x int, y int, c
 
 func WriteDisplayTileNew(textStruct *rwp.HWCText, width int, height int, shrink int, border int) monogfx.MonoImg { // Border and shrink shall come from info about the tile we render onto...
 
+	if textStruct.TextStyling == nil {
+		textStruct.TextStyling = &rwp.HWCText_TextStyle{}
+	}
+	if textStruct.TextStyling.TextFont == nil {
+		textStruct.TextStyling.TextFont = &rwp.HWCText_TextStyle_Font{}
+	}
+	if textStruct.TextStyling.TitleFont == nil {
+		textStruct.TextStyling.TitleFont = &rwp.HWCText_TextStyle_Font{}
+	}
+	if textStruct.Scale == nil {
+		textStruct.Scale = &rwp.HWCText_ScaleM{}
+	}
+
 	const WHITE = true
 	const BLACK = false
 

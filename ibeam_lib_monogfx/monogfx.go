@@ -101,14 +101,14 @@ func (img *MonoImg) CreateFromBytes(width int, height int, bytes []byte) {
 }
 
 // Converts a monochrome byte slice back to image object
-func (img *MonoImg) ConvertToImage() image.Image {
+func (img *MonoImg) ConvertToImage(invert bool) image.Image {
 	dest := image.NewRGBA(image.Rectangle{image.Point{0, 0}, image.Point{img.Width, img.Height}})
 
 	var i = 0
 	for rows := 0; rows < img.Height; rows++ {
 		for columns := 0; columns < img.widthInBytes; columns++ {
 			for pixels := 0; pixels < 8; pixels++ {
-				if img.imgBytes[i]&(1<<((7-pixels)&0xFF)) > 0 { // A bit in the monochrome byte slice equals black on the output image.
+				if (img.imgBytes[i]&(1<<((7-pixels)&0xFF)) > 0) != invert { // A bit in the monochrome byte slice equals black on the output image.
 					dest.Set((columns<<3)+pixels, rows, color.Black)
 				} else {
 					dest.Set((columns<<3)+pixels, rows, color.White)
@@ -148,7 +148,6 @@ func (img *MonoImg) GetImgSlice() []byte {
 }
 
 func (img *MonoImg) GetImgSliceRGB() []byte {
-
 	pixelColorMSB := byte(img.OLEDPixelColor >> 8)
 	pixelColorLSB := byte(img.OLEDPixelColor & 0xFF)
 	bckgColorMSB := byte(img.OLEDBckgColor >> 8)
@@ -159,14 +158,14 @@ func (img *MonoImg) GetImgSliceRGB() []byte {
 	for row := 0; row < img.Height; row++ {
 		for columns := 0; columns < img.Width; columns++ {
 			if img.imgBytes[row*img.widthInBytes+columns/8]&(0b1<<(7-columns%8)) > 0 {
-				RGBimage[pointer] = pixelColorMSB
-				pointer++
 				RGBimage[pointer] = pixelColorLSB
 				pointer++
-			} else {
-				RGBimage[pointer] = bckgColorMSB
+				RGBimage[pointer] = pixelColorMSB
 				pointer++
+			} else {
 				RGBimage[pointer] = bckgColorLSB
+				pointer++
+				RGBimage[pointer] = bckgColorMSB
 				pointer++
 			}
 		}
