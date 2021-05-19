@@ -87,17 +87,14 @@ func (img *MonoImg) CreateFromImage(src image.Image) {
 
 // Creates from a byte slice
 // TODO: Checking size of byte slice matches dimensions!
-func (img *MonoImg) CreateFromBytes(width int, height int, bytes []byte) {
+func (img *MonoImg) CreateFromBytes(width int, height int, bytes []byte) error {
 	img.NewImage(width, height)
 	if img.widthInBytes*height > len(bytes) {
-		fmt.Println("ERROR: addressable dimensions larger than provided byte slice!")
-		return
+		return fmt.Errorf("addressable dimensions larger than provided byte slice")
 	}
 	img.imgBytes = bytes
 	img.init()
-
-	img.Print()
-	img.PrintImg()
+	return nil
 }
 
 // Converts a monochrome byte slice back to image object
