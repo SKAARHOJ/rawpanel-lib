@@ -338,6 +338,7 @@ func WriteDisplayTileNew(textStruct *rwp.HWCText, width int, height int, shrink 
 	disp.FillRect(0, 0, width, height, false) // Black out tile
 
 	// Defaults:
+	// TODO: Still I have seen panics over accessing nil-pointers for the next lines...=: (despite attempts in the first lines in this function to limit it.)
 	fontFaceContent := int(textStruct.TextStyling.TextFont.FontFace & 7) //  _extRetAdvancedFontFace & 7 - Default value
 	fontFaceTitle := int(textStruct.TextStyling.TitleFont.FontFace & 7)  // (_extRetAdvancedFontFace >> 3) & 7 - Default value
 	fontProportional := !textStruct.TextStyling.FixedWidth               // ((_extRetAdvancedFontFace >> 6) & 1) ? 0 : 1 - fixedWidthFonts

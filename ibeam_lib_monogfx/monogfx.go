@@ -95,6 +95,9 @@ func (img *MonoImg) CreateFromBytes(width int, height int, bytes []byte) error {
 	img.imgBytes = bytes
 	img.init()
 	return nil
+
+	//img.Print()
+	//img.PrintImg()
 }
 
 // Converts a monochrome byte slice back to image object
