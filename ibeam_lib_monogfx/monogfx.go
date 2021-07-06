@@ -158,14 +158,14 @@ func (img *MonoImg) GetImgSliceRGB() []byte {
 	for row := 0; row < img.Height; row++ {
 		for columns := 0; columns < img.Width; columns++ {
 			if img.imgBytes[row*img.widthInBytes+columns/8]&(0b1<<(7-columns%8)) > 0 {
-				RGBimage[pointer] = pixelColorLSB
-				pointer++
 				RGBimage[pointer] = pixelColorMSB
 				pointer++
-			} else {
-				RGBimage[pointer] = bckgColorLSB
+				RGBimage[pointer] = pixelColorLSB
 				pointer++
+			} else {
 				RGBimage[pointer] = bckgColorMSB
+				pointer++
+				RGBimage[pointer] = bckgColorLSB
 				pointer++
 			}
 		}

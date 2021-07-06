@@ -408,6 +408,9 @@ func WriteDisplayTileNew(textStruct *rwp.HWCText, width int, height int, shrink 
 
 			xOffset = su.ConstrainValue(activeWidth-disp.StrWidth(textStruct.Title)-su.Qint(textStruct.StateIcon == rwp.HWCText_SI_LOCK, 8-2, 0), 0, activeWidth) >> 1 // this makes room for the lock icon: (_extRetFormat & 0x30) == 0x20
 			yOffset = su.ConstrainValue(int(titlePadding)-su.Qint(!textStruct.SolidHeaderBar, 1, 0), 0, 10)                                                            // Move title font a little up in case of label (so it separates from the line)
+			if textStruct.SolidHeaderBar && xOffset == 0 {
+				xOffset++
+			}
 			disp.SetCursor(xOffset, yOffset)
 			disp.RenderText(textStruct.Title)
 		}
