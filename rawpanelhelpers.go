@@ -616,7 +616,7 @@ func RawPanelASCIIstringsToInboundMessages(rp20_ascii []string) []*rwp.InboundMe
 
 	// Set up regular expressions:
 	regex_cmd, _ := regexp.Compile("^(HWC#|HWCx#|HWCc#|HWCt#)([0-9,]+)=(.*)$")
-	regex_gfx, _ := regexp.Compile("^(HWCgRGB#|HWCg#)([0-9,]+)=([0-9]+)(/([0-9]+),([0-9]+)x([0-9]+)(,([0-9]+),([0-9]+)|)|):(.*)$")
+	regex_gfx, _ := regexp.Compile("^(HWCgRGB#|HWCgGray#|HWCg#)([0-9,]+)=([0-9]+)(/([0-9]+),([0-9]+)x([0-9]+)(,([0-9]+),([0-9]+)|)|):(.*)$")
 	regex_genericDual, _ := regexp.Compile("^(PanelBrightness)=([0-9]+),([0-9]+)$")
 	regex_genericSingle, _ := regexp.Compile("^(SleepTimer|Webserver|PanelBrightness)=([0-9]+)$")
 
@@ -875,7 +875,15 @@ func RawPanelASCIIstringsToInboundMessages(rp20_ascii []string) []*rwp.InboundMe
 			} else if regex_gfx.MatchString(inputString) {
 				submatches := regex_gfx.FindStringSubmatch(inputString)
 				gPartIndex := su.Intval(submatches[3])
-				imageType := su.Qint(submatches[1] == "HWCgRGB#", 1, 0)
+
+				imageType := int(rwp.HWCGfx_MONO)
+				switch submatches[1] {
+				case "HWCgRGB#":
+					imageType = int(rwp.HWCGfx_RGB16bit)
+				case "HWCgGray#":
+					imageType = int(rwp.HWCGfx_Gray4bit)
+				}
+
 				decodedSlice, _ := base64.StdEncoding.DecodeString(submatches[11])
 				if gPartIndex == 0 {
 					// Reset image intake:
@@ -1183,6 +1191,9 @@ func InboundMessagesToRawPanelASCIIstrings(inboundMsgs []*rwp.InboundMessage) []
 							cmdString := "HWCg"
 							if stateRec.HWCGfx.ImageType == rwp.HWCGfx_RGB16bit {
 								cmdString = "HWCgRGB"
+							}
+							if stateRec.HWCGfx.ImageType == rwp.HWCGfx_Gray4bit {
+								cmdString = "HWCgGray"
 							}
 							const bytesPerLine = 170
 

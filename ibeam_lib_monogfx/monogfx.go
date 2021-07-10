@@ -174,6 +174,42 @@ func (img *MonoImg) GetImgSliceRGB() []byte {
 	return RGBimage
 }
 
+func (img *MonoImg) GetImgSliceGray() []byte {
+	Gray16Image := make([]byte, img.Width*img.Height/2)
+	pointer := 0
+	for row := 0; row < img.Height; row++ {
+		for columns := 0; columns < img.Width; columns++ {
+			if pointer < len(Gray16Image) { // Image must/should have even number width
+				// MS Nibbel
+				if img.imgBytes[row*img.widthInBytes+columns/8]&(0b1<<(7-columns%8)) > 0 {
+					Gray16Image[pointer] = RGB16BitToGray(img.OLEDPixelColor) & 0b11110000
+				} else {
+					Gray16Image[pointer] = RGB16BitToGray(img.OLEDBckgColor) & 0b11110000
+				}
+				// LS Nibbel
+				columns++
+				if img.imgBytes[row*img.widthInBytes+columns/8]&(0b1<<(7-columns%8)) > 0 {
+					Gray16Image[pointer] |= (RGB16BitToGray(img.OLEDPixelColor) >> 4) & 0b1111
+				} else {
+					Gray16Image[pointer] |= (RGB16BitToGray(img.OLEDBckgColor) >> 4) & 0b1111
+				}
+				pointer++
+			}
+		}
+	}
+
+	return Gray16Image
+}
+
+func RGB16BitToGray(color uint16) byte {
+	colR := uint32((color & 0b11111) * 2114)
+	colG := uint32(((color >> 5) & 0b111111) * 1040)
+	colB := uint32(((color >> 11) & 0b11111) * 2114)
+
+	pixelColor := ((19595*colR + 38470*colG + 7471*colB + 1<<15) >> 16) & 0xFFFF // Gray pixel value (16 bit)
+	return byte(pixelColor >> 8)
+}
+
 func (img *MonoImg) SetOLEDBckgColor(color int) {
 
 	// input: 6 bit color for OLED display: xxrrggbb
