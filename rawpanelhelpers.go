@@ -615,10 +615,10 @@ func RawPanelASCIIstringsToInboundMessages(rp20_ascii []string) []*rwp.InboundMe
 	returnMsgs := []*rwp.InboundMessage{}
 
 	// Set up regular expressions:
-	regex_cmd, _ := regexp.Compile("^(HWC#|HWCx#|HWCc#|HWCt#)([0-9,]+)=(.*)$")
+	regex_cmd, _ := regexp.Compile("^(HWC#|HWCx#|HWCc#|HWCt#|HWCr#)([0-9,]+)=(.*)$")
 	regex_gfx, _ := regexp.Compile("^(HWCgRGB#|HWCgGray#|HWCg#)([0-9,]+)=([0-9]+)(/([0-9]+),([0-9]+)x([0-9]+)(,([0-9]+),([0-9]+)|)|):(.*)$")
 	regex_genericDual, _ := regexp.Compile("^(PanelBrightness)=([0-9]+),([0-9]+)$")
-	regex_genericSingle, _ := regexp.Compile("^(SleepTimer|Webserver|PanelBrightness)=([0-9]+)$")
+	regex_genericSingle, _ := regexp.Compile("^(SleepTimer|Webserver|PanelBrightness|SystemStat|LoadCPU)=([0-9]+)$")
 
 	// Graphics constructed of multiple lines is build up here:
 	temp_HWCGfx := &rwp.HWCGfx{}
@@ -732,21 +732,37 @@ func RawPanelASCIIstringsToInboundMessages(rp20_ascii []string) []*rwp.InboundMe
 								HWCIDs: HWCidArray,
 								HWCMode: &rwp.HWCMode{
 									State:        rwp.HWCMode_StateE(value & 0xF),
-									Output:       (value & 0x20) == 0x20,
 									BlinkPattern: uint32((value >> 8) & 0xF),
+								},
+							},
+						},
+					}
+				case "HWCr#":
+					value, _ := strconv.Atoi(regex_cmd.FindStringSubmatch(inputString)[3])
+					msg = &rwp.InboundMessage{
+						States: []*rwp.HWCState{
+							&rwp.HWCState{
+								HWCIDs: HWCidArray,
+								PublishRawADCValues: &rwp.PublishRawADCValues{
+									Enabled: value != 0,
 								},
 							},
 						},
 					}
 				case "HWCx#":
 					value, _ := strconv.Atoi(regex_cmd.FindStringSubmatch(inputString)[3])
+					i := rwp.HWCExtended_InterpretationE((value >> 12) & 0xF)
+					v := uint32(value & 0x3FF)
+					if i == rwp.HWCExtended_BUZZER {
+						v = uint32(value & 0xFFF)
+					}
 					msg = &rwp.InboundMessage{
 						States: []*rwp.HWCState{
 							&rwp.HWCState{
 								HWCIDs: HWCidArray,
 								HWCExtended: &rwp.HWCExtended{
-									Interpretation: rwp.HWCExtended_InterpretationE((value >> 12) & 0xF),
-									Value:          uint32(value & 0x3FF),
+									Interpretation: i,
+									Value:          v,
 								},
 							},
 						},
@@ -964,6 +980,22 @@ func RawPanelASCIIstringsToInboundMessages(rp20_ascii []string) []*rwp.InboundMe
 							},
 						},
 					}
+				case "SystemStat":
+					msg = &rwp.InboundMessage{
+						Command: &rwp.Command{
+							PublishSystemStat: &rwp.PublishSystemStat{
+								PeriodSec: uint32(param1),
+							},
+						},
+					}
+				case "LoadCPU":
+					msg = &rwp.InboundMessage{
+						Command: &rwp.Command{
+							LoadCPU: &rwp.LoadCPU{
+								Level: rwp.LoadCPU_LevelE(param1),
+							},
+						},
+					}
 				}
 			} else if regex_genericDual.MatchString(inputString) {
 				param1, _ := strconv.Atoi(regex_genericDual.FindStringSubmatch(inputString)[2])
@@ -1079,7 +1111,7 @@ func InboundMessagesToRawPanelASCIIstrings(inboundMsgs []*rwp.InboundMessage) []
 						singleHWCIDarray := []uint32{singleHWCID}
 
 						if stateRec.HWCMode != nil {
-							outputInteger := uint32(stateRec.HWCMode.State&0x7) | uint32((stateRec.HWCMode.BlinkPattern&0xF)<<8) | uint32(su.Qint(stateRec.HWCMode.Output, 0b100000, 0))
+							outputInteger := uint32(stateRec.HWCMode.State&0x7) | uint32((stateRec.HWCMode.BlinkPattern&0xF)<<8)
 							returnStrings = append(returnStrings, fmt.Sprintf("HWC#%s=%d", su.IntImplode(singleHWCIDarray, ","), outputInteger))
 						}
 						if stateRec.HWCColor != nil {
@@ -1513,6 +1545,13 @@ func OutboundMessagesToRawPanelASCIIstrings(outboundMsgs []*rwp.OutboundMessage)
 		if outboundMsg.SleepState != nil {
 			returnStrings = append(returnStrings, fmt.Sprintf("_isSleeping=%d", su.Qint(outboundMsg.SleepState.IsSleeping, 1, 0)))
 		}
+		if outboundMsg.BusStatus != nil {
+			if outboundMsg.BusStatus.GetFault() {
+				returnStrings = append(returnStrings, "BasFault=true")
+			} else {
+				returnStrings = append(returnStrings, "BasFault=false")
+			}
+		}
 
 		if len(outboundMsg.HWCavailability) > 0 {
 			for origHWC, available := range outboundMsg.HWCavailability {
@@ -1532,6 +1571,13 @@ func OutboundMessagesToRawPanelASCIIstrings(outboundMsgs []*rwp.OutboundMessage)
 				}
 				if eventRec.Speed != nil {
 					returnStrings = append(returnStrings, fmt.Sprintf("HWC#%d=Speed:%d", eventRec.HWCID, eventRec.Speed.Value))
+				}
+				if eventRec.RawAnalog != nil {
+					returnStrings = append(returnStrings, fmt.Sprintf("HWC#%d=Raw:%d", eventRec.HWCID, eventRec.RawAnalog.Value))
+				}
+				if eventRec.SysStat != nil {
+					returnStrings = append(returnStrings, fmt.Sprintf("CPUUsage=%d:CPUTemp=%f:ExtTemp=%f", eventRec.SysStat.CPUUsage,
+						eventRec.SysStat.CPUTemp, eventRec.SysStat.ExtTemp))
 				}
 			}
 		}
