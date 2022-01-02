@@ -523,6 +523,7 @@ func (img *MonoImg) writeChar(c byte) {
 		// skip em
 	} else {
 		img.DrawChar(img.cursor_x, img.cursor_y, c, img.textcolor, img.textbgcolor, img.textsizeH, img.textsizeV)
+		//fmt.Println("img.DrawChar ", c, img.cursor_x, img.cursor_y)
 		cWidth := int(img.GetCharWidth(c))
 		img.cursor_x += img.textsizeH*cWidth + int(img.charSpacingCompensation)
 		if img.wrap && (img.cursor_x > img.GetBWidth()-img.textsizeH*(cWidth-1)) { // (cWidth - 1) is because we assume the last pixel column is probably blank and we prefer to write text all the way to the edge
