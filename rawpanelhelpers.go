@@ -8,12 +8,17 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"sync"
 
 	rwp "github.com/SKAARHOJ/ibeam-lib-rawpanelhelpers/ibeam_rawpanel"
+	"google.golang.org/protobuf/proto"
 
 	monogfx "github.com/SKAARHOJ/ibeam-lib-rawpanelhelpers/ibeam_lib_monogfx"
 	su "github.com/SKAARHOJ/ibeam-lib-utils"
 )
+
+var DebugRWPhelpers = false
+var DebugRWPhelpersMU sync.RWMutex
 
 type TopologyHWcomponent struct {
 	Id   uint32 `json:"id"`
@@ -60,17 +65,18 @@ var noAccessGraphic = []byte{
 }
 
 // width x height = 8,8
-var icons8by8 = [7][]byte{{
-	// Cycle:
-	0b00000000,
-	0b00001100,
-	0b00011000,
-	0b00111110,
-	0b00011001,
-	0b00001101,
-	0b00100001,
-	0b00011110,
-},
+var icons8by8 = [7][]byte{
+	{
+		// Cycle:
+		0b00000000,
+		0b00001100,
+		0b00011000,
+		0b00111110,
+		0b00011001,
+		0b00001101,
+		0b00100001,
+		0b00011110,
+	},
 	{
 		// Down:
 		0b00000000,
@@ -303,6 +309,20 @@ func gfxCommandLines(newColorPixelData []byte, bytesPerLine int, x int, y int, c
 	return commandLines
 }
 
+func TrimExplode(str string, token string) []string {
+	outputStrings := make([]string, 0)
+	strSplit := strings.Split(str, token)
+	for _, val := range strSplit {
+		val = strings.TrimSpace(val)
+		if val != "" {
+			outputStrings = append(outputStrings, val)
+		}
+	}
+
+	return outputStrings
+}
+
+// Port of similar function in UniSketch:
 func WriteDisplayTileNew(textStruct *rwp.HWCText, width int, height int, shrink int, border int) monogfx.MonoImg { // Border and shrink shall come from info about the tile we render onto...
 
 	if textStruct.TextStyling == nil {
@@ -615,10 +635,10 @@ func RawPanelASCIIstringsToInboundMessages(rp20_ascii []string) []*rwp.InboundMe
 	returnMsgs := []*rwp.InboundMessage{}
 
 	// Set up regular expressions:
-	regex_cmd, _ := regexp.Compile("^(HWC#|HWCx#|HWCc#|HWCt#)([0-9,]+)=(.*)$")
+	regex_cmd, _ := regexp.Compile("^(HWC#|HWCx#|HWCc#|HWCt#|HWCrawADCValues#)([0-9,]+)=(.*)$")
 	regex_gfx, _ := regexp.Compile("^(HWCgRGB#|HWCgGray#|HWCg#)([0-9,]+)=([0-9]+)(/([0-9]+),([0-9]+)x([0-9]+)(,([0-9]+),([0-9]+)|)|):(.*)$")
 	regex_genericDual, _ := regexp.Compile("^(PanelBrightness)=([0-9]+),([0-9]+)$")
-	regex_genericSingle, _ := regexp.Compile("^(SleepTimer|Webserver|PanelBrightness)=([0-9]+)$")
+	regex_genericSingle, _ := regexp.Compile("^(HeartBeatTimer|DimmedGain|PublishSystemStat|LoadCPU|SleepTimer|Webserver|PanelBrightness)=([0-9]+)$")
 
 	// Graphics constructed of multiple lines is build up here:
 	temp_HWCGfx := &rwp.HWCGfx{}
@@ -682,6 +702,18 @@ func RawPanelASCIIstringsToInboundMessages(rp20_ascii []string) []*rwp.InboundMe
 					SendBurninProfile: true,
 				},
 			}
+		case "Connections?":
+			msg = &rwp.InboundMessage{
+				Command: &rwp.Command{
+					GetConnections: true,
+				},
+			}
+		case "RunTimeStats?":
+			msg = &rwp.InboundMessage{
+				Command: &rwp.Command{
+					GetRunTimeStats: true,
+				},
+			}
 		case "Clear":
 			msg = &rwp.InboundMessage{
 				Command: &rwp.Command{
@@ -712,8 +744,15 @@ func RawPanelASCIIstringsToInboundMessages(rp20_ascii []string) []*rwp.InboundMe
 					WakeUp: true,
 				},
 			}
+		case "Reboot":
+			msg = &rwp.InboundMessage{
+				Command: &rwp.Command{
+					Reboot: true,
+				},
+			}
 		default:
 			if len(inputString) > 0 && inputString[0:1] == "{" { // JSON input:
+				//fmt.Println(inputString)
 				myState := &rwp.HWCState{}
 				json.Unmarshal([]byte(inputString), myState)
 				msg = &rwp.InboundMessage{
@@ -871,6 +910,18 @@ func RawPanelASCIIstringsToInboundMessages(rp20_ascii []string) []*rwp.InboundMe
 							},
 						},
 					}
+				case "HWCrawADCValues#":
+					value, _ := strconv.Atoi(regex_cmd.FindStringSubmatch(inputString)[3])
+					msg = &rwp.InboundMessage{
+						States: []*rwp.HWCState{
+							&rwp.HWCState{
+								HWCIDs: HWCidArray,
+								PublishRawADCValues: &rwp.PublishRawADCValues{
+									Enabled: value == 1,
+								},
+							},
+						},
+					}
 				}
 			} else if regex_gfx.MatchString(inputString) {
 				submatches := regex_gfx.FindStringSubmatch(inputString)
@@ -939,6 +990,38 @@ func RawPanelASCIIstringsToInboundMessages(rp20_ascii []string) []*rwp.InboundMe
 			} else if regex_genericSingle.MatchString(inputString) {
 				param1, _ := strconv.Atoi(regex_genericSingle.FindStringSubmatch(inputString)[2])
 				switch regex_genericSingle.FindStringSubmatch(inputString)[1] {
+				case "HeartBeatTimer":
+					msg = &rwp.InboundMessage{
+						Command: &rwp.Command{
+							SetHeartBeatTimer: &rwp.HeartBeatTimer{
+								Value: uint32(param1),
+							},
+						},
+					}
+				case "DimmedGain":
+					msg = &rwp.InboundMessage{
+						Command: &rwp.Command{
+							SetDimmedGain: &rwp.DimmedGain{
+								Value: uint32(param1),
+							},
+						},
+					}
+				case "PublishSystemStat":
+					msg = &rwp.InboundMessage{
+						Command: &rwp.Command{
+							PublishSystemStat: &rwp.PublishSystemStat{
+								PeriodSec: uint32(param1),
+							},
+						},
+					}
+				case "LoadCPU":
+					msg = &rwp.InboundMessage{
+						Command: &rwp.Command{
+							LoadCPU: &rwp.LoadCPU{
+								Level: rwp.LoadCPU_LevelE(uint32(param1)),
+							},
+						},
+					}
 				case "SleepTimer":
 					msg = &rwp.InboundMessage{
 						Command: &rwp.Command{
@@ -1010,6 +1093,32 @@ func RawPanelASCIIstringsToInboundMessages(rp20_ascii []string) []*rwp.InboundMe
 			returnMsgs = append(returnMsgs, msg)
 		}
 	}
+
+	if DebugRWPhelpers {
+		DebugRWPhelpersMU.Lock()
+		fmt.Println("\n-------------------------------------------------------------------------------")
+		fmt.Println(len(rp20_ascii), "inbound strings converted to Proto Messages:\n")
+		for _, string := range rp20_ascii {
+			fmt.Println(string)
+		}
+
+		fmt.Println("\n----\n")
+
+		for key, msg := range returnMsgs {
+			_ = key
+			pbdata, _ := proto.Marshal(msg)
+			fmt.Println("#", key, ": Raw data", pbdata)
+
+			jsonRes, _ := json.MarshalIndent(msg, "", "\t")
+			//jsonRes, _ := json.Marshal(msg)
+			jsonStr := string(jsonRes)
+			su.StripEmptyJSONObjects(&jsonStr)
+			fmt.Println("#", key, ": JSON:\n", jsonStr)
+		}
+		fmt.Println("-------------------------------------------------------------------------------\n")
+		DebugRWPhelpersMU.Unlock()
+	}
+
 	return returnMsgs
 }
 
@@ -1045,6 +1154,12 @@ func InboundMessagesToRawPanelASCIIstrings(inboundMsgs []*rwp.InboundMessage) []
 			if inboundMsg.Command.SendBurninProfile {
 				returnStrings = append(returnStrings, "BurninProfile?")
 			}
+			if inboundMsg.Command.GetConnections {
+				returnStrings = append(returnStrings, "Connections?")
+			}
+			if inboundMsg.Command.GetRunTimeStats {
+				returnStrings = append(returnStrings, "RunTimeStats?")
+			}
 			if inboundMsg.Command.ClearAll {
 				returnStrings = append(returnStrings, "Clear")
 			}
@@ -1060,12 +1175,26 @@ func InboundMessagesToRawPanelASCIIstrings(inboundMsgs []*rwp.InboundMessage) []
 			if inboundMsg.Command.WakeUp {
 				returnStrings = append(returnStrings, "WakeUp!")
 			}
-
+			if inboundMsg.Command.Reboot {
+				returnStrings = append(returnStrings, "Reboot")
+			}
 			if inboundMsg.Command.PanelBrightness != nil {
 				returnStrings = append(returnStrings, fmt.Sprintf("PanelBrightness=%d,%d", inboundMsg.Command.PanelBrightness.LEDs, inboundMsg.Command.PanelBrightness.OLEDs))
 			}
 			if inboundMsg.Command.SetSleepTimeout != nil {
 				returnStrings = append(returnStrings, fmt.Sprintf("SleepTimer=%d", inboundMsg.Command.SetSleepTimeout.Value))
+			}
+			if inboundMsg.Command.SetDimmedGain != nil {
+				returnStrings = append(returnStrings, fmt.Sprintf("DimmedGain=%d", inboundMsg.Command.SetDimmedGain.Value))
+			}
+			if inboundMsg.Command.SetHeartBeatTimer != nil {
+				returnStrings = append(returnStrings, fmt.Sprintf("HeartBeatTimer=%d", inboundMsg.Command.SetHeartBeatTimer.Value))
+			}
+			if inboundMsg.Command.PublishSystemStat != nil {
+				returnStrings = append(returnStrings, fmt.Sprintf("PublishSystemStat=%d", inboundMsg.Command.PublishSystemStat.PeriodSec))
+			}
+			if inboundMsg.Command.LoadCPU != nil {
+				returnStrings = append(returnStrings, fmt.Sprintf("LoadCPU=%d", inboundMsg.Command.LoadCPU.Level))
 			}
 			if inboundMsg.Command.SetWebserverEnabled != nil {
 				returnStrings = append(returnStrings, fmt.Sprintf("Webserver=%d", su.Qint(inboundMsg.Command.SetWebserverEnabled.Enabled, 1, 0)))
@@ -1212,18 +1341,21 @@ func InboundMessagesToRawPanelASCIIstrings(inboundMsgs []*rwp.InboundMessage) []
 								returnStrings = append(returnStrings, sline)
 							}
 						}
+						if stateRec.PublishRawADCValues != nil {
+							outputInteger := uint32(su.Qint(stateRec.PublishRawADCValues.Enabled, 1, 0))
+							returnStrings = append(returnStrings, fmt.Sprintf("HWCrawADCValues#%s=%d", su.IntImplode(singleHWCIDarray, ","), outputInteger))
+						}
 					}
 				}
 			}
 		}
 	}
-	/*
-		fmt.Println(len(inboundMsgs), "Proto Messages converted back to strings:")
-		for _, string := range returnStrings {
-			fmt.Println(string)
-		}
 
-		fmt.Println(len(inboundMsgs), "Proto Messages:")
+	if DebugRWPhelpers {
+		DebugRWPhelpersMU.Lock()
+		fmt.Println("\n-------------------------------------------------------------------------------")
+		fmt.Println(len(inboundMsgs), "Inbound Proto Messages converted back to strings:\n")
+
 		for key, msg := range inboundMsgs {
 			_ = key
 			//pbdata, _ := proto.Marshal(msg)
@@ -1235,7 +1367,16 @@ func InboundMessagesToRawPanelASCIIstrings(inboundMsgs []*rwp.InboundMessage) []
 			su.StripEmptyJSONObjects(&jsonStr)
 			fmt.Println("#", key, ": JSON:\n", jsonStr)
 		}
-	*/
+
+		fmt.Println("\n----\n")
+
+		for _, string := range returnStrings {
+			fmt.Println(string)
+		}
+		fmt.Println("-------------------------------------------------------------------------------\n")
+		DebugRWPhelpersMU.Unlock()
+	}
+
 	return returnStrings
 }
 
@@ -1248,7 +1389,7 @@ func RawPanelASCIIstringsToOutboundMessages(rp20_ascii []string) []*rwp.Outbound
 
 	// Set up regular expressions:
 	regex_cmd, _ := regexp.Compile("^HWC#([0-9]+)(|.([0-9]+))=(Down|Up|Press|Abs|Speed|Enc)(|:([-0-9]+))$")
-	regex_genericSingle, _ := regexp.Compile("^(_model|_serial|_version|_isSleeping|_sleepTimer|_panelTopology_svgbase|_panelTopology_HWC)=(.+)$")
+	regex_genericSingle, _ := regexp.Compile("^(_model|_serial|_version|_platform|_bluePillReady|_name|_isSleeping|_sleepTimer|_panelTopology_svgbase|_panelTopology_HWC|_serverModeLockToIP|_serverModeMaxClients|_heartBeatTimer|DimmedGain|_connections|_bootsCount|_totalUptimeMin|_sessionUptimeMin|_screenSaverOnMin|ErrorMsg|Msg|SysStat)=(.+)$")
 	regex_map, _ := regexp.Compile("^map=([0-9]+):([0-9]+)$")
 
 	// Traverse through ASCII strings:
@@ -1363,6 +1504,18 @@ func RawPanelASCIIstringsToOutboundMessages(rp20_ascii []string) []*rwp.Outbound
 							},
 						},
 					}
+				case "Raw":
+					value := su.Intval(regex_cmd.FindStringSubmatch(inputString)[6])
+					msg = &rwp.OutboundMessage{
+						Events: []*rwp.HWCEvent{
+							&rwp.HWCEvent{
+								HWCID: uint32(HWCid),
+								RawAnalog: &rwp.RawAnalogEvent{
+									Value: uint32(value),
+								},
+							},
+						},
+					}
 				}
 			} else if regex_map.MatchString(inputString) { // regexp.Compile("^map=([0-9]+):([0-9]+)$")
 				//su.Debug(regex_map.FindStringSubmatch(inputString))
@@ -1405,6 +1558,12 @@ func RawPanelASCIIstringsToOutboundMessages(rp20_ascii []string) []*rwp.Outbound
 							Platform: strValue,
 						},
 					}
+				case "_bluePillReady":
+					msg = &rwp.OutboundMessage{
+						PanelInfo: &rwp.PanelInfo{
+							BluePillReady: su.Intval(strValue) != 0,
+						},
+					}
 				case "_name":
 					msg = &rwp.OutboundMessage{
 						PanelInfo: &rwp.PanelInfo{
@@ -1441,8 +1600,88 @@ func RawPanelASCIIstringsToOutboundMessages(rp20_ascii []string) []*rwp.Outbound
 							Json: strValue,
 						},
 					}
+				case "_serverModeLockToIP":
+					msg = &rwp.OutboundMessage{
+						PanelInfo: &rwp.PanelInfo{
+							LockedToIPs: TrimExplode(strValue, ";"),
+						},
+					}
+				case "_serverModeMaxClients":
+					msg = &rwp.OutboundMessage{
+						PanelInfo: &rwp.PanelInfo{
+							MaxClients: uint32(su.Intval(strValue)),
+						},
+					}
+				case "_heartBeatTimer":
+					msg = &rwp.OutboundMessage{
+						HeartBeatTimer: &rwp.HeartBeatTimer{
+							Value: uint32(su.Intval(strValue)),
+						},
+					}
+				case "DimmedGain":
+					msg = &rwp.OutboundMessage{
+						DimmedGain: &rwp.DimmedGain{
+							Value: uint32(su.Intval(strValue)),
+						},
+					}
+				case "_connections":
+					msg = &rwp.OutboundMessage{
+						Connections: &rwp.Connections{
+							Connection: TrimExplode(strValue, ";"),
+						},
+					}
+				case "_bootsCount":
+					msg = &rwp.OutboundMessage{
+						RunTimeStats: &rwp.RunTimeStats{
+							BootsCount: uint32(su.Intval(strValue)),
+						},
+					}
+				case "_totalUptimeMin":
+					msg = &rwp.OutboundMessage{
+						RunTimeStats: &rwp.RunTimeStats{
+							TotalUptime: uint32(su.Intval(strValue)),
+						},
+					}
+				case "_sessionUptimeMin":
+					msg = &rwp.OutboundMessage{
+						RunTimeStats: &rwp.RunTimeStats{
+							SessionUptime: uint32(su.Intval(strValue)),
+						},
+					}
+				case "_screenSaverOnMin":
+					msg = &rwp.OutboundMessage{
+						RunTimeStats: &rwp.RunTimeStats{
+							ScreenSaveOnTime: uint32(su.Intval(strValue)),
+						},
+					}
+				case "ErrorMsg":
+					msg = &rwp.OutboundMessage{
+						ErrorMessage: &rwp.Message{
+							Message: strValue,
+						},
+					}
+				case "Msg":
+					msg = &rwp.OutboundMessage{
+						Message: &rwp.Message{
+							Message: strValue,
+						},
+					}
+				case "SysStat":
+					parts := strings.Split(strValue+":::::", ":")
+					CPUTempFloat, _ := strconv.ParseFloat(parts[3], 32)
+					ExtTempFloat, _ := strconv.ParseFloat(parts[5], 32)
+					msg = &rwp.OutboundMessage{
+						Events: []*rwp.HWCEvent{
+							&rwp.HWCEvent{
+								SysStat: &rwp.SystemStat{
+									CPUUsage: uint32(su.Intval(parts[1])),
+									CPUTemp:  float32(CPUTempFloat),
+									ExtTemp:  float32(ExtTempFloat),
+								},
+							},
+						},
+					}
 				}
-
 			} else {
 				msg = &rwp.OutboundMessage{} //  == nack?
 			}
@@ -1452,6 +1691,32 @@ func RawPanelASCIIstringsToOutboundMessages(rp20_ascii []string) []*rwp.Outbound
 			returnMsgs = append(returnMsgs, msg)
 		}
 	}
+
+	if DebugRWPhelpers {
+		DebugRWPhelpersMU.Lock()
+		fmt.Println("\n-------------------------------------------------------------------------------")
+		fmt.Println(len(rp20_ascii), "Outbound strings converted to Proto Messages:\n")
+		for _, string := range rp20_ascii {
+			fmt.Println(string)
+		}
+
+		fmt.Println("\n----\n")
+
+		for key, msg := range returnMsgs {
+			_ = key
+			pbdata, _ := proto.Marshal(msg)
+			fmt.Println("#", key, ": Raw data", pbdata)
+
+			jsonRes, _ := json.MarshalIndent(msg, "", "\t")
+			//jsonRes, _ := json.Marshal(msg)
+			jsonStr := string(jsonRes)
+			su.StripEmptyJSONObjects(&jsonStr)
+			fmt.Println("#", key, ": JSON:\n", jsonStr)
+		}
+		fmt.Println("-------------------------------------------------------------------------------\n")
+		DebugRWPhelpersMU.Unlock()
+	}
+
 	return returnMsgs
 }
 
@@ -1493,6 +1758,15 @@ func OutboundMessagesToRawPanelASCIIstrings(outboundMsgs []*rwp.OutboundMessage)
 			if outboundMsg.PanelInfo.Platform != "" {
 				returnStrings = append(returnStrings, "_platform="+outboundMsg.PanelInfo.Platform)
 			}
+			if outboundMsg.PanelInfo.BluePillReady {
+				returnStrings = append(returnStrings, "_bluePillReady="+su.Qstr(outboundMsg.PanelInfo.BluePillReady, "1", "0"))
+			}
+			if outboundMsg.PanelInfo.MaxClients > 0 {
+				returnStrings = append(returnStrings, fmt.Sprintf("_serverModeMaxClients=%d", outboundMsg.PanelInfo.MaxClients))
+			}
+			if outboundMsg.PanelInfo.LockedToIPs != nil {
+				returnStrings = append(returnStrings, fmt.Sprintf("_serverModeLockToIP=%s", strings.Join(outboundMsg.PanelInfo.LockedToIPs, ";")))
+			}
 		}
 		if outboundMsg.PanelTopology != nil {
 			if outboundMsg.PanelTopology.Svgbase != "" {
@@ -1512,6 +1786,35 @@ func OutboundMessagesToRawPanelASCIIstrings(outboundMsgs []*rwp.OutboundMessage)
 		}
 		if outboundMsg.SleepState != nil {
 			returnStrings = append(returnStrings, fmt.Sprintf("_isSleeping=%d", su.Qint(outboundMsg.SleepState.IsSleeping, 1, 0)))
+		}
+		if outboundMsg.HeartBeatTimer != nil {
+			returnStrings = append(returnStrings, fmt.Sprintf("_heartBeatTimer=%d", outboundMsg.HeartBeatTimer.Value))
+		}
+		if outboundMsg.DimmedGain != nil {
+			returnStrings = append(returnStrings, fmt.Sprintf("DimmedGain=%d", outboundMsg.DimmedGain.Value))
+		}
+		if outboundMsg.Connections != nil {
+			returnStrings = append(returnStrings, fmt.Sprintf("_connections=%s", strings.Join(outboundMsg.Connections.Connection, ";")))
+		}
+		if outboundMsg.RunTimeStats != nil {
+			if outboundMsg.RunTimeStats.BootsCount > 0 {
+				returnStrings = append(returnStrings, fmt.Sprintf("_bootsCount=%d", outboundMsg.RunTimeStats.BootsCount))
+			}
+			if outboundMsg.RunTimeStats.TotalUptime > 0 {
+				returnStrings = append(returnStrings, fmt.Sprintf("_totalUptimeMin=%d", outboundMsg.RunTimeStats.TotalUptime))
+			}
+			if outboundMsg.RunTimeStats.SessionUptime > 0 {
+				returnStrings = append(returnStrings, fmt.Sprintf("_sessionUptimeMin=%d", outboundMsg.RunTimeStats.SessionUptime))
+			}
+			if outboundMsg.RunTimeStats.ScreenSaveOnTime > 0 {
+				returnStrings = append(returnStrings, fmt.Sprintf("_screenSaverOnMin=%d", outboundMsg.RunTimeStats.ScreenSaveOnTime))
+			}
+		}
+		if outboundMsg.ErrorMessage != nil {
+			returnStrings = append(returnStrings, fmt.Sprintf("ErrorMsg=%s", outboundMsg.ErrorMessage.Message))
+		}
+		if outboundMsg.Message != nil {
+			returnStrings = append(returnStrings, fmt.Sprintf("Msg=%s", outboundMsg.Message.Message))
 		}
 
 		if len(outboundMsg.HWCavailability) > 0 {
@@ -1533,17 +1836,21 @@ func OutboundMessagesToRawPanelASCIIstrings(outboundMsgs []*rwp.OutboundMessage)
 				if eventRec.Speed != nil {
 					returnStrings = append(returnStrings, fmt.Sprintf("HWC#%d=Speed:%d", eventRec.HWCID, eventRec.Speed.Value))
 				}
+				if eventRec.RawAnalog != nil {
+					returnStrings = append(returnStrings, fmt.Sprintf("HWC#%d=Raw:%d", eventRec.HWCID, eventRec.RawAnalog.Value))
+				}
+				if eventRec.SysStat != nil {
+					returnStrings = append(returnStrings, fmt.Sprintf("SysStat=CPUUsage:%d:CPUTemp:%.1f:ExtTemp:%.1f", eventRec.SysStat.CPUUsage, eventRec.SysStat.CPUTemp, eventRec.SysStat.ExtTemp))
+				}
 			}
 		}
 	}
 
-	/*
-		fmt.Println(len(outboundMsgs), "Proto Messages converted back to strings:")
-		for _, string := range returnStrings {
-			fmt.Println(string)
-		}
+	if DebugRWPhelpers {
+		DebugRWPhelpersMU.Lock()
+		fmt.Println("\n-------------------------------------------------------------------------------")
+		fmt.Println(len(outboundMsgs), "Outbound Proto Messages converted back to strings:\n")
 
-		fmt.Println(len(outboundMsgs), "Proto Messages:")
 		for key, msg := range outboundMsgs {
 			_ = key
 			pbdata, _ := proto.Marshal(msg)
@@ -1555,7 +1862,15 @@ func OutboundMessagesToRawPanelASCIIstrings(outboundMsgs []*rwp.OutboundMessage)
 			su.StripEmptyJSONObjects(&jsonStr)
 			fmt.Println("#", key, ": JSON:\n", jsonStr)
 		}
-	*/
+
+		fmt.Println("\n----\n")
+
+		for _, string := range returnStrings {
+			fmt.Println(string)
+		}
+		fmt.Println("-------------------------------------------------------------------------------\n")
+		DebugRWPhelpersMU.Unlock()
+	}
 
 	return returnStrings
 }
