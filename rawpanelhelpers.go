@@ -638,7 +638,7 @@ func RawPanelASCIIstringsToInboundMessages(rp20_ascii []string) []*rwp.InboundMe
 	regex_cmd, _ := regexp.Compile("^(HWC#|HWCx#|HWCc#|HWCt#|HWCrawADCValues#)([0-9,]+)=(.*)$")
 	regex_gfx, _ := regexp.Compile("^(HWCgRGB#|HWCgGray#|HWCg#)([0-9,]+)=([0-9]+)(/([0-9]+),([0-9]+)x([0-9]+)(,([0-9]+),([0-9]+)|)|):(.*)$")
 	regex_genericDual, _ := regexp.Compile("^(PanelBrightness)=([0-9]+),([0-9]+)$")
-	regex_genericSingle, _ := regexp.Compile("^(HeartBeatTimer|DimmedGain|PublishSystemStat|LoadCPU|SleepTimer|Webserver|PanelBrightness)=([0-9]+)$")
+	regex_genericSingle, _ := regexp.Compile("^(HeartBeatTimer|DimmedGain|PublishSystemStat|LoadCPU|SleepTimer|SleepMode|SleepScreenSaver|Webserver|PanelBrightness)=([0-9]+)$")
 
 	// Graphics constructed of multiple lines is build up here:
 	temp_HWCGfx := &rwp.HWCGfx{}
@@ -1030,6 +1030,22 @@ func RawPanelASCIIstringsToInboundMessages(rp20_ascii []string) []*rwp.InboundMe
 							},
 						},
 					}
+				case "SleepMode":
+					msg = &rwp.InboundMessage{
+						Command: &rwp.Command{
+							SetSleepMode: &rwp.SleepMode{
+								Mode: rwp.SleepMode_SlpMode(param1),
+							},
+						},
+					}
+				case "SleepScreenSaver":
+					msg = &rwp.InboundMessage{
+						Command: &rwp.Command{
+							SetSleepScreenSaver: &rwp.SleepScreenSaver{
+								Type: rwp.SleepScreenSaver_SlpScrSaver(param1),
+							},
+						},
+					}
 				case "Webserver":
 					msg = &rwp.InboundMessage{
 						Command: &rwp.Command{
@@ -1183,6 +1199,12 @@ func InboundMessagesToRawPanelASCIIstrings(inboundMsgs []*rwp.InboundMessage) []
 			}
 			if inboundMsg.Command.SetSleepTimeout != nil {
 				returnStrings = append(returnStrings, fmt.Sprintf("SleepTimer=%d", inboundMsg.Command.SetSleepTimeout.Value))
+			}
+			if inboundMsg.Command.SetSleepMode != nil {
+				returnStrings = append(returnStrings, fmt.Sprintf("SleepMode=%d", inboundMsg.Command.SetSleepMode.Mode))
+			}
+			if inboundMsg.Command.SetSleepScreenSaver != nil {
+				returnStrings = append(returnStrings, fmt.Sprintf("SleepScreenSaver=%d", inboundMsg.Command.SetSleepScreenSaver.Type))
 			}
 			if inboundMsg.Command.SetDimmedGain != nil {
 				returnStrings = append(returnStrings, fmt.Sprintf("DimmedGain=%d", inboundMsg.Command.SetDimmedGain.Value))
