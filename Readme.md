@@ -8,3 +8,4 @@ The protocol has 2 versions:
 - The newer protobuf based protocol (using container messages with prefixed length) as supported by BluePill and BluePillInside controllers
 
 For further documentation take a look at the wiki at https://wiki.skaarhoj.com
+ 
