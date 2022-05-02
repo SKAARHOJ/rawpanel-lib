@@ -10,11 +10,11 @@ import (
 	"strings"
 	"sync"
 
-	rwp "github.com/SKAARHOJ/ibeam-lib-rawpanelhelpers/ibeam_rawpanel"
+	rwp "github.com/SKAARHOJ/rawpanel-lib/ibeam_rawpanel"
 	"google.golang.org/protobuf/proto"
 
-	monogfx "github.com/SKAARHOJ/ibeam-lib-rawpanelhelpers/ibeam_lib_monogfx"
 	su "github.com/SKAARHOJ/ibeam-lib-utils"
+	monogfx "github.com/SKAARHOJ/rawpanel-lib/ibeam_lib_monogfx"
 )
 
 var DebugRWPhelpers = false
