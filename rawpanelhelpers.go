@@ -627,18 +627,18 @@ func WriteDisplayTileNew(textStruct *rwp.HWCText, width int, height int, shrink 
 	return disp
 }
 
+// Set up regular expressions:
+var regex_cmd = regexp.MustCompile("^(HWC#|HWCx#|HWCc#|HWCt#|HWCrawADCValues#)([0-9,]+)=(.*)$")
+var regex_gfx = regexp.MustCompile("^(HWCgRGB#|HWCgGray#|HWCg#)([0-9,]+)=([0-9]+)(/([0-9]+),([0-9]+)x([0-9]+)(,([0-9]+),([0-9]+)|)|):(.*)$")
+var regex_genericDual = regexp.MustCompile("^(PanelBrightness)=([0-9]+),([0-9]+)$")
+var regex_genericSingle = regexp.MustCompile("^(HeartBeatTimer|DimmedGain|PublishSystemStat|LoadCPU|SleepTimer|SleepMode|SleepScreenSaver|Webserver|PanelBrightness)=([0-9]+)$")
+
 // Converts Raw Panel 2.0 ASCII Strings into proto InboundMessage structs
 // Inbound TCP commands - from external system to SKAARHOJ panel
 func RawPanelASCIIstringsToInboundMessages(rp20_ascii []string) []*rwp.InboundMessage {
 
 	// Empty array of inbound messages prepared for return:
 	returnMsgs := []*rwp.InboundMessage{}
-
-	// Set up regular expressions:
-	regex_cmd, _ := regexp.Compile("^(HWC#|HWCx#|HWCc#|HWCt#|HWCrawADCValues#)([0-9,]+)=(.*)$")
-	regex_gfx, _ := regexp.Compile("^(HWCgRGB#|HWCgGray#|HWCg#)([0-9,]+)=([0-9]+)(/([0-9]+),([0-9]+)x([0-9]+)(,([0-9]+),([0-9]+)|)|):(.*)$")
-	regex_genericDual, _ := regexp.Compile("^(PanelBrightness)=([0-9]+),([0-9]+)$")
-	regex_genericSingle, _ := regexp.Compile("^(HeartBeatTimer|DimmedGain|PublishSystemStat|LoadCPU|SleepTimer|SleepMode|SleepScreenSaver|Webserver|PanelBrightness)=([0-9]+)$")
 
 	// Graphics constructed of multiple lines is build up here:
 	temp_HWCGfx := &rwp.HWCGfx{}
@@ -1402,6 +1402,10 @@ func InboundMessagesToRawPanelASCIIstrings(inboundMsgs []*rwp.InboundMessage) []
 	return returnStrings
 }
 
+var regex_map = regexp.MustCompile("^map=([0-9]+):([0-9]+)$")
+var regex_genericSingle_inbound = regexp.MustCompile("^(_model|_serial|_version|_platform|_bluePillReady|_name|_isSleeping|_sleepTimer|_panelTopology_svgbase|_panelTopology_HWC|_serverModeLockToIP|_serverModeMaxClients|_heartBeatTimer|DimmedGain|_connections|_bootsCount|_totalUptimeMin|_sessionUptimeMin|_screenSaverOnMin|ErrorMsg|Msg|SysStat)=(.+)$")
+var regex_cmd_inbound = regexp.MustCompile("^HWC#([0-9]+)(|.([0-9]+))=(Down|Up|Press|Abs|Speed|Enc)(|:([-0-9]+))$")
+
 // Converts Raw Panel 1.0 ASCII Strings into proto OutboundMessage structs
 // Outbound TCP commands - from panel to external system
 func RawPanelASCIIstringsToOutboundMessages(rp20_ascii []string) []*rwp.OutboundMessage {
@@ -1410,9 +1414,12 @@ func RawPanelASCIIstringsToOutboundMessages(rp20_ascii []string) []*rwp.Outbound
 	returnMsgs := []*rwp.OutboundMessage{}
 
 	// Set up regular expressions:
+<<<<<<< Updated upstream
 	regex_cmd, _ := regexp.Compile("^HWC#([0-9]+)(|.([0-9]+))=(Down|Up|Press|Abs|Speed|Enc)(|:([-0-9]+))$")
 	regex_genericSingle, _ := regexp.Compile("^(_model|_serial|_version|_platform|_bluePillReady|_name|_isSleeping|_sleepTimer|_panelTopology_svgbase|_panelTopology_HWC|_serverModeLockToIP|_serverModeMaxClients|_heartBeatTimer|DimmedGain|_connections|_bootsCount|_totalUptimeMin|_sessionUptimeMin|_screenSaverOnMin|ErrorMsg|Msg|SysStat)=(.+)$")
 	regex_map, _ := regexp.Compile("^map=([0-9]+):([0-9]+)$")
+=======
+>>>>>>> Stashed changes
 
 	// Traverse through ASCII strings:
 	//tln(len(rp20_ascii), "ASCII strings:")
@@ -1452,13 +1459,13 @@ func RawPanelASCIIstringsToOutboundMessages(rp20_ascii []string) []*rwp.Outbound
 				FlowMessage: rwp.OutboundMessage_HELLO,
 			}
 		default:
-			if regex_cmd.MatchString(inputString) { // regexp.Compile("^HWC#([0-9,]+)(|.([0-9]+))=(Down|Up|Press|Abs|Speed|Enc)(|:([-0-9]+))$")
+			if regex_cmd_inbound.MatchString(inputString) { // regexp.Compile("^HWC#([0-9,]+)(|.([0-9]+))=(Down|Up|Press|Abs|Speed|Enc)(|:([-0-9]+))$")
 				//su.Debug(regex_cmd.FindStringSubmatch(inputString))
-				HWCid := su.Intval(regex_cmd.FindStringSubmatch(inputString)[1])
-				eventType := regex_cmd.FindStringSubmatch(inputString)[4]
+				HWCid := su.Intval(regex_cmd_inbound.FindStringSubmatch(inputString)[1])
+				eventType := regex_cmd_inbound.FindStringSubmatch(inputString)[4]
 				switch eventType {
 				case "Down", "Up":
-					edge := su.Intval(regex_cmd.FindStringSubmatch(inputString)[3])
+					edge := su.Intval(regex_cmd_inbound.FindStringSubmatch(inputString)[3])
 					msg = &rwp.OutboundMessage{
 						Events: []*rwp.HWCEvent{
 							&rwp.HWCEvent{
@@ -1471,7 +1478,7 @@ func RawPanelASCIIstringsToOutboundMessages(rp20_ascii []string) []*rwp.Outbound
 						},
 					}
 				case "Press":
-					edge := su.Intval(regex_cmd.FindStringSubmatch(inputString)[3])
+					edge := su.Intval(regex_cmd_inbound.FindStringSubmatch(inputString)[3])
 					msg = &rwp.OutboundMessage{
 						Events: []*rwp.HWCEvent{
 							&rwp.HWCEvent{
@@ -1491,7 +1498,7 @@ func RawPanelASCIIstringsToOutboundMessages(rp20_ascii []string) []*rwp.Outbound
 						},
 					}
 				case "Enc":
-					value := su.Intval(regex_cmd.FindStringSubmatch(inputString)[6])
+					value := su.Intval(regex_cmd_inbound.FindStringSubmatch(inputString)[6])
 					msg = &rwp.OutboundMessage{
 						Events: []*rwp.HWCEvent{
 							&rwp.HWCEvent{
@@ -1503,7 +1510,7 @@ func RawPanelASCIIstringsToOutboundMessages(rp20_ascii []string) []*rwp.Outbound
 						},
 					}
 				case "Abs":
-					value := su.Intval(regex_cmd.FindStringSubmatch(inputString)[6])
+					value := su.Intval(regex_cmd_inbound.FindStringSubmatch(inputString)[6])
 					msg = &rwp.OutboundMessage{
 						Events: []*rwp.HWCEvent{
 							&rwp.HWCEvent{
@@ -1515,7 +1522,7 @@ func RawPanelASCIIstringsToOutboundMessages(rp20_ascii []string) []*rwp.Outbound
 						},
 					}
 				case "Speed":
-					value := su.Intval(regex_cmd.FindStringSubmatch(inputString)[6])
+					value := su.Intval(regex_cmd_inbound.FindStringSubmatch(inputString)[6])
 					msg = &rwp.OutboundMessage{
 						Events: []*rwp.HWCEvent{
 							&rwp.HWCEvent{
@@ -1550,10 +1557,10 @@ func RawPanelASCIIstringsToOutboundMessages(rp20_ascii []string) []*rwp.Outbound
 					HWCavailability: theMap,
 				}
 
-			} else if regex_genericSingle.MatchString(inputString) { // regexp.Compile("^(_model|_serial|_version|_isSleeping|_sleepTimer|_panelTopology_svgbase|_panelTopology_HWC)=(.+)$")
+			} else if regex_genericSingle_inbound.MatchString(inputString) { // regexp.Compile("^(_model|_serial|_version|_isSleeping|_sleepTimer|_panelTopology_svgbase|_panelTopology_HWC)=(.+)$")
 				//su.Debug(regex_genericSingle.FindStringSubmatch(inputString))
-				eventType := regex_genericSingle.FindStringSubmatch(inputString)[1]
-				strValue := regex_genericSingle.FindStringSubmatch(inputString)[2]
+				eventType := regex_genericSingle_inbound.FindStringSubmatch(inputString)[1]
+				strValue := regex_genericSingle_inbound.FindStringSubmatch(inputString)[2]
 
 				switch eventType {
 				case "_model":
