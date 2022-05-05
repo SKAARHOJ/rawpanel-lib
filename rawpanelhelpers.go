@@ -1390,12 +1390,12 @@ func InboundMessagesToRawPanelASCIIstrings(inboundMsgs []*rwp.InboundMessage) []
 			fmt.Println("#", key, ": JSON:\n", jsonStr)
 		}
 
-		fmt.Println("\n----\n")
+		fmt.Print("\n----\n\n")
 
 		for _, string := range returnStrings {
 			fmt.Println(string)
 		}
-		fmt.Println("-------------------------------------------------------------------------------\n")
+		fmt.Print("-------------------------------------------------------------------------------\n\n")
 		DebugRWPhelpersMU.Unlock()
 	}
 
@@ -1412,14 +1412,6 @@ func RawPanelASCIIstringsToOutboundMessages(rp20_ascii []string) []*rwp.Outbound
 
 	// Empty array of outbound messages prepared for return:
 	returnMsgs := []*rwp.OutboundMessage{}
-
-	// Set up regular expressions:
-<<<<<<< Updated upstream
-	regex_cmd, _ := regexp.Compile("^HWC#([0-9]+)(|.([0-9]+))=(Down|Up|Press|Abs|Speed|Enc)(|:([-0-9]+))$")
-	regex_genericSingle, _ := regexp.Compile("^(_model|_serial|_version|_platform|_bluePillReady|_name|_isSleeping|_sleepTimer|_panelTopology_svgbase|_panelTopology_HWC|_serverModeLockToIP|_serverModeMaxClients|_heartBeatTimer|DimmedGain|_connections|_bootsCount|_totalUptimeMin|_sessionUptimeMin|_screenSaverOnMin|ErrorMsg|Msg|SysStat)=(.+)$")
-	regex_map, _ := regexp.Compile("^map=([0-9]+):([0-9]+)$")
-=======
->>>>>>> Stashed changes
 
 	// Traverse through ASCII strings:
 	//tln(len(rp20_ascii), "ASCII strings:")
