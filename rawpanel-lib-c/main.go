@@ -3,6 +3,7 @@ package main
 import "C"
 
 import (
+	"strings"
 	"unsafe"
 
 	h "github.com/SKAARHOJ/rawpanel-lib"
@@ -30,10 +31,10 @@ func OutboundMessageToRawPanelASCIIstring(bytes []byte) *C.char {
 		return C.CString("")
 	}
 	strs := h.OutboundMessagesToRawPanelASCIIstrings([]*rwp.OutboundMessage{msg})
-	if len(strs) != 1 {
+	if len(strs) < 1 {
 		return C.CString("")
 	}
-	return C.CString(strs[0])
+	return C.CString(strings.Join(strs, "\n"))
 }
 
 func main() {
