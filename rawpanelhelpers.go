@@ -961,30 +961,30 @@ func RawPanelASCIIstringsToInboundMessages(rp20_ascii []string) []*rwp.InboundMe
 						}
 					}
 				}
-					if temp_HWCGfx_ImageType == imageType {
-						if submatches[2] == temp_HWCGfx_HWClist { // Check that HWC list is the same as last one
-							temp_HWCGfx_count++
-							if gPartIndex == temp_HWCGfx_count { // Make sure index is the next in line
-								temp_HWCGfx.ImageData = append(temp_HWCGfx.ImageData, decodedSlice...)
-								if gPartIndex == temp_HWCGfx_max { // If we have reached the final one, wrap it up:
-									msg = &rwp.InboundMessage{
-										States: []*rwp.HWCState{
-											&rwp.HWCState{
-												HWCIDs: su.IntExplode(temp_HWCGfx_HWClist, ","),
-												HWCGfx: temp_HWCGfx,
-											},
+				if temp_HWCGfx_ImageType == imageType {
+					if submatches[2] == temp_HWCGfx_HWClist { // Check that HWC list is the same as last one
+						temp_HWCGfx_count++
+						if gPartIndex == temp_HWCGfx_count { // Make sure index is the next in line
+							temp_HWCGfx.ImageData = append(temp_HWCGfx.ImageData, decodedSlice...)
+							if gPartIndex == temp_HWCGfx_max { // If we have reached the final one, wrap it up:
+								msg = &rwp.InboundMessage{
+									States: []*rwp.HWCState{
+										&rwp.HWCState{
+											HWCIDs: su.IntExplode(temp_HWCGfx_HWClist, ","),
+											HWCGfx: temp_HWCGfx,
 										},
-									}
-								//fmt.Println("DID IT! ", submatches)
+									},
 								}
-							} else {
-								//fmt.Println("gPartIndex didn't match expected")
+								//fmt.Println("DID IT! ", submatches)
 							}
 						} else {
-							//fmt.Println("Wrong HWC addressed!")
+							//fmt.Println("gPartIndex didn't match expected")
 						}
 					} else {
-						//fmt.Println("Wrong image type !")
+						//fmt.Println("Wrong HWC addressed!")
+					}
+				} else {
+					//fmt.Println("Wrong image type !")
 				}
 			} else if regex_genericSingle.MatchString(inputString) {
 				param1, _ := strconv.Atoi(regex_genericSingle.FindStringSubmatch(inputString)[2])
@@ -1249,7 +1249,7 @@ func InboundMessagesToRawPanelASCIIstrings(inboundMsgs []*rwp.InboundMessage) []
 							outputInteger := uint32(stateRec.HWCExtended.Value&0x3FF) | uint32((stateRec.HWCExtended.Interpretation&0xF)<<12)
 							returnStrings = append(returnStrings, fmt.Sprintf("HWCx#%s=%d", su.IntImplode(singleHWCIDarray, ","), outputInteger))
 						}
-						if stateRec.HWCText != nil {
+						if stateRec.HWCText != nil && !proto.Equal(stateRec.HWCText, &rwp.HWCText{}) {
 							stringSlice := make([]string, 21)
 							if stateRec.HWCText.BackgroundColor != nil {
 								stringSlice[20] = strconv.Itoa(int(convertToColorInteger(*stateRec.HWCText.BackgroundColor)))
@@ -1337,7 +1337,7 @@ func InboundMessagesToRawPanelASCIIstrings(inboundMsgs []*rwp.InboundMessage) []
 
 							returnStrings = append(returnStrings, fmt.Sprintf("HWCt#%s=%s", su.IntImplode(singleHWCIDarray, ","), su.StringImplodeRemoveTrailingEmpty(stringSlice, "|")))
 						}
-						if stateRec.HWCGfx != nil {
+						if stateRec.HWCGfx != nil && !proto.Equal(stateRec.HWCGfx, &rwp.HWCGfx{}) {
 							cmdString := "HWCg"
 							if stateRec.HWCGfx.ImageType == rwp.HWCGfx_RGB16bit {
 								cmdString = "HWCgRGB"
