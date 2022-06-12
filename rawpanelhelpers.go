@@ -939,7 +939,7 @@ func RawPanelASCIIstringsToInboundMessages(rp20_ascii []string) []*rwp.InboundMe
 				if gPartIndex == 0 {
 					// Reset image intake:
 					temp_HWCGfx_HWClist = submatches[2]
-					temp_HWCGfx_count = 0
+					temp_HWCGfx_count = -1
 					temp_HWCGfx_ImageType = imageType
 
 					if len(submatches[4]) > 0 { // It's the "advanced" format:
@@ -960,8 +960,7 @@ func RawPanelASCIIstringsToInboundMessages(rp20_ascii []string) []*rwp.InboundMe
 							H:         32,
 						}
 					}
-					temp_HWCGfx.ImageData = append(temp_HWCGfx.ImageData, decodedSlice...)
-				} else {
+				}
 					if temp_HWCGfx_ImageType == imageType {
 						if submatches[2] == temp_HWCGfx_HWClist { // Check that HWC list is the same as last one
 							temp_HWCGfx_count++
@@ -976,6 +975,7 @@ func RawPanelASCIIstringsToInboundMessages(rp20_ascii []string) []*rwp.InboundMe
 											},
 										},
 									}
+								//fmt.Println("DID IT! ", submatches)
 								}
 							} else {
 								//fmt.Println("gPartIndex didn't match expected")
@@ -985,7 +985,6 @@ func RawPanelASCIIstringsToInboundMessages(rp20_ascii []string) []*rwp.InboundMe
 						}
 					} else {
 						//fmt.Println("Wrong image type !")
-					}
 				}
 			} else if regex_genericSingle.MatchString(inputString) {
 				param1, _ := strconv.Atoi(regex_genericSingle.FindStringSubmatch(inputString)[2])
