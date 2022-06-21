@@ -73,8 +73,15 @@ extern "C" {
 struct RawPanelASCIIstringToInboundMessage_return {
 	void* r0;
 	GoInt r1;
+	void* r2;
+	GoInt r3;
 };
-extern struct RawPanelASCIIstringToInboundMessage_return RawPanelASCIIstringToInboundMessage(GoString ascii);
+
+// The convertor needs to store its state to handle graphics, which is split into multiple messages.
+// Unfortunately, global variables doesn't seem to work for this. Global strings objects get damaged
+// somehow somewhere in between function calls (garbage collector?). For now, the state gets marshalled
+// and passed to the C-side.
+extern struct RawPanelASCIIstringToInboundMessage_return RawPanelASCIIstringToInboundMessage(GoString ascii, GoSlice state);
 extern char* OutboundMessageToRawPanelASCIIstring(GoSlice bytes);
 
 #ifdef __cplusplus
