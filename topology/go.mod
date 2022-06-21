@@ -1,3 +1,3 @@
-module rwptopology
+module topology
 
 go 1.18

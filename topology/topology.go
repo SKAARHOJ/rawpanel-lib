@@ -1,4 +1,4 @@
-package rwptopology
+package topology
 
 // TODO: Import these definitions from somewhere else... (so it is shared)
 type Topology struct {
