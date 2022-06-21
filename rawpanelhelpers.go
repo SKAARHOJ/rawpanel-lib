@@ -1,4 +1,4 @@
-package ibeam_lib_rawpanelhelpers
+package rawpanellib
 
 import (
 	"encoding/base64"
