@@ -15,6 +15,7 @@ import (
 
 	su "github.com/SKAARHOJ/ibeam-lib-utils"
 	monogfx "github.com/SKAARHOJ/rawpanel-lib/ibeam_lib_monogfx"
+	log "github.com/s00500/env_logger"
 )
 
 var DebugRWPhelpers = false
@@ -169,6 +170,7 @@ func ParseTopology(jsonString string) Topology {
 	*/
 	return panelInformation
 }
+
 func convertToColorRGB16bit(colorObj rwp.Color) int {
 	var buttonColors = []byte{
 		0b111111, // Default
@@ -410,7 +412,7 @@ func WriteDisplayTileNew(textStruct *rwp.HWCText, width int, height int, shrink 
 		disp.RenderText(textStruct.Textline2)
 	default:
 
-		// Write title bar:
+		// Write title bar
 		isTitle := len(textStruct.Title) > 0                                                                                                                                                   // Only render title if there is one...
 		titlePadding := su.Qint(textStruct.TextStyling.TitleBarPadding > 0, int(textStruct.TextStyling.TitleBarPadding), su.Qint(height < 32 && width != 256, 1, su.Qint(width == 256, 3, 1))) // Padding top/bottom of title area.
 		disp.SetFont(su.Qint(height < 32 && width != 256, 2, fontFaceTitle), fontProportional)                                                                                                 // Set font face for title bar. Force it to font 2 in case of mini tile (< 32 pixels and not a super wide title-only bar)
@@ -625,6 +627,74 @@ func WriteDisplayTileNew(textStruct *rwp.HWCText, width int, height int, shrink 
 	//fmt.Println("Image", disp.Width, "x", disp.Height)
 	//disp.PrintImg()
 	return disp
+}
+
+type ASCIIreader struct {
+	HWCGfx_count     int
+	HWCGfx_ImageType string
+	HWCGfx           []string
+	HWCGfx_max       int
+	HWCGfx_HWClist   string
+}
+
+var ASCIIreader_gfx = regexp.MustCompile("^(HWCgRGB#|HWCgGray#|HWCg#)([0-9,]+)=([0-9]+)(/([0-9]+),([0-9]+)x([0-9]+)(,([0-9]+),([0-9]+)|)|):(.*)$")
+
+func (ar *ASCIIreader) Parse(inputString string) []*rwp.InboundMessage {
+
+	// Init, if it's clear that there was no image ever loaded into the struct:
+	if ar.HWCGfx_HWClist == "" && ar.HWCGfx_ImageType == "" {
+		ar.HWCGfx_count = -1
+	}
+
+	inputString = strings.TrimSpace(inputString)
+
+	if ASCIIreader_gfx.MatchString(inputString) {
+		submatches := ASCIIreader_gfx.FindStringSubmatch(inputString)
+		gPartIndex := su.Intval(submatches[3])
+
+		if gPartIndex == 0 { // New image transfer:
+			if ar.HWCGfx_count != -1 {
+				log.Warnln("Initialization of a new ASCII image transfer while another image was apparently being received.")
+				//log.Println("In buffer: ", ar.HWCGfx_HWClist, ar.HWCGfx_ImageType, ar.HWCGfx_count, log.Indent(ar.HWCGfx))
+				//log.Println("Incoming: ", inputString)
+				//log.Println(log.Indent(submatches))
+			}
+
+			// Reset image intake:
+			ar.HWCGfx_count = -1
+			ar.HWCGfx_HWClist = submatches[2]
+			ar.HWCGfx_ImageType = submatches[1]
+			ar.HWCGfx = []string{}
+
+			if len(submatches[4]) > 0 { // It's the "advanced" format:
+				ar.HWCGfx_max = su.Intval(submatches[5])
+			} else { // Simple format of three lines:
+				ar.HWCGfx_max = 2
+			}
+		}
+
+		if ar.HWCGfx_ImageType == submatches[1] {
+			if ar.HWCGfx_HWClist == submatches[2] { // Check that HWC list is the same as last one
+				ar.HWCGfx_count++
+				if gPartIndex == ar.HWCGfx_count { // Make sure index is the next in line
+					ar.HWCGfx = append(ar.HWCGfx, inputString)
+					if gPartIndex == ar.HWCGfx_max { // If we have reached the final one, wrap it up:
+						ar.HWCGfx_count = -1 // Reset
+						return RawPanelASCIIstringsToInboundMessages(ar.HWCGfx)
+					}
+				} else {
+					log.Warnf("gPartIndex %d didn't match expected %d\n", gPartIndex, ar.HWCGfx_count)
+				}
+			} else {
+				log.Warnf("Wrong HWC %s addressed! Should be %s\n", submatches[2], ar.HWCGfx_HWClist)
+			}
+		} else {
+			log.Warnf("Incoming image type %s doesn't match the image type %s we were building\n", submatches[1], ar.HWCGfx_ImageType)
+		}
+	} else {
+		return RawPanelASCIIstringsToInboundMessages([]string{inputString})
+	}
+	return nil
 }
 
 // Set up regular expressions:
@@ -1402,7 +1472,7 @@ func InboundMessagesToRawPanelASCIIstrings(inboundMsgs []*rwp.InboundMessage) []
 }
 
 var regex_map = regexp.MustCompile("^map=([0-9]+):([0-9]+)$")
-var regex_genericSingle_inbound = regexp.MustCompile("^(_model|_serial|_version|_platform|_bluePillReady|_name|_isSleeping|_sleepTimer|_panelTopology_svgbase|_panelTopology_HWC|_serverModeLockToIP|_serverModeMaxClients|_heartBeatTimer|DimmedGain|_connections|_bootsCount|_totalUptimeMin|_sessionUptimeMin|_screenSaverOnMin|ErrorMsg|Msg|SysStat)=(.+)$")
+var regex_genericSingle_inbound = regexp.MustCompile("^(_model|_serial|_version|_platform|_bluePillReady|_name|_isSleeping|_sleepTimer|_panelTopology_svgbase|_panelTopology_HWC|_burninProfile|_serverModeLockToIP|_serverModeMaxClients|_heartBeatTimer|DimmedGain|_connections|_bootsCount|_totalUptimeMin|_sessionUptimeMin|_screenSaverOnMin|ErrorMsg|Msg|SysStat)=(.+)$")
 var regex_cmd_inbound = regexp.MustCompile("^HWC#([0-9]+)(|.([0-9]+))=(Down|Up|Press|Abs|Speed|Enc)(|:([-0-9]+))$")
 
 // Converts Raw Panel 1.0 ASCII Strings into proto OutboundMessage structs
@@ -1548,7 +1618,7 @@ func RawPanelASCIIstringsToOutboundMessages(rp20_ascii []string) []*rwp.Outbound
 					HWCavailability: theMap,
 				}
 
-			} else if regex_genericSingle_inbound.MatchString(inputString) { // regexp.Compile("^(_model|_serial|_version|_isSleeping|_sleepTimer|_panelTopology_svgbase|_panelTopology_HWC)=(.+)$")
+			} else if regex_genericSingle_inbound.MatchString(inputString) {
 				//su.Debug(regex_genericSingle.FindStringSubmatch(inputString))
 				eventType := regex_genericSingle_inbound.FindStringSubmatch(inputString)[1]
 				strValue := regex_genericSingle_inbound.FindStringSubmatch(inputString)[2]
@@ -1687,17 +1757,58 @@ func RawPanelASCIIstringsToOutboundMessages(rp20_ascii []string) []*rwp.Outbound
 						},
 					}
 				case "SysStat":
-					parts := strings.Split(strValue+":::::", ":")
-					CPUTempFloat, _ := strconv.ParseFloat(parts[3], 32)
-					ExtTempFloat, _ := strconv.ParseFloat(parts[5], 32)
+					sysStatStruct := &rwp.SystemStat{}
+					parts := strings.Split(strValue, ":")
+					for a := 0; a+1 < len(parts); a++ {
+						floatVal, _ := strconv.ParseFloat(parts[a+1], 32)
+						switch parts[a] {
+						case "CPUUsage":
+							sysStatStruct.CPUUsage = uint32(su.Intval(parts[a+1]))
+						case "CPUTempFloat":
+							sysStatStruct.CPUTemp = float32(floatVal)
+						case "ExtTempFloat":
+							sysStatStruct.ExtTemp = float32(floatVal)
+						case "CPUVoltage":
+							sysStatStruct.CPUVoltage = float32(floatVal)
+						case "CPUFreqCurrent":
+							sysStatStruct.CPUFreqCurrent = int32(su.Intval(parts[a+1]))
+						case "CPUFreqMin":
+							sysStatStruct.CPUFreqMin = int32(su.Intval(parts[a+1]))
+						case "CPUFreqMax":
+							sysStatStruct.CPUFreqMax = int32(su.Intval(parts[a+1]))
+						case "MemTotal":
+							sysStatStruct.MemTotal = int32(su.Intval(parts[a+1]))
+						case "MemFree":
+							sysStatStruct.MemFree = int32(su.Intval(parts[a+1]))
+						case "MemAvailable":
+							sysStatStruct.MemAvailable = int32(su.Intval(parts[a+1]))
+						case "MemBuffers":
+							sysStatStruct.MemBuffers = int32(su.Intval(parts[a+1]))
+						case "MemCached":
+							sysStatStruct.MemCached = int32(su.Intval(parts[a+1]))
+						case "UnderVoltageNow":
+							sysStatStruct.UnderVoltageNow = su.Intval(parts[a+1]) == 1
+						case "UnderVoltage":
+							sysStatStruct.UnderVoltage = su.Intval(parts[a+1]) == 1
+						case "FreqCapNow":
+							sysStatStruct.FreqCapNow = su.Intval(parts[a+1]) == 1
+						case "FreqCap":
+							sysStatStruct.FreqCap = su.Intval(parts[a+1]) == 1
+						case "ThrottledNow":
+							sysStatStruct.ThrottledNow = su.Intval(parts[a+1]) == 1
+						case "Throttled":
+							sysStatStruct.Throttled = su.Intval(parts[a+1]) == 1
+						case "SoftTempLimitNow":
+							sysStatStruct.SoftTempLimitNow = su.Intval(parts[a+1]) == 1
+						case "SoftTempLimit":
+							sysStatStruct.SoftTempLimit = su.Intval(parts[a+1]) == 1
+						}
+						// Well, we should actually bypass all odd numbers as they would be values, but we don't have to. Maybe it's more resilient this way, maybe not?
+					}
 					msg = &rwp.OutboundMessage{
 						Events: []*rwp.HWCEvent{
 							&rwp.HWCEvent{
-								SysStat: &rwp.SystemStat{
-									CPUUsage: uint32(su.Intval(parts[1])),
-									CPUTemp:  float32(CPUTempFloat),
-									ExtTemp:  float32(ExtTempFloat),
-								},
+								SysStat: sysStatStruct,
 							},
 						},
 					}
@@ -1860,7 +1971,49 @@ func OutboundMessagesToRawPanelASCIIstrings(outboundMsgs []*rwp.OutboundMessage)
 					returnStrings = append(returnStrings, fmt.Sprintf("HWC#%d=Raw:%d", eventRec.HWCID, eventRec.RawAnalog.Value))
 				}
 				if eventRec.SysStat != nil {
-					returnStrings = append(returnStrings, fmt.Sprintf("SysStat=CPUUsage:%d:CPUTemp:%.1f:ExtTemp:%.1f", eventRec.SysStat.CPUUsage, eventRec.SysStat.CPUTemp, eventRec.SysStat.ExtTemp))
+					returnStrings = append(returnStrings, fmt.Sprintf(
+						"SysStat="+
+							"CPUUsage:%d:"+
+							"CPUTemp:%.1f:"+
+							"ExtTemp:%.1f:"+
+							"CPUVoltage:%.2f:"+
+							"CPUFreqCurrent:%d:"+
+							"CPUFreqMin:%d:"+
+							"CPUFreqMax:%d:"+
+							"MemTotal:%d:"+
+							"MemFree:%d:"+
+							"MemAvailable:%d:"+
+							"MemBuffers:%d:"+
+							"MemCached:%d:"+
+							"UnderVoltageNow:%s:"+
+							"UnderVoltage:%s:"+
+							"FreqCapNow:%s:"+
+							"FreqCap:%s:"+
+							"ThrottledNow:%s:"+
+							"Throttled:%s:"+
+							"SoftTempLimitNow:%s:"+
+							"SoftTempLimit:%s:",
+						eventRec.SysStat.CPUUsage,
+						eventRec.SysStat.CPUTemp,
+						eventRec.SysStat.ExtTemp,
+						eventRec.SysStat.CPUVoltage,
+						eventRec.SysStat.CPUFreqCurrent,
+						eventRec.SysStat.CPUFreqMin,
+						eventRec.SysStat.CPUFreqMax,
+						eventRec.SysStat.MemTotal,
+						eventRec.SysStat.MemFree,
+						eventRec.SysStat.MemAvailable,
+						eventRec.SysStat.MemBuffers,
+						eventRec.SysStat.MemCached,
+						su.Qstr(eventRec.SysStat.UnderVoltageNow, "1", "0"),
+						su.Qstr(eventRec.SysStat.UnderVoltage, "1", "0"),
+						su.Qstr(eventRec.SysStat.FreqCapNow, "1", "0"),
+						su.Qstr(eventRec.SysStat.FreqCap, "1", "0"),
+						su.Qstr(eventRec.SysStat.ThrottledNow, "1", "0"),
+						su.Qstr(eventRec.SysStat.Throttled, "1", "0"),
+						su.Qstr(eventRec.SysStat.SoftTempLimitNow, "1", "0"),
+						su.Qstr(eventRec.SysStat.SoftTempLimit, "1", "0"),
+					))
 				}
 			}
 		}
@@ -1892,5 +2045,10 @@ func OutboundMessagesToRawPanelASCIIstrings(outboundMsgs []*rwp.OutboundMessage)
 		DebugRWPhelpersMU.Unlock()
 	}
 
+	if false {
+		log.Println(log.Indent("")) // Just to keep log as imported module
+	}
+
 	return returnStrings
+
 }
