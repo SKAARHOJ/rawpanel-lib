@@ -63,6 +63,7 @@ func main() {
 						imageIdx[hwc] = (imageIdx[hwc] + 1) % len(imageSet)
 						imageFileName := imageSet[imageIdx[hwc]]
 						log.Println("Loading image ", imageFileName)
+
 						img, err := getImageFile(imageFileName)
 						if !log.Should(err) {
 							rp.DrawImage(hwc, img)

@@ -523,3 +523,13 @@ func (rp *RawPanel) DrawImageOptions(hwc uint32, inImg image.Image, displayInfo 
 
 	return nil
 }
+
+// Function SendRawState just forwards a state struct
+// to the panel
+func (rp *RawPanel) SendRawState(state *rwp.HWCState) {
+	rp.toPanel <- []*rwp.InboundMessage{
+		&rwp.InboundMessage{
+			States: []*rwp.HWCState{state},
+		},
+	}
+}

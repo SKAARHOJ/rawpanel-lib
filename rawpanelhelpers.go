@@ -1,6 +1,7 @@
 package rawpanellib
 
 import (
+	"bytes"
 	"encoding/base64"
 	"encoding/binary"
 	"encoding/json"
@@ -12,6 +13,10 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	_ "image/gif"  // Allow gifs to be loaded
+	_ "image/jpeg" // Allow jpegs to be loaded
+	_ "image/png"  // Allow pngs to be loaded
 
 	rwp "github.com/SKAARHOJ/rawpanel-lib/ibeam_rawpanel"
 	"google.golang.org/protobuf/proto"
@@ -832,6 +837,7 @@ func RawPanelASCIIstringsToInboundMessages(rp20_ascii []string) []*rwp.InboundMe
 				//fmt.Println(inputString)
 				myState := &rwp.HWCState{}
 				json.Unmarshal([]byte(inputString), myState)
+				//StateConverter(myState)
 				msg = &rwp.InboundMessage{
 					States: []*rwp.HWCState{
 						myState,
@@ -2446,4 +2452,69 @@ func AutoDetectIfPanelEncodingIsBinary(c net.Conn, panelIPAndPort string) bool {
 	}
 
 	return true // Default is binary
+}
+
+func StateConverter(state *rwp.HWCState) {
+	// If the state contains image for conversion, we will execute that:
+	if state.HWCGfxConverter != nil {
+
+		inImg, _, err := image.Decode(bytes.NewReader(state.HWCGfxConverter.ImageData))
+		if err != nil {
+			log.Fatalln(err)
+		}
+
+		// Initialize a raw panel graphics state:
+		img := rwp.HWCGfx{}
+		img.W = state.HWCGfxConverter.W
+		img.H = state.HWCGfxConverter.H
+
+		// Pick up source dimensions if none were explicitly set:
+		if img.W == 0 || img.W > 500 || img.H == 0 || img.H > 500 {
+			img.W = uint32(inImg.Bounds().Dx())
+			img.H = uint32(inImg.Bounds().Dy())
+		}
+
+		// Use monoImg to create a base:
+		monoImg := monogfx.MonoImg{}
+		monoImg.NewImage(int(img.W), int(img.H))
+
+		// Set up image type:
+		switch state.HWCGfxConverter.ImageType {
+		case rwp.HWCGfxConverter_RGB16bit:
+			img.ImageType = rwp.HWCGfx_RGB16bit
+			img.ImageData = monoImg.GetImgSliceRGB()
+		case rwp.HWCGfxConverter_Gray4bit:
+			img.ImageType = rwp.HWCGfx_Gray4bit
+			img.ImageData = monoImg.GetImgSliceGray()
+		default:
+			img.ImageType = rwp.HWCGfx_MONO
+			img.ImageData = monoImg.GetImgSlice()
+		}
+
+		// Set up bounds:
+		imgBounds := ImageBounds{X: 0, Y: 0, W: int(img.W), H: int(img.H)}
+
+		newImage := inImg
+
+		// Perform scaling and filtering:
+		fitting := ""
+		switch state.HWCGfxConverter.Scaling {
+		case rwp.HWCGfxConverter_FILL:
+			fitting = "Fill"
+		case rwp.HWCGfxConverter_FIT:
+			fitting = "Fit"
+		case rwp.HWCGfxConverter_STRETCH:
+			fitting = "Stretch"
+		}
+		if fitting != "" {
+			newImage = ScalingAndFilters(inImg, string(fitting), imgBounds.W, imgBounds.H, "")
+		}
+
+		// Map the image onto the canvas
+		RenderImageOnCanvas(&img, newImage, imgBounds, "", "", "")
+
+		// Set the new image:
+		state.HWCGfx = &img
+		state.HWCGfxConverter = nil
+	}
 }
