@@ -20,6 +20,9 @@ const (
 	Down              = 1
 )
 
+// Type BinaryEdge represents the edge pressed on binary triggers.
+// Edges can be top, left, bottom, right (2- and 4-way buttons) or
+// None ("normal" buttons) or Encoder (if an encoder was pressed)
 type BinaryEdge uint8
 
 const (

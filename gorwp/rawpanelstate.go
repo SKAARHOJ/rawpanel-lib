@@ -46,5 +46,5 @@ func (rps *RawPanelState) GetModel() string {
 func (rps *RawPanelState) GetTopology() *topology.Topology {
 	rps.Lock()
 	defer rps.Unlock()
-	return rps.topology // Shoudl return copy?
+	return rps.topology // Should return copy?
 }

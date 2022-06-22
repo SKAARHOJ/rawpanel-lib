@@ -29,6 +29,7 @@ import (
 
 	su "github.com/SKAARHOJ/ibeam-lib-utils"
 	helpers "github.com/SKAARHOJ/rawpanel-lib"
+	monogfx "github.com/SKAARHOJ/rawpanel-lib/ibeam_lib_monogfx"
 	rwp "github.com/SKAARHOJ/rawpanel-lib/ibeam_rawpanel"
 	topology "github.com/SKAARHOJ/rawpanel-lib/topology"
 	log "github.com/s00500/env_logger"
@@ -243,7 +244,7 @@ func (rp *RawPanel) readFromPanel() error {
 }
 
 func (rp *RawPanel) procesMessagesFromPanel(messagesFromPanel []*rwp.OutboundMessage) {
-	rp.State.Lock()
+
 	for _, msg := range messagesFromPanel {
 
 		// Respond to ping:
@@ -255,6 +256,7 @@ func (rp *RawPanel) procesMessagesFromPanel(messagesFromPanel []*rwp.OutboundMes
 
 		// Store panel info:
 		if msg.PanelInfo != nil {
+			rp.State.Lock()
 			if msg.PanelInfo.Model != "" {
 				rp.State.model = msg.PanelInfo.Model
 				log.Debugln("Model:", msg.PanelInfo.Model)
@@ -267,17 +269,21 @@ func (rp *RawPanel) procesMessagesFromPanel(messagesFromPanel []*rwp.OutboundMes
 				rp.State.name = msg.PanelInfo.Name
 				log.Debugln("Name:", msg.PanelInfo.Name)
 			}
+			rp.State.Unlock()
 		}
 
 		// Panel availability:
 		if msg.HWCavailability != nil {
+			rp.State.Lock()
 			for k, v := range msg.HWCavailability {
 				rp.State.hwcAvailability[k] = v
 			}
+			rp.State.Unlock()
 		}
 
 		// Topology:
 		if msg.PanelTopology != nil { // Receiving topology
+			rp.State.Lock()
 			if msg.PanelTopology.Json != "" {
 				rp.State.topologyJSON = msg.PanelTopology.Json
 				rp.State.topology = &topology.Topology{}
@@ -292,6 +298,7 @@ func (rp *RawPanel) procesMessagesFromPanel(messagesFromPanel []*rwp.OutboundMes
 				rp.State.topologySVG = msg.PanelTopology.Svgbase
 				log.Debugln("Received Topology SVG")
 			}
+			rp.State.Unlock()
 		}
 
 		// Events:
@@ -315,7 +322,6 @@ func (rp *RawPanel) procesMessagesFromPanel(messagesFromPanel []*rwp.OutboundMes
 			}
 		}
 	}
-	rp.State.Unlock()
 }
 
 func (rp *RawPanel) IsInitialized() bool {
@@ -417,8 +423,100 @@ func (rp *RawPanel) SetRWPTextByStruct(hwc uint32, txtStruct *rwp.HWCText) {
 	}
 }
 
-// Function Draw draws an image onto a specific display of the
-// SKAARHOJ Raw Panel.
-func (rp *RawPanel) DrawImage(hwc uint32, im image.Image, xoff, yoff int) {
+// Type DrawFitting represents how the image is scaled
+type DrawFitting string
 
+const (
+	Fit     DrawFitting = "Fit"     // Keep proportions and see full image. Will create letter or pillar box black areas.
+	Fill                = "Fill"    // Keep proportions and scale to avoid letter or pillar box black areas. Results in cropping away areas
+	Stretch             = "Stretch" // Distort proportions and scale to fill to avoid letter or pillar box black areas.
+	// Plus "WxH" free string
+)
+
+// Type DrawImageEncoding represents a an image encoding mode
+type DrawImageEncoding string
+
+const (
+	Mono DrawImageEncoding = "Mono" // Image is sent as monochromatic bitmap (lowest size and correct = 1/8 byte per pixel)
+	Gray                   = "Gray" // Image is sent as 4bit Grayscale (16 levels, = 1/2 byte per pixel)
+	RGB                    = "RGB"  // Image is sent as RGB with 16bits for all channels (5-6-5 for red, green, blue = 2 bytes per pixel)
+	// Plus "WxH" free string
+)
+
+// Function Draw draws an image onto a specific display of the
+// SKAARHOJ Raw Panel. It's not super efficient if you already know
+// the displayInfo of the HWC, but it's convenient
+func (rp *RawPanel) DrawImage(hwc uint32, inImg image.Image) error {
+	top := rp.State.GetTopology()
+	typeDef, _ := top.GetHWCtype(hwc)
+	displayInfo := typeDef.DisplayInfo()
+	if displayInfo != nil && displayInfo.W > 0 && displayInfo.H > 0 {
+		log.Println(log.Indent(displayInfo))
+		return rp.DrawImageOptions(hwc, inImg, displayInfo, Fit, "")
+	}
+
+	return fmt.Errorf("Some error happened.\n")
+}
+
+// Function Draw draws an image onto a specific display of the
+// SKAARHOJ Raw Panel. There is a number of options for fitting the image
+// and forcing the encoding mode (which generally will be picked up from
+// the displayInfo of the topology)
+func (rp *RawPanel) DrawImageOptions(hwc uint32, inImg image.Image, displayInfo *topology.TopologyHWcTypeDef_Display, fitting DrawFitting, forceEncoding DrawImageEncoding) error {
+
+	// Initialize a raw panel graphics state:
+	img := rwp.HWCGfx{}
+	img.W = uint32(displayInfo.W)
+	img.H = uint32(displayInfo.H)
+
+	// Use monoImg to create a base:
+	monoImg := monogfx.MonoImg{}
+	monoImg.NewImage(int(img.W), int(img.H))
+
+	// Set up image type:
+	imageType := displayInfo.Type
+	switch forceEncoding {
+	case Mono:
+		imageType = ""
+	case Gray:
+		imageType = "gray"
+	case RGB:
+		imageType = "color"
+	}
+	switch imageType {
+	case "color":
+		img.ImageType = rwp.HWCGfx_RGB16bit
+		img.ImageData = monoImg.GetImgSliceRGB()
+	case "gray":
+		img.ImageType = rwp.HWCGfx_Gray4bit
+		img.ImageData = monoImg.GetImgSliceGray()
+	default:
+		img.ImageType = rwp.HWCGfx_MONO
+		img.ImageData = monoImg.GetImgSlice()
+	}
+
+	// Set up bounds:
+	imgBounds := helpers.ImageBounds{X: 0, Y: 0, W: int(img.W), H: int(img.H)}
+
+	// Perform scaling and fildering:
+	newImage := inImg
+	if fitting != "" {
+		newImage = helpers.ScalingAndFilters(inImg, string(fitting), imgBounds.W, imgBounds.H, "")
+	}
+
+	// Map the image onto the canvas
+	helpers.RenderImageOnCanvas(&img, newImage, imgBounds, "", "", "")
+
+	rp.toPanel <- []*rwp.InboundMessage{
+		&rwp.InboundMessage{
+			States: []*rwp.HWCState{
+				&rwp.HWCState{
+					HWCIDs: []uint32{hwc},
+					HWCGfx: &img,
+				},
+			},
+		},
+	}
+
+	return nil
 }
