@@ -16,8 +16,8 @@ import (
 type BinaryStatus uint8
 
 const (
-	Down BinaryStatus = 0
-	Up                = 1
+	Up   BinaryStatus = 0
+	Down              = 1
 )
 
 type BinaryEdge uint8

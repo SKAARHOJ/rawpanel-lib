@@ -18,6 +18,8 @@ import (
 	"encoding/binary"
 	"encoding/json"
 	"fmt"
+	"image"
+	"image/color"
 	"io"
 	"net"
 	"strings"
@@ -327,4 +329,96 @@ func (rp *RawPanel) IsInitialized() bool {
 		return true
 	}
 	return false
+}
+
+// Sets the panel brightness (same for OLED and LEDs in this case)
+func (rp *RawPanel) SetBrightness(brightness int) {
+	rp.toPanel <- []*rwp.InboundMessage{
+		&rwp.InboundMessage{
+			Command: &rwp.Command{
+				PanelBrightness: &rwp.Brightness{
+					OLEDs: uint32(brightness),
+					LEDs:  uint32(brightness),
+				},
+			},
+		},
+	}
+}
+
+// Sets the color of a specific LED.
+func (rp *RawPanel) SetLEDColor(hwc uint32, c color.RGBA, intensity rwp.HWCMode_StateE) {
+	r, g, b, _ := c.RGBA()
+	rp.toPanel <- []*rwp.InboundMessage{
+		&rwp.InboundMessage{
+			States: []*rwp.HWCState{
+				&rwp.HWCState{
+					HWCIDs: []uint32{hwc},
+					HWCMode: &rwp.HWCMode{
+						State: rwp.HWCMode_StateE(intensity),
+					},
+					HWCColor: &rwp.HWCColor{
+						ColorRGB: &rwp.ColorRGB{
+							Red:   uint32(r >> 8),
+							Green: uint32(g >> 8),
+							Blue:  uint32(b >> 8),
+						},
+					},
+				},
+			},
+		},
+	}
+}
+
+// Sets the color of a specific LED by index
+func (rp *RawPanel) SetLEDColorByIndex(hwc uint32, colorIndex rwp.ColorIndex_Colors, intensity rwp.HWCMode_StateE) {
+	rp.toPanel <- []*rwp.InboundMessage{
+		&rwp.InboundMessage{
+			States: []*rwp.HWCState{
+				&rwp.HWCState{
+					HWCIDs: []uint32{hwc},
+					HWCMode: &rwp.HWCMode{
+						State: rwp.HWCMode_StateE(intensity),
+					},
+					HWCColor: &rwp.HWCColor{
+						ColorIndex: &rwp.ColorIndex{
+							Index: colorIndex,
+						},
+					},
+				},
+			},
+		},
+	}
+}
+
+// Sets the raw panel ASCII text of a display (text lines and header type)
+func (rp *RawPanel) SetRWPText(hwc uint32, title string, text1 string, text2 string, headerBar bool) {
+	txtStruct := &rwp.HWCText{
+		Title:          title,
+		Formatting:     7,
+		Textline1:      text1,
+		Textline2:      text2,
+		SolidHeaderBar: headerBar,
+		PairMode:       rwp.HWCText_PairModeE(su.Qint(text2 != "", 1, 0)),
+	}
+	rp.SetRWPTextByStruct(hwc, txtStruct)
+}
+
+// Sets the raw panel ASCII text of a display by forwarding a full text struct
+func (rp *RawPanel) SetRWPTextByStruct(hwc uint32, txtStruct *rwp.HWCText) {
+	rp.toPanel <- []*rwp.InboundMessage{
+		&rwp.InboundMessage{
+			States: []*rwp.HWCState{
+				&rwp.HWCState{
+					HWCIDs:  []uint32{hwc},
+					HWCText: txtStruct,
+				},
+			},
+		},
+	}
+}
+
+// Function Draw draws an image onto a specific display of the
+// SKAARHOJ Raw Panel.
+func (rp *RawPanel) DrawImage(hwc uint32, im image.Image, xoff, yoff int) {
+
 }

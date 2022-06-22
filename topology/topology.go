@@ -145,16 +145,44 @@ func (typeDef *TopologyHWcTypeDef) IsIntensity() bool {
 	return typeDef.In == "iv" || typeDef.In == "ih" || typeDef.In == "ir"
 }
 
-/*
-func (topology *Topology) DisplayInfo(hwc uint32) bool {
+func (typeDef *TopologyHWcTypeDef) DisplayInfo() *TopologyHWcTypeDef_Display {
+	typeDef.Lock()
+	defer typeDef.Unlock()
+
+	return typeDef.Disp
 }
-func (topology *Topology) HasLED(hwc uint32) bool {
+
+func (typeDef *TopologyHWcTypeDef) HasLED() bool {
+	typeDef.Lock()
+	defer typeDef.Unlock()
+	return typeDef.Out == "rgb" || typeDef.In == "rg" || typeDef.In == "mono"
 }
-func (topology *Topology) HasSteps(hwc uint32) bool {
+
+func (typeDef *TopologyHWcTypeDef) HasSteps() int {
+	typeDef.Lock()
+	defer typeDef.Unlock()
+	if typeDef.Ext == "steps" {
+		min := 10000
+		max := -10000
+		for _, subEl := range typeDef.Sub {
+			if subEl.Idx < min {
+				min = subEl.Idx
+			}
+			if subEl.Idx > max {
+				max = subEl.Idx
+			}
+		}
+		return max - min + 1
+	}
+
+	return 0
 }
-func (topology *Topology) IsMotorized(hwc uint32) bool {
+
+func (typeDef *TopologyHWcTypeDef) IsMotorized() bool {
+	typeDef.Lock()
+	defer typeDef.Unlock()
+	return typeDef.Ext == "pos"
 }
-*/
 
 func (topology *Topology) Verify() {
 
