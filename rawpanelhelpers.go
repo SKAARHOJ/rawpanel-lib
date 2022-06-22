@@ -2,13 +2,16 @@ package rawpanellib
 
 import (
 	"encoding/base64"
+	"encoding/binary"
 	"encoding/json"
 	"fmt"
 	"math"
+	"net"
 	"regexp"
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 
 	rwp "github.com/SKAARHOJ/rawpanel-lib/ibeam_rawpanel"
 	"google.golang.org/protobuf/proto"
@@ -2393,4 +2396,54 @@ func RenderImageOnCanvas(img *rwp.HWCGfx, srcImg image.Image, imgBounds ImageBou
 			}
 		}
 	}
+}
+
+// Is server mode panel ASCII or Binary? Test by sending a binary ping to the panel.
+// Background: Since it's possible that a panel auto detects binary or ascii protocol mode itself, it's best to probe with a binary package since otherwise a binary capable panel/system pair in auto mode would negotiate to use ASCII which is not as efficient and complete an encoding.
+// Returns true if binary panel. May hang for a few seconds waiting for reply
+func AutoDetectIfPanelEncodingIsBinary(c net.Conn, panelIPAndPort string) bool {
+
+	pingMessage := &rwp.InboundMessage{
+		FlowMessage: rwp.InboundMessage_PING,
+	}
+	pbdata, err := proto.Marshal(pingMessage)
+	log.Should(err)
+	header := make([]byte, 4)                                  // Create a 4-bytes header
+	binary.LittleEndian.PutUint32(header, uint32(len(pbdata))) // Fill it in
+	pbdata = append(header, pbdata...)                         // and concatenate it with the binary message
+	log.Debugln("Autodetecting binary / ascii mode of panel", panelIPAndPort, "by sending binary ping:", pbdata)
+
+	_, err = c.Write(pbdata) // Send "ping" and wait one second for a reply:
+	log.Should(err)
+	byteArray := make([]byte, 1000)
+	err = c.SetReadDeadline(time.Now().Add(2000 * time.Millisecond))
+	log.Should(err)
+
+	byteCount, err := c.Read(byteArray) // Should timeout after 2000 milliseconds if ascii panel, otherwise respond promptly with an ACK message
+	if err == nil {
+		if byteCount > 4 {
+			responsePayloadLength := binary.LittleEndian.Uint32(byteArray[0:4])
+			if responsePayloadLength+4 == uint32(byteCount) {
+				reply := &rwp.OutboundMessage{}
+				proto.Unmarshal(byteArray[4:byteCount], reply)
+				if reply.FlowMessage == rwp.OutboundMessage_ACK {
+					log.Debugln("Received ACK successfully: ", byteArray[0:byteCount])
+					log.Debugln("Using Binary Protocol Mode for panel ", panelIPAndPort)
+				} else {
+					log.Debugln("Received something else than an ack response, staying with Binary Protocol Mode for panel ", panelIPAndPort)
+				}
+			} else {
+				log.Debugln("Bytecount didn't match header, staying with Binary Protocol Mode for panel ", panelIPAndPort)
+			}
+		} else {
+			log.Debugln("Unexpected reply length, staying with Binary Protocol Mode for panel ", panelIPAndPort)
+		}
+	} else {
+		//log.WithError(err).Debug("tried to connected in binarymode failed, trying asciimode...")
+		log.Debugln("Using ASCII Protocol Mode for panel", panelIPAndPort)
+		_, err = c.Write([]byte("\n")) // Clearing an ASCII panels buffer with a newline since we sent it binary stuff
+		return false
+	}
+
+	return true // Default is binary
 }

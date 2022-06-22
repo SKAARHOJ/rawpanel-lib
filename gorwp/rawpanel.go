@@ -64,6 +64,8 @@ func Connect(panelIPAndPort string, ctx context.Context, cancel context.CancelFu
 		return nil, err
 	}
 
+	binaryPanel := helpers.AutoDetectIfPanelEncodingIsBinary(c, panelIPAndPort)
+
 	// Set up new raw panel, handshake and initialize:
 	newRawPanel := &RawPanel{
 		connection: c,
@@ -76,6 +78,8 @@ func Connect(panelIPAndPort string, ctx context.Context, cancel context.CancelFu
 		absoluteBindings:  make(map[uint32]AbsoluteFunc),
 		intensityBindings: make(map[uint32]IntensityFunc),
 		triggerBindings:   make(map[uint32]TriggerFunc),
+
+		binaryPanel: binaryPanel,
 	}
 	newRawPanel.State.hwcAvailability = make(map[uint32]uint32)
 
@@ -99,7 +103,6 @@ func (rp *RawPanel) Close() {
 
 // Asking a panel for initial information:
 func (rp *RawPanel) init(ctx context.Context) error {
-	rp.binaryPanel = true
 
 	// Sending request for various standard information from panel, all things we consider mandatory for initialization:
 	rp.toPanel <- []*rwp.InboundMessage{&rwp.InboundMessage{
