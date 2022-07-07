@@ -35,7 +35,7 @@ type TopologyHWcTypeDef struct {
 	Disp   *TopologyHWcTypeDef_Display `json:"disp,omitempty"` // Display description
 	Sub    []TopologyHWcTypeDefSubEl   `json:"sub,omitempty"`
 
-	sync.RWMutex `json:"title,omitempty"`
+	sync.RWMutex `json:"-"`
 }
 
 type TopologyHWcTypeDefSubEl struct {
@@ -51,10 +51,10 @@ type TopologyHWcTypeDefSubEl struct {
 	Idx     int    `json:"_idx,omitempty"`
 }
 type TopologyHWcTypeDef_Display struct {
-	W      int    `json:"w,omitempty"`         // Pixel width of display
-	H      int    `json:"h,omitempty"`         // Pixel height of display
+	W      int    `json:"w,omitempty"`         // Pixel width of display (alternatively with Type=text: indicates a limited number of characters shown)
+	H      int    `json:"h,omitempty"`         // Pixel height of display (alternatively with Type=text: indicates the number of lines supported, prioritized as Textline1, Title, Textline2)
 	Subidx int    `json:"subidx,omitempty"`    // Index of the sub element which placeholds for the display area. -1 if no sub element is used for that
-	Type   string `json:"type,omitempty"`      // Additional features of display. "color" for example.
+	Type   string `json:"type,omitempty"`      // Additional features of display: "gray" (4bit/pixel) or "color" (5-6-5 rgb/pixel) or "text" for text lines
 	Shrink int    `json:"shrink,omitempty"`    // W+H Shrink. W=bit0, H=bit1. W-shrink cuts a pixel off in the right side of tile. H-shrink cuts a pixel off in the bottom of tile.
 	Border int    `json:"txtborder,omitempty"` // Txt Border (shall match that used by ibeam-hardware and UniSketch for rendering)
 }
@@ -124,7 +124,7 @@ func (typeDef *TopologyHWcTypeDef) isButton() bool {
 func (typeDef *TopologyHWcTypeDef) IsBinary() bool {
 	typeDef.Lock()
 	defer typeDef.Unlock()
-	return typeDef.isButton() || typeDef.In == "pb"
+	return typeDef.isButton() || typeDef.In == "gpi"
 }
 
 func (typeDef *TopologyHWcTypeDef) IsPulsed() bool {
@@ -136,13 +136,13 @@ func (typeDef *TopologyHWcTypeDef) IsPulsed() bool {
 func (typeDef *TopologyHWcTypeDef) IsAbsolute() bool {
 	typeDef.Lock()
 	defer typeDef.Unlock()
-	return typeDef.In == "av" || typeDef.In == "ah" || typeDef.In == "ar"
+	return typeDef.In == "av" || typeDef.In == "ah" || typeDef.In == "ar" || typeDef.In == "a"
 }
 
 func (typeDef *TopologyHWcTypeDef) IsIntensity() bool {
 	typeDef.Lock()
 	defer typeDef.Unlock()
-	return typeDef.In == "iv" || typeDef.In == "ih" || typeDef.In == "ir"
+	return typeDef.In == "iv" || typeDef.In == "ih" || typeDef.In == "ir" || typeDef.In == "i"
 }
 
 func (typeDef *TopologyHWcTypeDef) DisplayInfo() *TopologyHWcTypeDef_Display {
