@@ -1914,15 +1914,15 @@ func OutboundMessagesToRawPanelASCIIstrings(outboundMsgs []*rwp.OutboundMessage)
 		}
 		if outboundMsg.PanelTopology != nil {
 			if outboundMsg.PanelTopology.Svgbase != "" {
-				returnStrings = append(returnStrings, "_panelTopology_svgbase="+outboundMsg.PanelTopology.Svgbase)
+				returnStrings = append(returnStrings, "_panelTopology_svgbase="+stripLineBreaksSvg(outboundMsg.PanelTopology.Svgbase))
 			}
 			if outboundMsg.PanelTopology.Json != "" {
-				returnStrings = append(returnStrings, "_panelTopology_HWC="+outboundMsg.PanelTopology.Json)
+				returnStrings = append(returnStrings, "_panelTopology_HWC="+stripLineBreaks(outboundMsg.PanelTopology.Json))
 			}
 		}
 		if outboundMsg.BurninProfile != nil {
 			if outboundMsg.BurninProfile.Json != "" {
-				returnStrings = append(returnStrings, "_burninProfile="+outboundMsg.BurninProfile.Json)
+				returnStrings = append(returnStrings, "_burninProfile="+stripLineBreaks(outboundMsg.BurninProfile.Json))
 			}
 		}
 		if outboundMsg.SleepTimeout != nil {
@@ -1955,10 +1955,10 @@ func OutboundMessagesToRawPanelASCIIstrings(outboundMsgs []*rwp.OutboundMessage)
 			}
 		}
 		if outboundMsg.ErrorMessage != nil {
-			returnStrings = append(returnStrings, fmt.Sprintf("ErrorMsg=%s", outboundMsg.ErrorMessage.Message))
+			returnStrings = append(returnStrings, fmt.Sprintf("ErrorMsg=%s", stripLineBreaks(outboundMsg.ErrorMessage.Message)))
 		}
 		if outboundMsg.Message != nil {
-			returnStrings = append(returnStrings, fmt.Sprintf("Msg=%s", outboundMsg.Message.Message))
+			returnStrings = append(returnStrings, fmt.Sprintf("Msg=%s", stripLineBreaks(outboundMsg.Message.Message)))
 		}
 
 		if len(outboundMsg.HWCavailability) > 0 {
@@ -2064,6 +2064,25 @@ func OutboundMessagesToRawPanelASCIIstrings(outboundMsgs []*rwp.OutboundMessage)
 
 	return returnStrings
 
+}
+
+func stripLineBreaksSvg(svg string) string {
+	parts := strings.Split(svg, "\n")
+	for i := range parts {
+		parts[i] = strings.TrimSpace(parts[i])
+		if !strings.HasSuffix(parts[i], ">") {
+			parts[i] = " " // Add a single space at the end if it's not tags. This is to secure integrity of such as a SVG path defined over multiple lines which is sometimes the case....
+		}
+	}
+	return strings.Join(parts, "")
+}
+
+func stripLineBreaks(in string) string {
+	parts := strings.Split(in, "\n")
+	for i := range parts {
+		parts[i] = strings.TrimSpace(parts[i])
+	}
+	return strings.Join(parts, "")
 }
 
 func ScalingAndFilters(srcImg image.Image, fitting string, imgWidth int, imgHeight int, imageFilters string) image.Image {
