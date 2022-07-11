@@ -6,6 +6,7 @@ package topology
 
 import (
 	"encoding/json"
+	"fmt"
 	"strconv"
 	"strings"
 
@@ -38,7 +39,7 @@ func GenerateCompositeSVG(topologyJSON string, topologySVG string, theMap map[ui
 
 	for _, HWcDef := range topology.HWc {
 
-		typeDef := topology.getTypeDefWithOverride(&HWcDef)
+		typeDef := topology.GetTypeDefWithOverride(&HWcDef)
 
 		if theMap[HWcDef.Id] == 0 {
 			continue
@@ -58,6 +59,9 @@ func GenerateCompositeSVG(topologyJSON string, topologySVG string, theMap map[ui
 			newHWc.SetAttributeValue("cy", strconv.Itoa(HWcDef.Y))
 			newHWc.SetAttributeValue("r", strconv.Itoa(typeDef.W/2)) // Radius is half the width
 		}
+		if typeDef.Rotate != 0 {
+			newHWc.SetAttributeValue("transform", fmt.Sprintf("rotate(%03f %d %d)", typeDef.Rotate, HWcDef.X, HWcDef.Y))
+		}
 		addFormatting(newHWc, int(HWcDef.Id))
 
 		// Sub elements:
@@ -70,6 +74,9 @@ func GenerateCompositeSVG(topologyJSON string, topologySVG string, theMap map[ui
 					subElForHWc.SetAttributeValue("width", strconv.Itoa(subEl.W))
 					subElForHWc.SetAttributeValue("height", strconv.Itoa(subEl.H))
 					subElForHWc.SetAttributeValue("pointer-events", "none")
+					if typeDef.Rotate != 0 {
+						subElForHWc.SetAttributeValue("transform", fmt.Sprintf("rotate(%03f %d %d)", typeDef.Rotate, HWcDef.X, HWcDef.Y))
+					}
 					addSubElFormatting(subElForHWc, &subEl)
 				}
 				if subEl.ObjType == "c" {
@@ -78,6 +85,9 @@ func GenerateCompositeSVG(topologyJSON string, topologySVG string, theMap map[ui
 					subElForHWc.SetAttributeValue("cy", strconv.Itoa(HWcDef.Y+subEl.Y))
 					subElForHWc.SetAttributeValue("r", strconv.Itoa(subEl.R))
 					subElForHWc.SetAttributeValue("pointer-events", "none")
+					if typeDef.Rotate != 0 {
+						subElForHWc.SetAttributeValue("transform", fmt.Sprintf("rotate(%03f %d %d)", typeDef.Rotate, HWcDef.X, HWcDef.Y))
+					}
 					addSubElFormatting(subElForHWc, &subEl)
 				}
 			}
@@ -102,6 +112,9 @@ func GenerateCompositeSVG(topologyJSON string, topologySVG string, theMap map[ui
 				textElForHWC.SetAttributeValue("font-size", "35")
 				textElForHWC.SetAttributeValue("font-family", "sans-serif")
 				textElForHWC.SetAttributeValue("pointer-events", "none")
+				if typeDef.Rotate != 0 {
+					textElForHWC.SetAttributeValue("transform", fmt.Sprintf("rotate(%03f %d %d)", typeDef.Rotate, HWcDef.X, HWcDef.Y))
+				}
 				textElForHWC.Text = sp[a]
 			}
 		}
@@ -116,6 +129,9 @@ func GenerateCompositeSVG(topologyJSON string, topologySVG string, theMap map[ui
 			textForTypeNumber.SetAttributeValue("font-size", "20")
 			textForTypeNumber.SetAttributeValue("font-family", "sans-serif")
 			textForTypeNumber.SetAttributeValue("pointer-events", "none")
+			if typeDef.Rotate != 0 {
+				textForTypeNumber.SetAttributeValue("transform", fmt.Sprintf("rotate(%03f %d %d)", typeDef.Rotate, HWcDef.X, HWcDef.Y))
+			}
 			textForTypeNumber.Text = "[TYPE=" + strconv.Itoa(int(HWcDef.Type)) + "]"
 		}
 
@@ -143,7 +159,9 @@ func GenerateCompositeSVG(topologyJSON string, topologySVG string, theMap map[ui
 			if typeDef.Disp.Type != "" {
 				dispLabelSuffix = " " + typeDef.Disp.Type
 			}
-
+			if typeDef.Rotate != 0 {
+				textForDisplaySize.SetAttributeValue("transform", fmt.Sprintf("rotate(%03f %d %d)", typeDef.Rotate, HWcDef.X, HWcDef.Y))
+			}
 			textForDisplaySize.Text = strconv.Itoa(typeDef.Disp.W) + "x" + strconv.Itoa(typeDef.Disp.H) + dispLabelSuffix
 		}
 
@@ -162,6 +180,9 @@ func GenerateCompositeSVG(topologyJSON string, topologySVG string, theMap map[ui
 			//numberForHWC.SetAttributeValue("stroke", "#dddddd")
 			//numberForHWC.SetAttributeValue("stroke-width", "6px")
 			//numberForHWC.SetAttributeValue("paint-order", "stroke")
+			if typeDef.Rotate != 0 {
+				numberForHWC.SetAttributeValue("transform", fmt.Sprintf("rotate(%03f %d %d)", typeDef.Rotate, HWcDef.X, HWcDef.Y))
+			}
 			numberForHWC.Text = strconv.Itoa(int(HWcDef.Id))
 		}
 	}

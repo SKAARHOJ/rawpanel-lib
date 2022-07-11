@@ -104,7 +104,7 @@ func (topology *Topology) GetHWCtype(hwc uint32) (*TopologyHWcTypeDef, error) {
 
 	for _, HWcDef := range topology.HWc {
 		if HWcDef.Id == hwc {
-			typeDef := topology.getTypeDefWithOverride(&HWcDef)
+			typeDef := topology.GetTypeDefWithOverride(&HWcDef)
 			return &typeDef, nil
 		}
 	}
@@ -220,7 +220,7 @@ func (topology *Topology) Verify() {
 	}
 }
 
-func (topology *Topology) getTypeDefWithOverride(HWcDef *TopologyHWcomponent) TopologyHWcTypeDef {
+func (topology *Topology) GetTypeDefWithOverride(HWcDef *TopologyHWcomponent) TopologyHWcTypeDef {
 
 	typeDef := topology.TypeIndex[HWcDef.Type]
 
