@@ -1819,11 +1819,7 @@ func RawPanelASCIIstringsToOutboundMessages(rp20_ascii []string) []*rwp.Outbound
 						// Well, we should actually bypass all odd numbers as they would be values, but we don't have to. Maybe it's more resilient this way, maybe not?
 					}
 					msg = &rwp.OutboundMessage{
-						Events: []*rwp.HWCEvent{
-							&rwp.HWCEvent{
-								SysStat: sysStatStruct,
-							},
-						},
+						SysStat: sysStatStruct,
 					}
 				}
 			} else {
@@ -1966,6 +1962,51 @@ func OutboundMessagesToRawPanelASCIIstrings(outboundMsgs []*rwp.OutboundMessage)
 				returnStrings = append(returnStrings, fmt.Sprintf("map=%d:%d", origHWC, available))
 			}
 		}
+		if outboundMsg.SysStat != nil {
+			returnStrings = append(returnStrings, fmt.Sprintf(
+				"SysStat="+
+					"CPUUsage:%d:"+
+					"CPUTemp:%.1f:"+
+					"ExtTemp:%.1f:"+
+					"CPUVoltage:%.2f:"+
+					"CPUFreqCurrent:%d:"+
+					"CPUFreqMin:%d:"+
+					"CPUFreqMax:%d:"+
+					"MemTotal:%d:"+
+					"MemFree:%d:"+
+					"MemAvailable:%d:"+
+					"MemBuffers:%d:"+
+					"MemCached:%d:"+
+					"UnderVoltageNow:%s:"+
+					"UnderVoltage:%s:"+
+					"FreqCapNow:%s:"+
+					"FreqCap:%s:"+
+					"ThrottledNow:%s:"+
+					"Throttled:%s:"+
+					"SoftTempLimitNow:%s:"+
+					"SoftTempLimit:%s:",
+				outboundMsg.SysStat.CPUUsage,
+				outboundMsg.SysStat.CPUTemp,
+				outboundMsg.SysStat.ExtTemp,
+				outboundMsg.SysStat.CPUVoltage,
+				outboundMsg.SysStat.CPUFreqCurrent,
+				outboundMsg.SysStat.CPUFreqMin,
+				outboundMsg.SysStat.CPUFreqMax,
+				outboundMsg.SysStat.MemTotal,
+				outboundMsg.SysStat.MemFree,
+				outboundMsg.SysStat.MemAvailable,
+				outboundMsg.SysStat.MemBuffers,
+				outboundMsg.SysStat.MemCached,
+				su.Qstr(outboundMsg.SysStat.UnderVoltageNow, "1", "0"),
+				su.Qstr(outboundMsg.SysStat.UnderVoltage, "1", "0"),
+				su.Qstr(outboundMsg.SysStat.FreqCapNow, "1", "0"),
+				su.Qstr(outboundMsg.SysStat.FreqCap, "1", "0"),
+				su.Qstr(outboundMsg.SysStat.ThrottledNow, "1", "0"),
+				su.Qstr(outboundMsg.SysStat.Throttled, "1", "0"),
+				su.Qstr(outboundMsg.SysStat.SoftTempLimitNow, "1", "0"),
+				su.Qstr(outboundMsg.SysStat.SoftTempLimit, "1", "0"),
+			))
+		}
 		if len(outboundMsg.Events) > 0 {
 			for _, eventRec := range outboundMsg.Events {
 				if eventRec.Binary != nil {
@@ -1982,51 +2023,6 @@ func OutboundMessagesToRawPanelASCIIstrings(outboundMsgs []*rwp.OutboundMessage)
 				}
 				if eventRec.RawAnalog != nil {
 					returnStrings = append(returnStrings, fmt.Sprintf("HWC#%d=Raw:%d", eventRec.HWCID, eventRec.RawAnalog.Value))
-				}
-				if eventRec.SysStat != nil {
-					returnStrings = append(returnStrings, fmt.Sprintf(
-						"SysStat="+
-							"CPUUsage:%d:"+
-							"CPUTemp:%.1f:"+
-							"ExtTemp:%.1f:"+
-							"CPUVoltage:%.2f:"+
-							"CPUFreqCurrent:%d:"+
-							"CPUFreqMin:%d:"+
-							"CPUFreqMax:%d:"+
-							"MemTotal:%d:"+
-							"MemFree:%d:"+
-							"MemAvailable:%d:"+
-							"MemBuffers:%d:"+
-							"MemCached:%d:"+
-							"UnderVoltageNow:%s:"+
-							"UnderVoltage:%s:"+
-							"FreqCapNow:%s:"+
-							"FreqCap:%s:"+
-							"ThrottledNow:%s:"+
-							"Throttled:%s:"+
-							"SoftTempLimitNow:%s:"+
-							"SoftTempLimit:%s:",
-						eventRec.SysStat.CPUUsage,
-						eventRec.SysStat.CPUTemp,
-						eventRec.SysStat.ExtTemp,
-						eventRec.SysStat.CPUVoltage,
-						eventRec.SysStat.CPUFreqCurrent,
-						eventRec.SysStat.CPUFreqMin,
-						eventRec.SysStat.CPUFreqMax,
-						eventRec.SysStat.MemTotal,
-						eventRec.SysStat.MemFree,
-						eventRec.SysStat.MemAvailable,
-						eventRec.SysStat.MemBuffers,
-						eventRec.SysStat.MemCached,
-						su.Qstr(eventRec.SysStat.UnderVoltageNow, "1", "0"),
-						su.Qstr(eventRec.SysStat.UnderVoltage, "1", "0"),
-						su.Qstr(eventRec.SysStat.FreqCapNow, "1", "0"),
-						su.Qstr(eventRec.SysStat.FreqCap, "1", "0"),
-						su.Qstr(eventRec.SysStat.ThrottledNow, "1", "0"),
-						su.Qstr(eventRec.SysStat.Throttled, "1", "0"),
-						su.Qstr(eventRec.SysStat.SoftTempLimitNow, "1", "0"),
-						su.Qstr(eventRec.SysStat.SoftTempLimit, "1", "0"),
-					))
 				}
 			}
 		}
