@@ -9,6 +9,7 @@ require (
 
 require (
 	github.com/SKAARHOJ/ibeam-lib-utils v0.0.0-20210106155940-a19b7739e1b7 // indirect
+	github.com/disintegration/gift v1.2.1 // indirect
 	github.com/mattn/go-colorable v0.1.8 // indirect
 	github.com/mattn/go-isatty v0.0.12 // indirect
 	github.com/s00500/env_logger v0.1.24 // indirect
