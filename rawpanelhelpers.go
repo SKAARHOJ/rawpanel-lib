@@ -1,6 +1,7 @@
 package rawpanellib
 
 import (
+	"bufio"
 	"bytes"
 	"encoding/base64"
 	"encoding/binary"
@@ -14,9 +15,11 @@ import (
 	"sync"
 	"time"
 
+	"image/color"
 	_ "image/gif"  // Allow gifs to be loaded
 	_ "image/jpeg" // Allow jpegs to be loaded
-	_ "image/png"  // Allow pngs to be loaded
+	"image/png"
+	_ "image/png" // Allow pngs to be loaded
 
 	rwp "github.com/SKAARHOJ/rawpanel-lib/ibeam_rawpanel"
 	"google.golang.org/protobuf/proto"
@@ -2532,4 +2535,112 @@ func StateConverter(state *rwp.HWCState) {
 		state.HWCGfx = &img
 		state.HWCGfxConverter = nil
 	}
+}
+
+// Converts a monochrome byte slice back to image object
+func CreateImgObjectFromRGBBytes(w int, h int, data []byte) image.Image {
+	dest := image.NewRGBA(image.Rectangle{image.Point{0, 0}, image.Point{w, h}})
+
+	for rows := 0; rows < h; rows++ {
+		for columns := 0; columns < w; columns++ {
+			idx := (rows*w + columns) * 2
+			if idx+1 < len(data) {
+				pixelColor16bit := int(data[idx])
+				pixelColor16bit = (pixelColor16bit << 8) | int(data[idx+1])
+
+				blue := uint8(su.MapValue((pixelColor16bit>>11)&0b11111, 0, 0b11111, 0, 255))
+				green := uint8(su.MapValue((pixelColor16bit>>5)&0b111111, 0, 0b111111, 0, 255))
+				red := uint8(su.MapValue(pixelColor16bit&0b11111, 0, 0b11111, 0, 255))
+				dest.Set(columns, rows, color.RGBA{red, green, blue, 255})
+			}
+		}
+	}
+
+	return dest
+}
+func CreateImgObjectFromGrayBytes(w int, h int, data []byte) image.Image {
+	dest := image.NewRGBA(image.Rectangle{image.Point{0, 0}, image.Point{w, h}})
+
+	for rows := 0; rows < h; rows++ {
+		for columns := 0; columns < w; columns++ {
+			idx := (rows*w + columns) / 2
+			odd := (rows*w + columns) % 2
+
+			if idx < len(data) {
+				pixelColor4bit := data[idx] & 0xF
+				if odd == 0 {
+					pixelColor4bit = (data[idx] >> 4) & 0xF
+				}
+
+				gray := uint8(su.MapValue(int(pixelColor4bit), 0, 0b1111, 0, 255))
+				dest.Set(columns, rows, color.RGBA{gray, gray, gray, 255})
+			}
+		}
+	}
+
+	return dest
+}
+
+func ConvertGfxStateToPngBytes(hwcState *rwp.HWCState) ([]byte, error) {
+	if hwcState != nil && hwcState.HWCGfx != nil {
+		switch hwcState.HWCGfx.ImageType { // Copied from Reactor code base.... (KS)
+		case rwp.HWCGfx_MONO:
+			monoImg := monogfx.MonoImg{}
+			err := monoImg.CreateFromBytes(
+				int(hwcState.HWCGfx.W),
+				int(hwcState.HWCGfx.H),
+				hwcState.HWCGfx.ImageData)
+			log.Should(err)
+			// TODO: Images with offsets!!
+
+			img := monoImg.ConvertToImage(true)
+
+			// Uncomment for debugging graphics (Kasper)
+			//tempRenderImage(img, int(HWCid))
+
+			var b bytes.Buffer
+			imgWriter := bufio.NewWriter(&b)
+			err = png.Encode(imgWriter, img)
+			log.Should(err)
+			imgWriter.Flush()
+
+			return b.Bytes(), nil
+
+		case rwp.HWCGfx_RGB16bit:
+			img := CreateImgObjectFromRGBBytes(
+				int(hwcState.HWCGfx.W),
+				int(hwcState.HWCGfx.H),
+				hwcState.HWCGfx.ImageData)
+
+			// Uncomment for debugging graphics (Kasper)
+			//tempRenderImage(img, int(HWCid))
+
+			var b bytes.Buffer
+			imgWriter := bufio.NewWriter(&b)
+			err := png.Encode(imgWriter, img)
+			log.Should(err)
+			imgWriter.Flush()
+
+			return b.Bytes(), nil
+
+		case rwp.HWCGfx_Gray4bit:
+			img := CreateImgObjectFromGrayBytes(
+				int(hwcState.HWCGfx.W),
+				int(hwcState.HWCGfx.H),
+				hwcState.HWCGfx.ImageData)
+
+			// Uncomment for debugging graphics (Kasper)
+			//tempRenderImage(img, int(HWCid))
+
+			var b bytes.Buffer
+			imgWriter := bufio.NewWriter(&b)
+			err := png.Encode(imgWriter, img)
+			log.Should(err)
+			imgWriter.Flush()
+
+			return b.Bytes(), nil
+		}
+	}
+
+	return []byte{}, fmt.Errorf("No image to render")
 }
