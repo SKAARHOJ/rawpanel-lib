@@ -41,7 +41,7 @@ func GenerateCompositeSVG(topologyJSON string, topologySVG string, theMap map[ui
 
 		typeDef := topology.GetTypeDefWithOverride(&HWcDef)
 
-		if theMap[HWcDef.Id] == 0 {
+		if theMap != nil && theMap[HWcDef.Id] == 0 {
 			continue
 		}
 
