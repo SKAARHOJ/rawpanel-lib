@@ -30,7 +30,7 @@ type ConnectToPanelConfig struct {
 // The Waitgroup helps you to know when everything is shut down internally (so you can safely close your supplied channels if you like)
 // onconnect/ondisconnect gets called when those events happen
 // Config is optional additional configuration options
-func ConnectToPanel(panelIPAndPort string, msgsToPanel <-chan []*rwp.InboundMessage, msgsFromPanel chan<- []*rwp.OutboundMessage, ctx context.Context, wg *sync.WaitGroup, onconnect func(string, bool, net.Conn), ondisconnect func(), config *ConnectToPanelConfig) {
+func ConnectToPanel(panelIPAndPort string, msgsToPanel <-chan []*rwp.InboundMessage, msgsFromPanel chan<- []*rwp.OutboundMessage, ctx context.Context, wg *sync.WaitGroup, onconnect func(string, bool, net.Conn), ondisconnect func(bool), config *ConnectToPanelConfig) {
 
 	// Config:
 	noConnectionRetryPeriod := 3
@@ -45,8 +45,10 @@ func ConnectToPanel(panelIPAndPort string, msgsToPanel <-chan []*rwp.InboundMess
 	}
 
 	// Workgroup setup:
-	wg.Add(1)
-	defer wg.Done()
+	if wg != nil {
+		wg.Add(1)
+		defer wg.Done()
+	}
 
 	// Main loop for continuous connection attempts:
 	for {
@@ -127,21 +129,20 @@ func ConnectToPanel(panelIPAndPort string, msgsToPanel <-chan []*rwp.InboundMess
 				binaryPanel = false
 			}
 
-			// At this point we should be connected and know what prototol to use. We may also have received an errormessage and been disconnected, but in that case we will figure it out later.
-			onconnect(errorMsg, binaryPanel, conn)
-
 			// This goroutine is reading the msgsToPanel channel and sending over the panel in the proper encoding (binary or ASCII)
 			var exit atomic.Bool
 			quit := make(chan bool)
 			go func() {
-				wg.Add(1)
-				defer wg.Done()
+				if wg != nil {
+					wg.Add(1)
+					defer wg.Done()
+				}
 				for {
 					select {
 					case <-ctx.Done(): // Context shutdown.
 						log.Debugln("Closing network connection because context was done, ", panelIPAndPort)
 						exit.Store(true)
-						conn.Close() // UNSOLVED ISSUE: The implications of closing the connection should be that the listening code will also fail and exit - but it doesn't always happen for the ASCII ReadString() function. Why? It leads to the waitgroup being irrelevant because it doesn't always exit as it should...
+						conn.Close() // The implications of closing the connection should be that the listening code below will also fail and exit - but it might not happen if the msgsFromPanel channel reader outside this function has been stopped prematurely, so watch out for that.
 						return
 					case <-quit:
 						return
@@ -167,6 +168,11 @@ func ConnectToPanel(panelIPAndPort string, msgsToPanel <-chan []*rwp.InboundMess
 					}
 				}
 			}()
+
+			// At this point we should be connected and know what prototol to use. We may also have received an errormessage and been disconnected, but in that case we will figure it out later.
+			if onconnect != nil {
+				onconnect(errorMsg, binaryPanel, conn)
+			}
 
 			// Below, we will listen to messages from the panel, decode it and forward to the msgsFromPanel channel (which must be read externally)
 			if binaryPanel {
@@ -218,10 +224,13 @@ func ConnectToPanel(panelIPAndPort string, msgsToPanel <-chan []*rwp.InboundMess
 
 			// Assume disconnected or otherwise in error state:
 			log.Debugln("Network connection closed or failed for ", panelIPAndPort)
-			ondisconnect()
 			close(quit)
 			conn.Close()
-			if exit.Load() { // This is true in case context cancellation is the reason.
+			doExit := exit.Load()
+			if ondisconnect != nil {
+				ondisconnect(doExit)
+			}
+			if doExit { // This is true in case context cancellation is the reason.
 				return
 			}
 
