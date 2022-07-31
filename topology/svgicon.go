@@ -28,7 +28,12 @@ func GenerateCompositeSVG(topologyJSON string, topologySVG string, theMap map[ui
 	// Parsing SVG file:
 	svgDoc, err := xmldom.ParseXML(topologySVG)
 	if err != nil {
-		log.Fatal(err)
+		log.Should(err)
+		return ""
+	}
+	if svgDoc.Root == nil {
+		log.Error("svgDoc.Root was nil")
+		return ""
 	}
 
 	// Reading JSON topology:
