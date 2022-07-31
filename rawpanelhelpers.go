@@ -2644,3 +2644,55 @@ func ConvertGfxStateToPngBytes(hwcState *rwp.HWCState) ([]byte, error) {
 
 	return []byte{}, fmt.Errorf("No image to render")
 }
+
+func RwpImgToImage(rwpImg *rwp.HWCGfx, width int, height int) image.Image {
+	rwpImgW := int(rwpImg.W)
+	rwpImgH := int(rwpImg.H)
+	outputImage := image.NewRGBA(image.Rect(0, 0, width, height))
+	wOffset := (width - rwpImgW) / 2
+	hOffset := (height - rwpImgH) / 2
+
+	wInBytes := int(math.Ceil(float64(rwpImgW) / 8))
+
+	// Iterate over all the bytes of the raw panel image:
+	for y := 0; y < rwpImgH; y++ {
+		for x := 0; x < rwpImgW; x++ {
+
+			switch rwpImg.ImageType {
+			case rwp.HWCGfx_RGB16bit:
+				i := 2 * (rwpImgW*y + x)
+				if int(i+1) < len(rwpImg.ImageData) {
+					colorWord := (uint16(rwpImg.ImageData[i]) << 8) | uint16(rwpImg.ImageData[i+1])
+
+					colR := su.MapValue(int(colorWord&0b11111), 0, 31, 0, 255)
+					colG := su.MapValue(int((colorWord>>5)&0b111111), 0, 63, 0, 255)
+					colB := su.MapValue(int((colorWord>>11)&0b11111), 0, 31, 0, 255)
+
+					c := color.RGBA{uint8(colR), uint8(colG), uint8(colB), 255}
+					outputImage.Set(x+wOffset, y+hOffset, c)
+				}
+			case rwp.HWCGfx_Gray4bit:
+				i := (rwpImgW*y + x)
+				if i/2 < len(rwpImg.ImageData) {
+					colorByte := rwpImg.ImageData[i/2]
+					if i%2 == 0 {
+						colorByte = colorByte >> 4
+					}
+					gray := su.MapValue(int(colorByte&0xF), 0, 15, 0, 255)
+					c := color.RGBA{uint8(gray), uint8(gray), uint8(gray), 255}
+					outputImage.Set(x+wOffset, y+hOffset, c)
+				}
+			case rwp.HWCGfx_MONO:
+				index := y*wInBytes + x/8
+				if index >= 0 && index < len(rwpImg.ImageData) { // Check we are not writing out of bounds
+					if rwpImg.ImageData[index]&byte(0b1<<(7-x%8)) > 0 {
+						c := color.RGBA{255, 255, 255, 255}
+						outputImage.Set(x+wOffset, y+hOffset, c)
+					}
+				}
+			}
+		}
+	}
+
+	return outputImage
+}
