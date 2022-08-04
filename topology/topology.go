@@ -108,7 +108,22 @@ func (topology *Topology) GetHWCtype(hwc uint32) (*TopologyHWcTypeDef, error) {
 			return &typeDef, nil
 		}
 	}
-	return nil, fmt.Errorf("No HWC found")
+	return nil, fmt.Errorf("No HWC found for %d", hwc)
+}
+
+func (topology *Topology) GetHWCsWithDisplay() []uint32 {
+	topology.Lock()
+	defer topology.Unlock()
+
+	retval := []uint32{}
+	for _, HWcDef := range topology.HWc {
+		typeDef := topology.GetTypeDefWithOverride(&HWcDef)
+		if typeDef.Disp != nil {
+			retval = append(retval, HWcDef.Id)
+		}
+	}
+
+	return retval
 }
 
 func (typeDef *TopologyHWcTypeDef) IsButton() bool {
