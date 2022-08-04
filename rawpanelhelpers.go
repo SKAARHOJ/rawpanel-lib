@@ -2688,6 +2688,8 @@ func RwpImgToImage(rwpImg *rwp.HWCGfx, width int, height int) image.Image {
 					if rwpImg.ImageData[index]&byte(0b1<<(7-x%8)) > 0 {
 						c := color.RGBA{255, 255, 255, 255}
 						outputImage.Set(x+wOffset, y+hOffset, c)
+					} else {
+						outputImage.Set(x+wOffset, y+hOffset, color.RGBA{0, 0, 0, 255})
 					}
 				}
 			}
