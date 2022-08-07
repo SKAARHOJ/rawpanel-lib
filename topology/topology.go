@@ -34,6 +34,7 @@ type TopologyHWcTypeDef struct {
 	Rotate float32                     `json:"rotate,omitempty"`
 	Disp   *TopologyHWcTypeDef_Display `json:"disp,omitempty"` // Display description
 	Sub    []TopologyHWcTypeDefSubEl   `json:"sub,omitempty"`
+	Render string                      `json:"render,omitempty"` // Comma separated list of features to always render: "txt" = Text label, "hwcid" = HWC ID of component.
 
 	sync.RWMutex `json:"-"`
 }
