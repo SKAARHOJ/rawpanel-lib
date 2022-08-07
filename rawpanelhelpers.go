@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"image/color"
+	"image/draw"
 	_ "image/gif"  // Allow gifs to be loaded
 	_ "image/jpeg" // Allow jpegs to be loaded
 	"image/png"
@@ -2648,7 +2649,11 @@ func ConvertGfxStateToPngBytes(hwcState *rwp.HWCState) ([]byte, error) {
 func RwpImgToImage(rwpImg *rwp.HWCGfx, width int, height int) image.Image {
 	rwpImgW := int(rwpImg.W)
 	rwpImgH := int(rwpImg.H)
+
 	outputImage := image.NewRGBA(image.Rect(0, 0, width, height))
+	black := color.RGBA{0, 0, 0, 255}
+	draw.Draw(outputImage, outputImage.Bounds(), &image.Uniform{black}, image.ZP, draw.Src)
+
 	wOffset := (width - rwpImgW) / 2
 	hOffset := (height - rwpImgH) / 2
 
