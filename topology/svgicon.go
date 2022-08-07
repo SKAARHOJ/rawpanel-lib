@@ -46,6 +46,8 @@ func GenerateCompositeSVG(topologyJSON string, topologySVG string, theMap map[ui
 
 		typeDef := topology.GetTypeDefWithOverride(&HWcDef)
 
+		renderOptions := strings.Split(typeDef.Render, ",")
+
 		if theMap != nil && theMap[HWcDef.Id] == 0 {
 			continue
 		}
@@ -72,6 +74,7 @@ func GenerateCompositeSVG(topologyJSON string, topologySVG string, theMap map[ui
 		// Sub elements:
 		if len(typeDef.Sub) > 0 {
 			for _, subEl := range typeDef.Sub {
+				// Element type "d" is a non-rendered exact placeholder for displays
 				if subEl.ObjType == "r" {
 					subElForHWc := svgDoc.Root.CreateNode("rect")
 					subElForHWc.SetAttributeValue("x", strconv.Itoa(HWcDef.X+subEl.X))
@@ -99,7 +102,7 @@ func GenerateCompositeSVG(topologyJSON string, topologySVG string, theMap map[ui
 		}
 
 		// Text labels:
-		if showLabels {
+		if showLabels || isIn("txt", renderOptions) {
 			sp := strings.Split(HWcDef.Txt, "|")
 			cnt := len(sp)
 			if cnt > 1 && len(sp[1]) > 0 {
@@ -110,15 +113,21 @@ func GenerateCompositeSVG(topologyJSON string, topologySVG string, theMap map[ui
 			for a := 0; a < cnt; a++ {
 				textElForHWC := svgDoc.Root.CreateNode("text")
 				textElForHWC.SetAttributeValue("x", strconv.Itoa(HWcDef.X))
-				textElForHWC.SetAttributeValue("y", strconv.Itoa(HWcDef.Y+33+a*40-(cnt*40/2)))
+				textElForHWC.SetAttributeValue("y", strconv.Itoa(HWcDef.Y+27+a*30-(cnt*30/2)))
 				textElForHWC.SetAttributeValue("text-anchor", "middle")
-				textElForHWC.SetAttributeValue("fill", "#000")
+				textElForHWC.SetAttributeValue("fill", su.Qstr(isIn("invtxt", renderOptions), su.Qstr(showLabels, "#FFF", "#666"), su.Qstr(showLabels, "#000", "#999")))
 				textElForHWC.SetAttributeValue("font-weight", "bold")
-				textElForHWC.SetAttributeValue("font-size", "35")
+				textElForHWC.SetAttributeValue("font-size", "30")
 				textElForHWC.SetAttributeValue("font-family", "sans-serif")
 				textElForHWC.SetAttributeValue("pointer-events", "none")
-				if typeDef.Rotate != 0 {
-					textElForHWC.SetAttributeValue("transform", fmt.Sprintf("rotate(%03f %d %d)", typeDef.Rotate, HWcDef.X, HWcDef.Y))
+
+				rotate := typeDef.Rotate
+				//if isIn("txt90", renderOptions) {
+				if typeDef.H > typeDef.W*2 {
+					rotate += 90
+				}
+				if rotate != 0 {
+					textElForHWC.SetAttributeValue("transform", fmt.Sprintf("rotate(%03f %d %d)", rotate, HWcDef.X, HWcDef.Y))
 				}
 				textElForHWC.Text = sp[a]
 			}
@@ -170,14 +179,14 @@ func GenerateCompositeSVG(topologyJSON string, topologySVG string, theMap map[ui
 			textForDisplaySize.Text = strconv.Itoa(typeDef.Disp.W) + "x" + strconv.Itoa(typeDef.Disp.H) + dispLabelSuffix
 		}
 
-		if showHWCID {
+		if showHWCID || isIn("hwcid", renderOptions) {
 			numberForHWC := svgDoc.Root.CreateNode("text")
 			numberForHWC.SetAttributeValue("x", strconv.Itoa(HWcDef.X-su.Qint(typeDef.H > 0, typeDef.W/2-4, 0)))
 			numberForHWC.SetAttributeValue("y", strconv.Itoa(HWcDef.Y-su.Qint(typeDef.H > 0, typeDef.H, typeDef.W)/2+20))
 			if typeDef.H == 0 { // Circle: Center it...
 				numberForHWC.SetAttributeValue("text-anchor", "middle")
 			}
-			numberForHWC.SetAttributeValue("fill", "#000")
+			numberForHWC.SetAttributeValue("fill", su.Qstr(showHWCID, "#000", "#999"))
 			numberForHWC.SetAttributeValue("font-size", "20")
 			numberForHWC.SetAttributeValue("font-family", "sans-serif")
 			numberForHWC.SetAttributeValue("pointer-events", "none")
@@ -219,4 +228,13 @@ func addSubElFormatting(newHWc *xml.Node, subEl *TopologyHWcTypeDefSubEl) {
 	newHWc.SetAttributeValue("fill", "#cccccc")
 	newHWc.SetAttributeValue("stroke", "#666")
 	newHWc.SetAttributeValue("stroke-width", "1")
+}
+
+func isIn(searchFor string, in []string) bool {
+	for _, el := range in {
+		if el == searchFor {
+			return true
+		}
+	}
+	return false
 }
