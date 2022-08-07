@@ -19,7 +19,7 @@ type TopologyHWcomponent struct {
 	Txt          string              `json:"txt"`  // text label, possibly split in two lines by "|"
 	Type         uint32              `json:"type"` // Type number, must be a key in $subElements (generateTopologies.phpsh) and thereby a key in the TypeIndex map. Type 0 (zero) means disabled.
 	TypeOverride *TopologyHWcTypeDef `json:"typeOverride,omitempty"`
-	UIparent     uint32              `json:"UIparent,omitempty"` // UI parent HWc, for simulator to know which elements should move along with a given parent when moved.
+	UIparent     uint32              `json:"UIparent,omitempty"` // UI parent HWc, for simulator to know which elements should move along with a given parent when moved. (NOTICE: I think this is actually wrong, it's encapsulated in an object where used in reactor it seems... Needs clarification and alignment (KS))
 }
 
 // See DC_SKAARHOJ_RawPanel.odt for descriptions:
