@@ -40,7 +40,7 @@ type TopologyHWcTypeDef struct {
 }
 
 type TopologyHWcTypeDefSubEl struct {
-	ObjType string `json:"_,omitempty"`
+	ObjType string `json:"_,omitempty"` // r (rectangle), c (circle), d (display placeholder)
 	X       int    `json:"_x,omitempty"`
 	Y       int    `json:"_y,omitempty"`
 	W       int    `json:"_w,omitempty"`

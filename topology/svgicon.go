@@ -25,20 +25,32 @@ func GenerateCompositeSVG(topologyJSON string, topologySVG string, theMap map[ui
 	showType := false        // Will render the type id above each component (for development)
 	showDisplaySize := false // Will render the display sizes in pixels at every display (for development)
 
+	svgDoc := GenerateCompositeSVGdoc(topologyJSON, topologySVG, theMap, showLabels, showHWCID, showType, showDisplaySize)
+	if svgDoc == nil {
+		return ""
+	}
+
+	return svgDoc.XMLPretty()
+}
+
+func GenerateCompositeSVGdoc(topologyJSON string, topologySVG string, theMap map[uint32]uint32, showLabels, showHWCID, showType, showDisplaySize bool) *xml.Document {
+
 	// Parsing SVG file:
 	svgDoc, err := xmldom.ParseXML(topologySVG)
 	if err != nil {
 		log.Should(err)
-		return ""
+		return nil
 	}
 	if svgDoc.Root == nil {
 		log.Error("svgDoc.Root was nil")
-		return ""
+		return nil
 	}
 
 	// Reading JSON topology:
 	var topology Topology
 	json.Unmarshal([]byte(topologyJSON), &topology)
+
+	//magicFaderKnob := strings.Contains(topologyJSON, "#faderKnob112x262")
 
 	topology.Verify()
 
@@ -201,7 +213,7 @@ func GenerateCompositeSVG(topologyJSON string, topologySVG string, theMap map[ui
 		}
 	}
 
-	return svgDoc.XMLPretty()
+	return svgDoc
 }
 
 func addFormatting(newHWc *xml.Node, id int) {
