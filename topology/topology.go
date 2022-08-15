@@ -250,8 +250,8 @@ func (topology *Topology) GetTypeDefWithOverride(HWcDef *TopologyHWcomponent) To
 		if HWcDef.TypeOverride.H > 0 {
 			typeDef.H = HWcDef.TypeOverride.H
 		}
-		if HWcDef.TypeOverride.Rotate != 0 {
-			typeDef.Rotate = HWcDef.TypeOverride.Rotate
+		if HWcDef.TypeOverride.Subidx > 0 {
+			typeDef.Subidx = HWcDef.TypeOverride.Subidx
 		}
 		if HWcDef.TypeOverride.Out != "" {
 			typeDef.Out = HWcDef.TypeOverride.Out
@@ -262,8 +262,14 @@ func (topology *Topology) GetTypeDefWithOverride(HWcDef *TopologyHWcomponent) To
 		if HWcDef.TypeOverride.Ext != "" {
 			typeDef.Ext = HWcDef.TypeOverride.Ext
 		}
-		if HWcDef.TypeOverride.Subidx > 0 {
-			typeDef.Subidx = HWcDef.TypeOverride.Subidx
+		if HWcDef.TypeOverride.Desc != "" {
+			typeDef.Desc = HWcDef.TypeOverride.Desc
+		}
+		if HWcDef.TypeOverride.Render != "" {
+			typeDef.Render = HWcDef.TypeOverride.Render
+		}
+		if HWcDef.TypeOverride.Rotate != 0 {
+			typeDef.Rotate = HWcDef.TypeOverride.Rotate
 		}
 		if HWcDef.TypeOverride.Disp != nil {
 			typeDef.Disp = HWcDef.TypeOverride.Disp
