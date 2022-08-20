@@ -1,8 +1,11 @@
 package topology
 
 import (
+	"encoding/json"
 	"fmt"
+	"math/rand"
 	"sync"
+	"time"
 )
 
 type Topology struct {
@@ -235,6 +238,56 @@ func (topology *Topology) Verify() {
 			fmt.Printf("Warning: Type %d not used in HWcID index\n", key)
 		}
 	}
+}
+
+func (topology *Topology) RandomizeTypes(sequence bool) {
+
+	// Remap:
+	newTypeStruct := make(map[uint32]TopologyHWcTypeDef)
+	typeMapping := make(map[uint32]uint32)
+	s1 := rand.NewSource(time.Now().UnixNano())
+	r1 := rand.New(s1)
+	seq := uint32(1)
+	for typeNum, typeStruct := range topology.TypeIndex {
+		// Find new random index not used:
+		typeMapping[typeNum] = uint32(r1.Intn(1000000))
+		if sequence {
+			typeMapping[typeNum] = seq
+		}
+		for {
+			if _, exists := newTypeStruct[typeMapping[typeNum]]; exists {
+				if sequence {
+					typeMapping[typeNum]++
+					seq++
+					//fmt.Println("Had to find new type instead of ", typeMapping[typeNum])
+				} else {
+					fmt.Println("Had to find new type instead of ", typeMapping[typeNum])
+					typeMapping[typeNum] = uint32(r1.Intn(1000000))
+				}
+			} else {
+				break
+			}
+		}
+		// Map it over:
+		newTypeStruct[typeMapping[typeNum]] = typeStruct // assumes locks are not set...
+	}
+	topology.TypeIndex = newTypeStruct
+
+	// Map it in HWc:
+	for i, HWc := range topology.HWc {
+		if HWc.Type != 0 { // If not disabled.
+			if newType, ok := typeMapping[HWc.Type]; !ok {
+				fmt.Printf("ERROR: Type %d not found in type index\n", HWc.Type)
+			} else {
+				topology.HWc[i].Type = newType
+			}
+		}
+	}
+}
+
+func (topology *Topology) ToJSON() string {
+	jsonEncoderNewTop, _ := json.Marshal(topology)
+	return string(jsonEncoderNewTop)
 }
 
 func (topology *Topology) GetTypeDefWithOverride(HWcDef *TopologyHWcomponent) TopologyHWcTypeDef {
