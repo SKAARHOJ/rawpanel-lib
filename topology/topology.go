@@ -4,16 +4,20 @@ import (
 	"encoding/json"
 	"fmt"
 	"math/rand"
+	"strings"
 	"sync"
 	"time"
+
+	log "github.com/s00500/env_logger"
+	"golang.org/x/exp/slices"
 )
 
 type Topology struct {
-	Title     string `json:"title,omitempty"` // Controller Title
-	HWc       []TopologyHWcomponent
-	TypeIndex map[uint32]TopologyHWcTypeDef `json:"typeIndex"`
-
-	sync.RWMutex `json:"title,omitempty"`
+	Title            string `json:"title,omitempty"` // Controller Title
+	HWc              []TopologyHWcomponent
+	TypeIndex        map[uint32]TopologyHWcTypeDef `json:"typeIndex"`
+	NoUnisketchCompt bool
+	sync.RWMutex     `json:"title,omitempty"`
 }
 type TopologyHWcomponent struct {
 	Id           uint32              `json:"id"`   // The HWCid - follows the index (+1) of the $HWc
@@ -28,6 +32,7 @@ type TopologyHWcomponent struct {
 
 // See DC_SKAARHOJ_RawPanel.odt for descriptions:
 type TopologyHWcTypeDef struct {
+	//UskCompatID int
 	W      int                         `json:"w,omitempty"`      // Width of component
 	H      int                         `json:"h,omitempty"`      // Height of component. If defined, the component will be a rectangle, otherwise a circle with diameter W.
 	Out    string                      `json:"out,omitempty"`    // Output type
@@ -129,6 +134,17 @@ func (topology *Topology) GetHWCsWithDisplay() []uint32 {
 	}
 
 	return retval
+}
+
+func (typeDef *TopologyHWcTypeDef) LedBarSteps() int {
+	if strings.Contains(typeDef.Ext, "steps") {
+		return len(typeDef.Sub) // Should actually count...
+	}
+	return 0
+}
+
+func (typeDef *TopologyHWcTypeDef) HasDisplay() bool {
+	return typeDef.Disp != nil
 }
 
 func (typeDef *TopologyHWcTypeDef) IsButton() bool {
@@ -296,15 +312,86 @@ func (topology *Topology) GetTypeDefWithOverride(HWcDef *TopologyHWcomponent) To
 
 	// Look for local type override and overlay it if it's there..:
 	// Across controllers, this is largely alternative disp{} pixel dimensions and some sub[] changes.
-	if HWcDef.TypeOverride != nil {
+	if HWcDef.TypeOverride == nil {
+		return typeDef
+	}
+
+	if HWcDef.TypeOverride.W > 0 {
+		typeDef.W = HWcDef.TypeOverride.W
+	}
+	if HWcDef.TypeOverride.H > 0 {
+		typeDef.H = HWcDef.TypeOverride.H
+	}
+	if HWcDef.TypeOverride.Subidx > 0 {
+		typeDef.Subidx = HWcDef.TypeOverride.Subidx
+	}
+	if HWcDef.TypeOverride.Out != "" {
+		typeDef.Out = HWcDef.TypeOverride.Out
+	}
+	if HWcDef.TypeOverride.In != "" {
+		typeDef.In = HWcDef.TypeOverride.In
+	}
+	if HWcDef.TypeOverride.Ext != "" {
+		typeDef.Ext = HWcDef.TypeOverride.Ext
+	}
+	if HWcDef.TypeOverride.Desc != "" {
+		typeDef.Desc = HWcDef.TypeOverride.Desc
+	}
+	if HWcDef.TypeOverride.Render != "" {
+		typeDef.Render = HWcDef.TypeOverride.Render
+	}
+	if HWcDef.TypeOverride.Rotate != 0 {
+		typeDef.Rotate = HWcDef.TypeOverride.Rotate
+	}
+	if HWcDef.TypeOverride.Disp != nil {
+		typeDef.Disp = HWcDef.TypeOverride.Disp
+	}
+	if len(HWcDef.TypeOverride.Sub) > 0 {
+		typeDef.Sub = HWcDef.TypeOverride.Sub
+	}
+	return typeDef
+}
+
+// Used by reactor:
+
+func (top *Topology) GetHWCTypeDefinitionFromHWCid(HWCid int) *TopologyHWcTypeDef {
+	for k, r := range top.HWc {
+		if r.Id == uint32(HWCid) {
+			return top.GetHWCTypeDefinition(k)
+		}
+	}
+
+	return &TopologyHWcTypeDef{}
+}
+func (top *Topology) GetHWCDefinitionFromHWCid(HWCid int) *TopologyHWcomponent {
+	for _, r := range top.HWc {
+		if r.Id == uint32(HWCid) {
+			return &r
+		}
+	}
+
+	return &TopologyHWcomponent{}
+}
+
+func (top *Topology) GetHWCTypeDefinition(HWCMapKey int) *TopologyHWcTypeDef {
+	if HWCMapKey >= len(top.HWc) {
+		return &TopologyHWcTypeDef{}
+	}
+
+	typeDef, ok := top.TypeIndex[top.HWc[HWCMapKey].Type]
+	if !ok {
+		return &TopologyHWcTypeDef{}
+	}
+
+	HWcDef := top.HWc[HWCMapKey]
+
+	if HWcDef.TypeOverride != nil && fmt.Sprint(HWcDef.TypeOverride) != fmt.Sprint(TopologyHWcTypeDef{}) {
+		// log.Println(HWCMapKey, log.Indent(HWcDef.TypeOverride))
 		if HWcDef.TypeOverride.W > 0 {
 			typeDef.W = HWcDef.TypeOverride.W
 		}
 		if HWcDef.TypeOverride.H > 0 {
 			typeDef.H = HWcDef.TypeOverride.H
-		}
-		if HWcDef.TypeOverride.Subidx > 0 {
-			typeDef.Subidx = HWcDef.TypeOverride.Subidx
 		}
 		if HWcDef.TypeOverride.Out != "" {
 			typeDef.Out = HWcDef.TypeOverride.Out
@@ -315,14 +402,8 @@ func (topology *Topology) GetTypeDefWithOverride(HWcDef *TopologyHWcomponent) To
 		if HWcDef.TypeOverride.Ext != "" {
 			typeDef.Ext = HWcDef.TypeOverride.Ext
 		}
-		if HWcDef.TypeOverride.Desc != "" {
-			typeDef.Desc = HWcDef.TypeOverride.Desc
-		}
-		if HWcDef.TypeOverride.Render != "" {
-			typeDef.Render = HWcDef.TypeOverride.Render
-		}
-		if HWcDef.TypeOverride.Rotate != 0 {
-			typeDef.Rotate = HWcDef.TypeOverride.Rotate
+		if HWcDef.TypeOverride.Subidx > 0 {
+			typeDef.Subidx = HWcDef.TypeOverride.Subidx
 		}
 		if HWcDef.TypeOverride.Disp != nil {
 			typeDef.Disp = HWcDef.TypeOverride.Disp
@@ -331,6 +412,25 @@ func (topology *Topology) GetTypeDefWithOverride(HWcDef *TopologyHWcomponent) To
 			typeDef.Sub = HWcDef.TypeOverride.Sub
 		}
 	}
+	return &typeDef
+}
 
-	return typeDef
+func (top *Topology) CleanSections() {
+	removeIDs := make([]int, 0)
+	for idx, hwc := range top.HWc {
+		if hwc.Type == 250 {
+			removeIDs = append(removeIDs, idx)
+		}
+	}
+
+	for i := range removeIDs {
+		delID := removeIDs[len(removeIDs)-1-i]
+		top.HWc = slices.Delete(top.HWc, delID, delID+1)
+	}
+}
+
+func (top *Topology) JSONstring() string {
+	jsonRes, err := json.Marshal(top)
+	log.Should(err)
+	return string(jsonRes)
 }
