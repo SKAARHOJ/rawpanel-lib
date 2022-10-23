@@ -76,6 +76,24 @@ func TestOutbound(t *testing.T) {
 			[]string{"EnvironmentalHealth=Blocked"},
 			[]string{"EnvironmentalHealth=Blocked"},
 		},
+
+		// Register
+		{
+			[]string{"Mem=33", "MemA=12", "MemBB=355", "MemZ3Z=33"},
+			[]string{"Mem=33", "MemA=12", "MemBB=355", "MemZ3Z=33"},
+		},
+		{
+			[]string{"Flag#64=1", "Flag#=0", "Flag#64=234"},
+			[]string{"Flag#64=1", "Flag#0=0", "Flag#64=1"},
+		},
+		{
+			[]string{"Shift=5", "ShiftA=15", "ShiftA=52", "ShiftA=544", "ShiftG=21"},
+			[]string{"Shift=5", "ShiftA=15", "ShiftA=52", "ShiftA=544", "ShiftG=21"},
+		},
+		{
+			[]string{"State=5", "StateA=15", "StateA=52", "StateA=544", "StateG=21"},
+			[]string{"State=5", "StateA=15", "StateA=52", "StateA=544", "StateG=21"},
+		},
 	}
 
 	for i, tt := range tests {
@@ -192,6 +210,28 @@ func TestInbound(t *testing.T) {
 		{
 			[]string{"JSONonOutbound=0"},
 			[]string{"JSONonOutbound=0"},
+		},
+
+		// Register
+		{
+			[]string{"Registers?"},
+			[]string{"Registers?"},
+		},
+		{
+			[]string{"Mem=33", "MemA=12", "MemBB=355", "MemZ3Z=33"},
+			[]string{"Mem=33", "MemA=12", "MemBB=355", "MemZ3Z=33"},
+		},
+		{
+			[]string{"Flag#64=1", "Flag#=0", "Flag#64=234"},
+			[]string{"Flag#64=1", "Flag#0=0", "Flag#64=1"},
+		},
+		{
+			[]string{"Shift=5", "ShiftA=15", "ShiftA=52", "ShiftA=544", "ShiftG=21"},
+			[]string{"Shift=5", "ShiftA=15", "ShiftA=52", "ShiftA=544", "ShiftG=21"},
+		},
+		{
+			[]string{"State=5", "StateA=15", "StateA=52", "StateA=544", "StateG=21"},
+			[]string{"State=5", "StateA=15", "StateA=52", "StateA=544", "StateG=21"},
 		},
 	}
 

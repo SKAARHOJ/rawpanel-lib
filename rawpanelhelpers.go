@@ -719,6 +719,7 @@ var regex_gfx = regexp.MustCompile("^(HWCgRGB#|HWCgGray#|HWCg#)([0-9,]+)=([0-9]+
 var regex_genericDual = regexp.MustCompile("^(PanelBrightness)=([0-9]+),([0-9]+)$")
 var regex_genericSingle = regexp.MustCompile("^(HeartBeatTimer|DimmedGain|PublishSystemStat|LoadCPU|SleepTimer|SleepMode|SleepScreenSaver|Webserver|JSONonOutbound|PanelBrightness)=([0-9]+)$")
 var regex_genericSingleStr = regexp.MustCompile("^(SetCalibrationProfile|SimulateEnvironmentalHealth)=(.*)$")
+var regex_registers = regexp.MustCompile("^(Flag#|Mem|Shift|State)([A-Z0-9]*)=([0-9]+)$")
 
 // Converts Raw Panel 2.0 ASCII Strings into proto InboundMessage structs
 // Inbound TCP commands - from external system to SKAARHOJ panel
@@ -793,6 +794,12 @@ func RawPanelASCIIstringsToInboundMessages(rp20_ascii []string) []*rwp.InboundMe
 			msg = &rwp.InboundMessage{
 				Command: &rwp.Command{
 					SendCalibrationProfile: true,
+				},
+			}
+		case "Registers?":
+			msg = &rwp.InboundMessage{
+				Command: &rwp.Command{
+					SendRegisters: true,
 				},
 			}
 		case "Connections?":
@@ -1223,6 +1230,50 @@ func RawPanelASCIIstringsToInboundMessages(rp20_ascii []string) []*rwp.InboundMe
 						}
 					}
 				}
+			} else if regex_registers.MatchString(inputString) {
+				regexResult := regex_registers.FindStringSubmatch(inputString)
+				switch regexResult[1] {
+				case "Mem":
+					msg = &rwp.InboundMessage{
+						Registers: []*rwp.Register{
+							{
+								Reg:   rwp.Register_MEM,
+								Id:    regexResult[2],
+								Value: uint32(su.Intval(regexResult[3])),
+							},
+						},
+					}
+				case "Flag#":
+					msg = &rwp.InboundMessage{
+						Registers: []*rwp.Register{
+							{
+								Reg:   rwp.Register_FLAG,
+								Id:    fmt.Sprintf("%d", su.Intval(regexResult[2])),
+								Value: uint32(su.Qint(su.Intval(regexResult[3]) > 0, 1, 0)),
+							},
+						},
+					}
+				case "Shift":
+					msg = &rwp.InboundMessage{
+						Registers: []*rwp.Register{
+							{
+								Reg:   rwp.Register_SHIFT,
+								Id:    regexResult[2],
+								Value: uint32(su.Intval(regexResult[3])),
+							},
+						},
+					}
+				case "State":
+					msg = &rwp.InboundMessage{
+						Registers: []*rwp.Register{
+							{
+								Reg:   rwp.Register_STATE,
+								Id:    regexResult[2],
+								Value: uint32(su.Intval(regexResult[3])),
+							},
+						},
+					}
+				}
 			} else {
 				msg = &rwp.InboundMessage{} //  == nack?
 			}
@@ -1320,6 +1371,9 @@ func InboundMessagesToRawPanelASCIIstrings(inboundMsgs []*rwp.InboundMessage) []
 			}
 			if inboundMsg.Command.SendCalibrationProfile {
 				returnStrings = append(returnStrings, "CalibrationProfile?")
+			}
+			if inboundMsg.Command.SendRegisters {
+				returnStrings = append(returnStrings, "Registers?")
 			}
 			if inboundMsg.Command.GetConnections {
 				returnStrings = append(returnStrings, "Connections?")
@@ -1538,6 +1592,21 @@ func InboundMessagesToRawPanelASCIIstrings(inboundMsgs []*rwp.InboundMessage) []
 				}
 			}
 		}
+
+		if len(inboundMsg.Registers) > 0 {
+			for _, reg := range inboundMsg.Registers {
+				switch reg.Reg {
+				case rwp.Register_MEM:
+					returnStrings = append(returnStrings, fmt.Sprintf("Mem%s=%d", reg.Id, reg.Value))
+				case rwp.Register_FLAG:
+					returnStrings = append(returnStrings, fmt.Sprintf("Flag#%s=%d", reg.Id, reg.Value))
+				case rwp.Register_SHIFT:
+					returnStrings = append(returnStrings, fmt.Sprintf("Shift%s=%d", reg.Id, reg.Value))
+				case rwp.Register_STATE:
+					returnStrings = append(returnStrings, fmt.Sprintf("State%s=%d", reg.Id, reg.Value))
+				}
+			}
+		}
 	}
 
 	if DebugRWPhelpers {
@@ -1573,6 +1642,7 @@ func InboundMessagesToRawPanelASCIIstrings(inboundMsgs []*rwp.InboundMessage) []
 var regex_map = regexp.MustCompile("^map=([0-9]+):([0-9]+)$")
 var regex_genericSingle_inbound = regexp.MustCompile("^(_model|_serial|_version|_platform|_bluePillReady|_name|_panelType|_support|_isSleeping|_sleepTimer|_panelTopology_svgbase|_panelTopology_HWC|_burninProfile|_calibrationProfile|_defaultCalibrationProfile|_serverModeLockToIP|_serverModeMaxClients|_heartBeatTimer|DimmedGain|_connections|_bootsCount|_totalUptimeMin|_sessionUptimeMin|_screenSaverOnMin|ErrorMsg|Msg|EnvironmentalHealth|SysStat)=(.+)$")
 var regex_cmd_inbound = regexp.MustCompile("^HWC#([0-9]+)(|.([0-9]+))=(Down|Up|Press|Abs|Speed|Enc)(|:([-0-9]+))$")
+var regex_registersOut = regexp.MustCompile("^(Flag#|Mem|Shift|State)([A-Z0-9]*)=([0-9]+)$")
 
 // Converts Raw Panel 1.0 ASCII Strings into proto OutboundMessage structs
 // Outbound TCP commands - from panel to external system
@@ -2010,6 +2080,50 @@ func RawPanelASCIIstringsToOutboundMessages(rp20_ascii []string) []*rwp.Outbound
 						SysStat: sysStatStruct,
 					}
 				}
+			} else if regex_registersOut.MatchString(inputString) {
+				regexResult := regex_registersOut.FindStringSubmatch(inputString)
+				switch regexResult[1] {
+				case "Mem":
+					msg = &rwp.OutboundMessage{
+						Registers: []*rwp.Register{
+							{
+								Reg:   rwp.Register_MEM,
+								Id:    regexResult[2],
+								Value: uint32(su.Intval(regexResult[3])),
+							},
+						},
+					}
+				case "Flag#":
+					msg = &rwp.OutboundMessage{
+						Registers: []*rwp.Register{
+							{
+								Reg:   rwp.Register_FLAG,
+								Id:    fmt.Sprintf("%d", su.Intval(regexResult[2])),
+								Value: uint32(su.Qint(su.Intval(regexResult[3]) > 0, 1, 0)),
+							},
+						},
+					}
+				case "Shift":
+					msg = &rwp.OutboundMessage{
+						Registers: []*rwp.Register{
+							{
+								Reg:   rwp.Register_SHIFT,
+								Id:    regexResult[2],
+								Value: uint32(su.Intval(regexResult[3])),
+							},
+						},
+					}
+				case "State":
+					msg = &rwp.OutboundMessage{
+						Registers: []*rwp.Register{
+							{
+								Reg:   rwp.Register_STATE,
+								Id:    regexResult[2],
+								Value: uint32(su.Intval(regexResult[3])),
+							},
+						},
+					}
+				}
 			} else {
 				msg = &rwp.OutboundMessage{} //  == nack?
 			}
@@ -2275,6 +2389,21 @@ func OutboundMessagesToRawPanelASCIIstrings(outboundMsgs []*rwp.OutboundMessage)
 				}
 				if eventRec.RawAnalog != nil {
 					returnStrings = append(returnStrings, fmt.Sprintf("HWC#%d=Raw:%d", eventRec.HWCID, eventRec.RawAnalog.Value))
+				}
+			}
+		}
+
+		if len(outboundMsg.Registers) > 0 {
+			for _, reg := range outboundMsg.Registers {
+				switch reg.Reg {
+				case rwp.Register_MEM:
+					returnStrings = append(returnStrings, fmt.Sprintf("Mem%s=%d", reg.Id, reg.Value))
+				case rwp.Register_FLAG:
+					returnStrings = append(returnStrings, fmt.Sprintf("Flag#%s=%d", reg.Id, reg.Value))
+				case rwp.Register_SHIFT:
+					returnStrings = append(returnStrings, fmt.Sprintf("Shift%s=%d", reg.Id, reg.Value))
+				case rwp.Register_STATE:
+					returnStrings = append(returnStrings, fmt.Sprintf("State%s=%d", reg.Id, reg.Value))
 				}
 			}
 		}
