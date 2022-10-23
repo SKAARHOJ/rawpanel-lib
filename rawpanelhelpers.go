@@ -1888,9 +1888,9 @@ func RawPanelASCIIstringsToOutboundMessages(rp20_ascii []string) []*rwp.Outbound
 						switch parts[a] {
 						case "CPUUsage":
 							sysStatStruct.CPUUsage = uint32(su.Intval(parts[a+1]))
-						case "CPUTempFloat":
+						case "CPUTemp":
 							sysStatStruct.CPUTemp = float32(floatVal)
-						case "ExtTempFloat":
+						case "ExtTemp":
 							sysStatStruct.ExtTemp = float32(floatVal)
 						case "CPUVoltage":
 							sysStatStruct.CPUVoltage = float32(floatVal)
