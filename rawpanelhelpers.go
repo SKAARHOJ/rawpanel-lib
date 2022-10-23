@@ -844,7 +844,7 @@ func RawPanelASCIIstringsToInboundMessages(rp20_ascii []string) []*rwp.InboundMe
 				},
 			}
 		default:
-			if len(inputString) > 0 && inputString[0:1] == "{" { // JSON input:
+			if len(inputString) > 0 && inputString[0:1] == "{" { // JSON input, events
 				//fmt.Println(inputString)
 				myState := &rwp.HWCState{}
 				json.Unmarshal([]byte(inputString), myState)
@@ -854,6 +854,12 @@ func RawPanelASCIIstringsToInboundMessages(rp20_ascii []string) []*rwp.InboundMe
 						myState,
 					},
 				}
+			} else if len(inputString) > 0 && inputString[0:1] == "[" { // JSON input, full protobuf message
+				//fmt.Println(inputString)
+				myStateMsgs := []*rwp.InboundMessage{}
+				json.Unmarshal([]byte(inputString), &myStateMsgs)
+				msg = nil
+				returnMsgs = append(returnMsgs, myStateMsgs...)
 			} else if regex_cmd.MatchString(inputString) {
 				HWCidArray := su.IntExplode(regex_cmd.FindStringSubmatch(inputString)[2], ",")
 				switch regex_cmd.FindStringSubmatch(inputString)[1] {
