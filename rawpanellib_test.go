@@ -185,6 +185,14 @@ func TestInbound(t *testing.T) {
 			[]string{"SimulateEnvironmentalHealth=Blocked"},
 			[]string{"SimulateEnvironmentalHealth=Blocked"},
 		},
+		{
+			[]string{"JSONonOutbound=1"},
+			[]string{"JSONonOutbound=1"},
+		},
+		{
+			[]string{"JSONonOutbound=0"},
+			[]string{"JSONonOutbound=0"},
+		},
 	}
 
 	for i, tt := range tests {

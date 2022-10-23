@@ -717,7 +717,7 @@ func (ar *ASCIIreader) Parse(inputString string) []*rwp.InboundMessage {
 var regex_cmd = regexp.MustCompile("^(HWC#|HWCx#|HWCc#|HWCt#|HWCrawADCValues#)([0-9,]+)=(.*)$")
 var regex_gfx = regexp.MustCompile("^(HWCgRGB#|HWCgGray#|HWCg#)([0-9,]+)=([0-9]+)(/([0-9]+),([0-9]+)x([0-9]+)(,([0-9]+),([0-9]+)|)|):(.*)$")
 var regex_genericDual = regexp.MustCompile("^(PanelBrightness)=([0-9]+),([0-9]+)$")
-var regex_genericSingle = regexp.MustCompile("^(HeartBeatTimer|DimmedGain|PublishSystemStat|LoadCPU|SleepTimer|SleepMode|SleepScreenSaver|Webserver|PanelBrightness)=([0-9]+)$")
+var regex_genericSingle = regexp.MustCompile("^(HeartBeatTimer|DimmedGain|PublishSystemStat|LoadCPU|SleepTimer|SleepMode|SleepScreenSaver|Webserver|JSONonOutbound|PanelBrightness)=([0-9]+)$")
 var regex_genericSingleStr = regexp.MustCompile("^(SetCalibrationProfile|SimulateEnvironmentalHealth)=(.*)$")
 
 // Converts Raw Panel 2.0 ASCII Strings into proto InboundMessage structs
@@ -1147,6 +1147,14 @@ func RawPanelASCIIstringsToInboundMessages(rp20_ascii []string) []*rwp.InboundMe
 							},
 						},
 					}
+				case "JSONonOutbound":
+					msg = &rwp.InboundMessage{
+						Command: &rwp.Command{
+							JSONconfig: &rwp.JSONconfig{
+								Outbound: param1 > 0,
+							},
+						},
+					}
 				case "PanelBrightness":
 					msg = &rwp.InboundMessage{
 						Command: &rwp.Command{
@@ -1370,6 +1378,9 @@ func InboundMessagesToRawPanelASCIIstrings(inboundMsgs []*rwp.InboundMessage) []
 			}
 			if inboundMsg.Command.SetWebserverEnabled != nil {
 				returnStrings = append(returnStrings, fmt.Sprintf("Webserver=%d", su.Qint(inboundMsg.Command.SetWebserverEnabled.Enabled, 1, 0)))
+			}
+			if inboundMsg.Command.JSONconfig != nil {
+				returnStrings = append(returnStrings, fmt.Sprintf("JSONonOutbound=%d", su.Qint(inboundMsg.Command.JSONconfig.Outbound, 1, 0)))
 			}
 		}
 
