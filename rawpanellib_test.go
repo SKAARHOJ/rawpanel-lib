@@ -62,6 +62,20 @@ func TestOutbound(t *testing.T) {
 			[]string{"SysStat=CPUUsage:4:CPUTemp:56.0:ExtTemp:-100.0:CPUVoltage:0.85:CPUFreqCurrent:-1500000:CPUFreqMin:-1400000:CPUFreqMax:-1300000:MemTotal:-1893788:MemFree:-1637268:MemAvailable:-1750128:MemBuffers:-6004:MemCached:-120080:UnderVoltageNow:1:UnderVoltage:0:FreqCapNow:0:FreqCap:1:ThrottledNow:0:Throttled:1:SoftTempLimitNow:1:SoftTempLimit:0:"},
 			[]string{"SysStat=CPUUsage:4:CPUTemp:56.0:ExtTemp:-100.0:CPUVoltage:0.85:CPUFreqCurrent:-1500000:CPUFreqMin:-1400000:CPUFreqMax:-1300000:MemTotal:-1893788:MemFree:-1637268:MemAvailable:-1750128:MemBuffers:-6004:MemCached:-120080:UnderVoltageNow:1:UnderVoltage:0:FreqCapNow:0:FreqCap:1:ThrottledNow:0:Throttled:1:SoftTempLimitNow:1:SoftTempLimit:0:"},
 		},
+
+		// Environmental Health:
+		{
+			[]string{"EnvironmentalHealth=Normal"},
+			[]string{"EnvironmentalHealth=Normal"},
+		},
+		{
+			[]string{"EnvironmentalHealth=Safemode"},
+			[]string{"EnvironmentalHealth=Safemode"},
+		},
+		{
+			[]string{"EnvironmentalHealth=Blocked"},
+			[]string{"EnvironmentalHealth=Blocked"},
+		},
 	}
 
 	for i, tt := range tests {
@@ -158,6 +172,18 @@ func TestInbound(t *testing.T) {
 		{
 			[]string{"SetCalibrationProfile= (JSON) "},
 			[]string{"SetCalibrationProfile=(JSON)"},
+		},
+		{
+			[]string{"SimulateEnvironmentalHealth=Normal"},
+			[]string{"SimulateEnvironmentalHealth=Normal"},
+		},
+		{
+			[]string{"SimulateEnvironmentalHealth=Safemode"},
+			[]string{"SimulateEnvironmentalHealth=Safemode"},
+		},
+		{
+			[]string{"SimulateEnvironmentalHealth=Blocked"},
+			[]string{"SimulateEnvironmentalHealth=Blocked"},
 		},
 	}
 

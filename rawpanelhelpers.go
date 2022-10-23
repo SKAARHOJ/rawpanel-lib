@@ -718,7 +718,7 @@ var regex_cmd = regexp.MustCompile("^(HWC#|HWCx#|HWCc#|HWCt#|HWCrawADCValues#)([
 var regex_gfx = regexp.MustCompile("^(HWCgRGB#|HWCgGray#|HWCg#)([0-9,]+)=([0-9]+)(/([0-9]+),([0-9]+)x([0-9]+)(,([0-9]+),([0-9]+)|)|):(.*)$")
 var regex_genericDual = regexp.MustCompile("^(PanelBrightness)=([0-9]+),([0-9]+)$")
 var regex_genericSingle = regexp.MustCompile("^(HeartBeatTimer|DimmedGain|PublishSystemStat|LoadCPU|SleepTimer|SleepMode|SleepScreenSaver|Webserver|PanelBrightness)=([0-9]+)$")
-var regex_genericSingleStr = regexp.MustCompile("^(SetCalibrationProfile)=(.*)$")
+var regex_genericSingleStr = regexp.MustCompile("^(SetCalibrationProfile|SimulateEnvironmentalHealth)=(.*)$")
 
 // Converts Raw Panel 2.0 ASCII Strings into proto InboundMessage structs
 // Inbound TCP commands - from external system to SKAARHOJ panel
@@ -1181,6 +1181,33 @@ func RawPanelASCIIstringsToInboundMessages(rp20_ascii []string) []*rwp.InboundMe
 							},
 						},
 					}
+				case "SimulateEnvironmentalHealth":
+					switch regex_genericSingleStr.FindStringSubmatch(inputString)[2] {
+					case "Normal":
+						msg = &rwp.InboundMessage{
+							Command: &rwp.Command{
+								SimulateEnvironmentalHealth: &rwp.Environment{
+									RunMode: rwp.Environment_NORMAL,
+								},
+							},
+						}
+					case "Safemode":
+						msg = &rwp.InboundMessage{
+							Command: &rwp.Command{
+								SimulateEnvironmentalHealth: &rwp.Environment{
+									RunMode: rwp.Environment_SAFEMODE,
+								},
+							},
+						}
+					case "Blocked":
+						msg = &rwp.InboundMessage{
+							Command: &rwp.Command{
+								SimulateEnvironmentalHealth: &rwp.Environment{
+									RunMode: rwp.Environment_BLOCKED,
+								},
+							},
+						}
+					}
 				}
 			} else {
 				msg = &rwp.InboundMessage{} //  == nack?
@@ -1309,6 +1336,16 @@ func InboundMessagesToRawPanelASCIIstrings(inboundMsgs []*rwp.InboundMessage) []
 			}
 			if inboundMsg.Command.SetCalibrationProfile != nil {
 				returnStrings = append(returnStrings, fmt.Sprintf("SetCalibrationProfile=%s", stripLineBreaks(inboundMsg.Command.SetCalibrationProfile.Json)))
+			}
+			if inboundMsg.Command.SimulateEnvironmentalHealth != nil {
+				switch inboundMsg.Command.SimulateEnvironmentalHealth.RunMode {
+				case rwp.Environment_NORMAL:
+					returnStrings = append(returnStrings, "SimulateEnvironmentalHealth=Normal")
+				case rwp.Environment_SAFEMODE:
+					returnStrings = append(returnStrings, "SimulateEnvironmentalHealth=Safemode")
+				case rwp.Environment_BLOCKED:
+					returnStrings = append(returnStrings, "SimulateEnvironmentalHealth=Blocked")
+				}
 			}
 			if inboundMsg.Command.SetSleepTimeout != nil {
 				returnStrings = append(returnStrings, fmt.Sprintf("SleepTimer=%d", inboundMsg.Command.SetSleepTimeout.Value))
@@ -1517,7 +1554,7 @@ func InboundMessagesToRawPanelASCIIstrings(inboundMsgs []*rwp.InboundMessage) []
 }
 
 var regex_map = regexp.MustCompile("^map=([0-9]+):([0-9]+)$")
-var regex_genericSingle_inbound = regexp.MustCompile("^(_model|_serial|_version|_platform|_bluePillReady|_name|_panelType|_support|_isSleeping|_sleepTimer|_panelTopology_svgbase|_panelTopology_HWC|_burninProfile|_calibrationProfile|_defaultCalibrationProfile|_serverModeLockToIP|_serverModeMaxClients|_heartBeatTimer|DimmedGain|_connections|_bootsCount|_totalUptimeMin|_sessionUptimeMin|_screenSaverOnMin|ErrorMsg|Msg|SysStat)=(.+)$")
+var regex_genericSingle_inbound = regexp.MustCompile("^(_model|_serial|_version|_platform|_bluePillReady|_name|_panelType|_support|_isSleeping|_sleepTimer|_panelTopology_svgbase|_panelTopology_HWC|_burninProfile|_calibrationProfile|_defaultCalibrationProfile|_serverModeLockToIP|_serverModeMaxClients|_heartBeatTimer|DimmedGain|_connections|_bootsCount|_totalUptimeMin|_sessionUptimeMin|_screenSaverOnMin|ErrorMsg|Msg|EnvironmentalHealth|SysStat)=(.+)$")
 var regex_cmd_inbound = regexp.MustCompile("^HWC#([0-9]+)(|.([0-9]+))=(Down|Up|Press|Abs|Speed|Enc)(|:([-0-9]+))$")
 
 // Converts Raw Panel 1.0 ASCII Strings into proto OutboundMessage structs
@@ -1880,6 +1917,29 @@ func RawPanelASCIIstringsToOutboundMessages(rp20_ascii []string) []*rwp.Outbound
 							Message: strValue,
 						},
 					}
+				case "EnvironmentalHealth":
+					{
+						switch strValue {
+						case "Normal":
+							msg = &rwp.OutboundMessage{
+								EnvironmentalHealth: &rwp.Environment{
+									RunMode: rwp.Environment_NORMAL,
+								},
+							}
+						case "Safemode":
+							msg = &rwp.OutboundMessage{
+								EnvironmentalHealth: &rwp.Environment{
+									RunMode: rwp.Environment_SAFEMODE,
+								},
+							}
+						case "Blocked":
+							msg = &rwp.OutboundMessage{
+								EnvironmentalHealth: &rwp.Environment{
+									RunMode: rwp.Environment_BLOCKED,
+								},
+							}
+						}
+					}
 				case "SysStat":
 					sysStatStruct := &rwp.SystemStat{}
 					parts := strings.Split(strValue, ":")
@@ -2125,6 +2185,16 @@ func OutboundMessagesToRawPanelASCIIstrings(outboundMsgs []*rwp.OutboundMessage)
 		if len(outboundMsg.HWCavailability) > 0 {
 			for origHWC, available := range outboundMsg.HWCavailability {
 				returnStrings = append(returnStrings, fmt.Sprintf("map=%d:%d", origHWC, available))
+			}
+		}
+		if outboundMsg.EnvironmentalHealth != nil {
+			switch outboundMsg.EnvironmentalHealth.RunMode {
+			case rwp.Environment_NORMAL:
+				returnStrings = append(returnStrings, "EnvironmentalHealth=Normal")
+			case rwp.Environment_SAFEMODE:
+				returnStrings = append(returnStrings, "EnvironmentalHealth=Safemode")
+			case rwp.Environment_BLOCKED:
+				returnStrings = append(returnStrings, "EnvironmentalHealth=Blocked")
 			}
 		}
 		if outboundMsg.SysStat != nil {
