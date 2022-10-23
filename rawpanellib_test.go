@@ -107,6 +107,16 @@ func TestOutboundFromBinary(t *testing.T) {
 			},
 			[]string{`_burninProfile=[{"Test": {"Json": " TEST "}}]`},
 		},
+		{
+			[]*ibeam_rawpanel.OutboundMessage{
+				{
+					BurninProfile:             &ibeam_rawpanel.BurninProfile{},
+					CalibrationProfile:        &ibeam_rawpanel.CalibrationProfile{},
+					DefaultCalibrationProfile: &ibeam_rawpanel.CalibrationProfile{},
+				},
+			},
+			[]string{`_burninProfile=`, `_calibrationProfile=`, `_defaultCalibrationProfile=`},
+		},
 	}
 
 	for i, tt := range tests {

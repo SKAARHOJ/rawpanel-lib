@@ -2074,27 +2074,17 @@ func OutboundMessagesToRawPanelASCIIstrings(outboundMsgs []*rwp.OutboundMessage)
 			}
 		}
 		if outboundMsg.PanelTopology != nil {
-			if outboundMsg.PanelTopology.Svgbase != "" {
-				returnStrings = append(returnStrings, "_panelTopology_svgbase="+stripLineBreaksSvg(outboundMsg.PanelTopology.Svgbase))
-			}
-			if outboundMsg.PanelTopology.Json != "" {
-				returnStrings = append(returnStrings, "_panelTopology_HWC="+stripLineBreaks(outboundMsg.PanelTopology.Json))
-			}
+			returnStrings = append(returnStrings, "_panelTopology_svgbase="+stripLineBreaksSvg(outboundMsg.PanelTopology.Svgbase))
+			returnStrings = append(returnStrings, "_panelTopology_HWC="+stripLineBreaks(outboundMsg.PanelTopology.Json))
 		}
 		if outboundMsg.BurninProfile != nil {
-			if outboundMsg.BurninProfile.Json != "" {
-				returnStrings = append(returnStrings, "_burninProfile="+stripLineBreaks(outboundMsg.BurninProfile.Json))
-			}
+			returnStrings = append(returnStrings, "_burninProfile="+stripLineBreaks(outboundMsg.BurninProfile.Json))
 		}
 		if outboundMsg.CalibrationProfile != nil {
-			if outboundMsg.CalibrationProfile.Json != "" {
-				returnStrings = append(returnStrings, "_calibrationProfile="+stripLineBreaks(outboundMsg.CalibrationProfile.Json))
-			}
+			returnStrings = append(returnStrings, "_calibrationProfile="+stripLineBreaks(outboundMsg.CalibrationProfile.Json))
 		}
 		if outboundMsg.DefaultCalibrationProfile != nil {
-			if outboundMsg.DefaultCalibrationProfile.Json != "" {
-				returnStrings = append(returnStrings, "_defaultCalibrationProfile="+stripLineBreaks(outboundMsg.DefaultCalibrationProfile.Json))
-			}
+			returnStrings = append(returnStrings, "_defaultCalibrationProfile="+stripLineBreaks(outboundMsg.DefaultCalibrationProfile.Json))
 		}
 		if outboundMsg.SleepTimeout != nil {
 			returnStrings = append(returnStrings, fmt.Sprintf("_sleepTimer=%d", outboundMsg.SleepTimeout.Value))
