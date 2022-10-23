@@ -140,6 +140,10 @@ func TestInbound(t *testing.T) {
 			[]string{"CalibrationProfile?"},
 			[]string{"CalibrationProfile?"},
 		},
+		{
+			[]string{"SetCalibrationProfile= (JSON) "},
+			[]string{"SetCalibrationProfile=(JSON)"},
+		},
 	}
 
 	for i, tt := range tests {
@@ -158,6 +162,56 @@ func TestInbound(t *testing.T) {
 					if roundtrip[i] != tt.want[i] {
 						log.Println(log.Indent(protobufObj))
 						t.Errorf("Round trip %v didn't match wanted %v", roundtrip, tt.want)
+						continue
+					}
+				}
+			}
+		})
+	}
+}
+
+func TestInboundFromBinary(t *testing.T) {
+	var tests = []struct {
+		give []*ibeam_rawpanel.InboundMessage
+		want []string
+	}{
+		// Testing JSON strings
+		{
+			[]*ibeam_rawpanel.InboundMessage{
+				{
+					Command: &ibeam_rawpanel.Command{
+						SetCalibrationProfile: &ibeam_rawpanel.CalibrationProfile{
+							Json: `
+							[
+								{
+								 "Test": {
+								  "Json": " TEST "
+								 }
+								}
+							   ]
+							   `,
+						},
+					},
+				},
+			},
+			[]string{`SetCalibrationProfile=[{"Test": {"Json": " TEST "}}]`},
+		},
+	}
+
+	for i, tt := range tests {
+		testname := fmt.Sprintf("TestInboundFromBinary%d", i)
+		t.Run(testname, func(t *testing.T) {
+			ASCIIstrings := InboundMessagesToRawPanelASCIIstrings(tt.give)
+			//log.Println(ASCIIstrings)
+
+			if len(ASCIIstrings) != len(tt.want) {
+				log.Println(log.Indent(tt.give))
+				t.Errorf("Round trip %v didn't match wanted %v", ASCIIstrings, tt.want)
+			} else {
+				for i := range ASCIIstrings {
+					if ASCIIstrings[i] != tt.want[i] {
+						log.Println(log.Indent(tt.give))
+						t.Errorf("Round trip %v didn't match wanted %v", ASCIIstrings, tt.want)
 						continue
 					}
 				}

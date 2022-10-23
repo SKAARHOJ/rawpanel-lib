@@ -264,49 +264,49 @@ func convertToColorStruct(colorValue int) *rwp.Color {
 /*
 func commandsForColorImage(img image.Image, bytesPerLine int) []string {
 
-	// Image dimensions and making a slice for calculated byte data:
-	dimensions := img.Bounds()
-	newColorPixelData := make([]byte, dimensions.Max.X*dimensions.Max.Y*2)
-	var i = 0
-	var OLEDEncodedColor int16
-	for rows := 0; rows < dimensions.Max.Y; rows++ {
-		for columns := 0; columns < dimensions.Max.X; columns++ {
-			red, green, blue, _ := img.At(columns, rows).RGBA()
-			OLEDEncodedColor = ((int16(blue) & 0xF8) << 8) | ((int16(green) & 0xFC) << 3) | ((int16(red) & 0xFF) >> 3)
-			newColorPixelData[i] = byte(OLEDEncodedColor >> 8)
-			i++
-			newColorPixelData[i] = byte(OLEDEncodedColor & 0xFF)
-			i++
+		// Image dimensions and making a slice for calculated byte data:
+		dimensions := img.Bounds()
+		newColorPixelData := make([]byte, dimensions.Max.X*dimensions.Max.Y*2)
+		var i = 0
+		var OLEDEncodedColor int16
+		for rows := 0; rows < dimensions.Max.Y; rows++ {
+			for columns := 0; columns < dimensions.Max.X; columns++ {
+				red, green, blue, _ := img.At(columns, rows).RGBA()
+				OLEDEncodedColor = ((int16(blue) & 0xF8) << 8) | ((int16(green) & 0xFC) << 3) | ((int16(red) & 0xFF) >> 3)
+				newColorPixelData[i] = byte(OLEDEncodedColor >> 8)
+				i++
+				newColorPixelData[i] = byte(OLEDEncodedColor & 0xFF)
+				i++
+			}
 		}
-	}
 
-	return gfxCommandLines(newColorPixelData, bytesPerLine, dimensions.Max.X, dimensions.Max.Y, "HWCgRGB")
-}
+		return gfxCommandLines(newColorPixelData, bytesPerLine, dimensions.Max.X, dimensions.Max.Y, "HWCgRGB")
+	}
 
 func commandsForBWImage(src image.Image, bytesPerLine int) []string {
 
-	g := gift.New(gift.Threshold(50))
-	img := image.NewRGBA(g.Bounds(src.Bounds()))
-	g.Draw(img, src)
+		g := gift.New(gift.Threshold(50))
+		img := image.NewRGBA(g.Bounds(src.Bounds()))
+		g.Draw(img, src)
 
-	// Image dimensions and making a slice for calculated byte data:
-	dimensions := img.Bounds()
-	colMax := int(math.Ceil(float64(dimensions.Max.X) / 8))
-	newColorPixelData := make([]byte, colMax*dimensions.Max.Y)
+		// Image dimensions and making a slice for calculated byte data:
+		dimensions := img.Bounds()
+		colMax := int(math.Ceil(float64(dimensions.Max.X) / 8))
+		newColorPixelData := make([]byte, colMax*dimensions.Max.Y)
 
-	var i = 0
-	for rows := 0; rows < dimensions.Max.Y; rows++ {
-		for columns := 0; columns < colMax; columns++ {
-			for pixels := 0; pixels < 8; pixels++ {
-				pixel, _, _, _ := img.At((columns<<3)+pixels, rows).RGBA()
-				newColorPixelData[i] |= byte(su.Qint(pixel > 127, 0, 1) << (7 - pixels) & 0xFF)
+		var i = 0
+		for rows := 0; rows < dimensions.Max.Y; rows++ {
+			for columns := 0; columns < colMax; columns++ {
+				for pixels := 0; pixels < 8; pixels++ {
+					pixel, _, _, _ := img.At((columns<<3)+pixels, rows).RGBA()
+					newColorPixelData[i] |= byte(su.Qint(pixel > 127, 0, 1) << (7 - pixels) & 0xFF)
+				}
+				i++
 			}
-			i++
 		}
-	}
 
-	return gfxCommandLines(newColorPixelData, bytesPerLine, dimensions.Max.X, dimensions.Max.Y, "HWCg")
-}
+		return gfxCommandLines(newColorPixelData, bytesPerLine, dimensions.Max.X, dimensions.Max.Y, "HWCg")
+	}
 */
 func gfxCommandLines(newColorPixelData []byte, bytesPerLine int, x int, y int, cmdString string) []string {
 	// Initialize output slice with command strings:
@@ -718,6 +718,7 @@ var regex_cmd = regexp.MustCompile("^(HWC#|HWCx#|HWCc#|HWCt#|HWCrawADCValues#)([
 var regex_gfx = regexp.MustCompile("^(HWCgRGB#|HWCgGray#|HWCg#)([0-9,]+)=([0-9]+)(/([0-9]+),([0-9]+)x([0-9]+)(,([0-9]+),([0-9]+)|)|):(.*)$")
 var regex_genericDual = regexp.MustCompile("^(PanelBrightness)=([0-9]+),([0-9]+)$")
 var regex_genericSingle = regexp.MustCompile("^(HeartBeatTimer|DimmedGain|PublishSystemStat|LoadCPU|SleepTimer|SleepMode|SleepScreenSaver|Webserver|PanelBrightness)=([0-9]+)$")
+var regex_genericSingleStr = regexp.MustCompile("^(SetCalibrationProfile)=(.*)$")
 
 // Converts Raw Panel 2.0 ASCII Strings into proto InboundMessage structs
 // Inbound TCP commands - from external system to SKAARHOJ panel
@@ -786,6 +787,12 @@ func RawPanelASCIIstringsToInboundMessages(rp20_ascii []string) []*rwp.InboundMe
 			msg = &rwp.InboundMessage{
 				Command: &rwp.Command{
 					SendBurninProfile: true,
+				},
+			}
+		case "CalibrationProfile?": // Test OK
+			msg = &rwp.InboundMessage{
+				Command: &rwp.Command{
+					SendCalibrationProfile: true,
 				},
 			}
 		case "Connections?":
@@ -1164,6 +1171,17 @@ func RawPanelASCIIstringsToInboundMessages(rp20_ascii []string) []*rwp.InboundMe
 						},
 					}
 				}
+			} else if regex_genericSingleStr.MatchString(inputString) {
+				switch regex_genericSingleStr.FindStringSubmatch(inputString)[1] {
+				case "SetCalibrationProfile":
+					msg = &rwp.InboundMessage{
+						Command: &rwp.Command{
+							SetCalibrationProfile: &rwp.CalibrationProfile{
+								Json: regex_genericSingleStr.FindStringSubmatch(inputString)[2],
+							},
+						},
+					}
+				}
 			} else {
 				msg = &rwp.InboundMessage{} //  == nack?
 			}
@@ -1259,6 +1277,9 @@ func InboundMessagesToRawPanelASCIIstrings(inboundMsgs []*rwp.InboundMessage) []
 			if inboundMsg.Command.SendBurninProfile {
 				returnStrings = append(returnStrings, "BurninProfile?")
 			}
+			if inboundMsg.Command.SendCalibrationProfile {
+				returnStrings = append(returnStrings, "CalibrationProfile?")
+			}
 			if inboundMsg.Command.GetConnections {
 				returnStrings = append(returnStrings, "Connections?")
 			}
@@ -1285,6 +1306,9 @@ func InboundMessagesToRawPanelASCIIstrings(inboundMsgs []*rwp.InboundMessage) []
 			}
 			if inboundMsg.Command.PanelBrightness != nil {
 				returnStrings = append(returnStrings, fmt.Sprintf("PanelBrightness=%d,%d", inboundMsg.Command.PanelBrightness.LEDs, inboundMsg.Command.PanelBrightness.OLEDs))
+			}
+			if inboundMsg.Command.SetCalibrationProfile != nil {
+				returnStrings = append(returnStrings, fmt.Sprintf("SetCalibrationProfile=%s", stripLineBreaks(inboundMsg.Command.SetCalibrationProfile.Json)))
 			}
 			if inboundMsg.Command.SetSleepTimeout != nil {
 				returnStrings = append(returnStrings, fmt.Sprintf("SleepTimer=%d", inboundMsg.Command.SetSleepTimeout.Value))
@@ -1778,6 +1802,18 @@ func RawPanelASCIIstringsToOutboundMessages(rp20_ascii []string) []*rwp.Outbound
 							Json: strValue,
 						},
 					}
+				case "_calibrationProfile":
+					msg = &rwp.OutboundMessage{
+						CalibrationProfile: &rwp.CalibrationProfile{
+							Json: strValue,
+						},
+					}
+				case "_defaultCalibrationProfile":
+					msg = &rwp.OutboundMessage{
+						DefaultCalibrationProfile: &rwp.CalibrationProfile{
+							Json: strValue,
+						},
+					}
 				case "_serverModeLockToIP":
 					msg = &rwp.OutboundMessage{
 						PanelInfo: &rwp.PanelInfo{
@@ -2048,6 +2084,16 @@ func OutboundMessagesToRawPanelASCIIstrings(outboundMsgs []*rwp.OutboundMessage)
 		if outboundMsg.BurninProfile != nil {
 			if outboundMsg.BurninProfile.Json != "" {
 				returnStrings = append(returnStrings, "_burninProfile="+stripLineBreaks(outboundMsg.BurninProfile.Json))
+			}
+		}
+		if outboundMsg.CalibrationProfile != nil {
+			if outboundMsg.CalibrationProfile.Json != "" {
+				returnStrings = append(returnStrings, "_calibrationProfile="+stripLineBreaks(outboundMsg.CalibrationProfile.Json))
+			}
+		}
+		if outboundMsg.DefaultCalibrationProfile != nil {
+			if outboundMsg.DefaultCalibrationProfile.Json != "" {
+				returnStrings = append(returnStrings, "_defaultCalibrationProfile="+stripLineBreaks(outboundMsg.DefaultCalibrationProfile.Json))
 			}
 		}
 		if outboundMsg.SleepTimeout != nil {
