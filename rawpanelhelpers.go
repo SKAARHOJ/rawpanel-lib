@@ -1199,12 +1199,14 @@ func RawPanelASCIIstringsToInboundMessages(rp20_ascii []string) []*rwp.InboundMe
 	if DebugRWPhelpers {
 		DebugRWPhelpersMU.Lock()
 		fmt.Println("\n-------------------------------------------------------------------------------")
-		fmt.Println(len(rp20_ascii), "inbound strings converted to Proto Messages:\n")
+		fmt.Println(len(rp20_ascii), "inbound strings converted to Proto Messages:")
+		fmt.Println()
 		for _, string := range rp20_ascii {
 			fmt.Println(string)
 		}
 
-		fmt.Println("\n----\n")
+		fmt.Println("\n----")
+		fmt.Println()
 
 		for key, msg := range returnMsgs {
 			_ = key
@@ -1217,7 +1219,8 @@ func RawPanelASCIIstringsToInboundMessages(rp20_ascii []string) []*rwp.InboundMe
 			su.StripEmptyJSONObjects(&jsonStr)
 			fmt.Println("#", key, ": JSON:\n", jsonStr)
 		}
-		fmt.Println("-------------------------------------------------------------------------------\n")
+		fmt.Println("-------------------------------------------------------------------------------")
+		fmt.Println()
 		DebugRWPhelpersMU.Unlock()
 	}
 
@@ -1462,7 +1465,8 @@ func InboundMessagesToRawPanelASCIIstrings(inboundMsgs []*rwp.InboundMessage) []
 	if DebugRWPhelpers {
 		DebugRWPhelpersMU.Lock()
 		fmt.Println("\n-------------------------------------------------------------------------------")
-		fmt.Println(len(inboundMsgs), "Inbound Proto Messages converted back to strings:\n")
+		fmt.Println(len(inboundMsgs), "Inbound Proto Messages converted back to strings:")
+		fmt.Println()
 
 		for key, msg := range inboundMsgs {
 			_ = key
@@ -1489,7 +1493,7 @@ func InboundMessagesToRawPanelASCIIstrings(inboundMsgs []*rwp.InboundMessage) []
 }
 
 var regex_map = regexp.MustCompile("^map=([0-9]+):([0-9]+)$")
-var regex_genericSingle_inbound = regexp.MustCompile("^(_model|_serial|_version|_platform|_bluePillReady|_name|_isSleeping|_sleepTimer|_panelTopology_svgbase|_panelTopology_HWC|_burninProfile|_serverModeLockToIP|_serverModeMaxClients|_heartBeatTimer|DimmedGain|_connections|_bootsCount|_totalUptimeMin|_sessionUptimeMin|_screenSaverOnMin|ErrorMsg|Msg|SysStat)=(.+)$")
+var regex_genericSingle_inbound = regexp.MustCompile("^(_model|_serial|_version|_platform|_bluePillReady|_name|_panelType|_support|_isSleeping|_sleepTimer|_panelTopology_svgbase|_panelTopology_HWC|_burninProfile|_calibrationProfile|_defaultCalibrationProfile|_serverModeLockToIP|_serverModeMaxClients|_heartBeatTimer|DimmedGain|_connections|_bootsCount|_totalUptimeMin|_sessionUptimeMin|_screenSaverOnMin|ErrorMsg|Msg|SysStat)=(.+)$")
 var regex_cmd_inbound = regexp.MustCompile("^HWC#([0-9]+)(|.([0-9]+))=(Down|Up|Press|Abs|Speed|Enc)(|:([-0-9]+))$")
 
 // Converts Raw Panel 1.0 ASCII Strings into proto OutboundMessage structs
@@ -1671,6 +1675,73 @@ func RawPanelASCIIstringsToOutboundMessages(rp20_ascii []string) []*rwp.Outbound
 							BluePillReady: su.Intval(strValue) != 0,
 						},
 					}
+				case "_panelType": // Test OK
+					switch strValue {
+					case "BPI":
+						msg = &rwp.OutboundMessage{
+							PanelInfo: &rwp.PanelInfo{
+								PanelType: rwp.PanelInfo_BLUEPILLINSIDE,
+							},
+						}
+					case "Physical":
+						msg = &rwp.OutboundMessage{
+							PanelInfo: &rwp.PanelInfo{
+								PanelType: rwp.PanelInfo_PHYSICAL,
+							},
+						}
+					case "Emulation":
+						msg = &rwp.OutboundMessage{
+							PanelInfo: &rwp.PanelInfo{
+								PanelType: rwp.PanelInfo_EMULATION,
+							},
+						}
+					case "Touch":
+						msg = &rwp.OutboundMessage{
+							PanelInfo: &rwp.PanelInfo{
+								PanelType: rwp.PanelInfo_TOUCH,
+							},
+						}
+					case "Composite":
+						msg = &rwp.OutboundMessage{
+							PanelInfo: &rwp.PanelInfo{
+								PanelType: rwp.PanelInfo_COMPOSITE,
+							},
+						}
+					}
+				case "_support": // Test OK
+					parts := strings.Split(strValue, ",")
+					supportObj := &rwp.RawPanelSupport{}
+					for _, part := range parts {
+						switch part {
+						case "ASCII":
+							supportObj.ASCII = true
+						case "Binary":
+							supportObj.Binary = true
+						case "JSONFeedback":
+							supportObj.ASCII_JSONfeedback = true
+						case "JSONonInbound":
+							supportObj.ASCII_Inbound = true
+						case "JSONonOutbound":
+							supportObj.ASCII_Outbound = true
+						case "System":
+							supportObj.System = true
+						case "RawADCValues":
+							supportObj.RawADCValues = true
+						case "BurninProfile":
+							supportObj.BurninProfile = true
+						case "EnvHealth":
+							supportObj.EnvHealth = true
+						case "Registers":
+							supportObj.Registers = true
+						case "Calibration":
+							supportObj.Calibration = true
+						}
+					}
+					msg = &rwp.OutboundMessage{
+						PanelInfo: &rwp.PanelInfo{
+							RawPanelSupport: supportObj,
+						},
+					}
 				case "_name":
 					msg = &rwp.OutboundMessage{
 						PanelInfo: &rwp.PanelInfo{
@@ -1839,12 +1910,14 @@ func RawPanelASCIIstringsToOutboundMessages(rp20_ascii []string) []*rwp.Outbound
 	if DebugRWPhelpers {
 		DebugRWPhelpersMU.Lock()
 		fmt.Println("\n-------------------------------------------------------------------------------")
-		fmt.Println(len(rp20_ascii), "Outbound strings converted to Proto Messages:\n")
+		fmt.Println(len(rp20_ascii), "Outbound strings converted to Proto Messages:")
+		fmt.Println()
 		for _, string := range rp20_ascii {
 			fmt.Println(string)
 		}
 
-		fmt.Println("\n----\n")
+		fmt.Println("\n----")
+		fmt.Println()
 
 		for key, msg := range returnMsgs {
 			_ = key
@@ -1857,7 +1930,8 @@ func RawPanelASCIIstringsToOutboundMessages(rp20_ascii []string) []*rwp.Outbound
 			su.StripEmptyJSONObjects(&jsonStr)
 			fmt.Println("#", key, ": JSON:\n", jsonStr)
 		}
-		fmt.Println("-------------------------------------------------------------------------------\n")
+		fmt.Println("-------------------------------------------------------------------------------")
+		fmt.Println()
 		DebugRWPhelpersMU.Unlock()
 	}
 
@@ -1908,8 +1982,59 @@ func OutboundMessagesToRawPanelASCIIstrings(outboundMsgs []*rwp.OutboundMessage)
 			if outboundMsg.PanelInfo.MaxClients > 0 {
 				returnStrings = append(returnStrings, fmt.Sprintf("_serverModeMaxClients=%d", outboundMsg.PanelInfo.MaxClients))
 			}
-			if outboundMsg.PanelInfo.LockedToIPs != nil {
+			if outboundMsg.PanelInfo.LockedToIPs != nil && len(outboundMsg.PanelInfo.LockedToIPs) > 0 {
 				returnStrings = append(returnStrings, fmt.Sprintf("_serverModeLockToIP=%s", strings.Join(outboundMsg.PanelInfo.LockedToIPs, ";")))
+			}
+
+			switch outboundMsg.PanelInfo.PanelType {
+			case rwp.PanelInfo_BLUEPILLINSIDE:
+				returnStrings = append(returnStrings, "_panelType=BPI")
+			case rwp.PanelInfo_PHYSICAL:
+				returnStrings = append(returnStrings, "_panelType=Physical")
+			case rwp.PanelInfo_EMULATION:
+				returnStrings = append(returnStrings, "_panelType=Emulation")
+			case rwp.PanelInfo_TOUCH:
+				returnStrings = append(returnStrings, "_panelType=Touch")
+			case rwp.PanelInfo_COMPOSITE:
+				returnStrings = append(returnStrings, "_panelType=Composite")
+			}
+
+			if outboundMsg.PanelInfo.RawPanelSupport != nil {
+				support := make([]string, 0, 11)
+				if outboundMsg.PanelInfo.RawPanelSupport.ASCII {
+					support = append(support, "ASCII")
+				}
+				if outboundMsg.PanelInfo.RawPanelSupport.Binary {
+					support = append(support, "Binary")
+				}
+				if outboundMsg.PanelInfo.RawPanelSupport.ASCII_JSONfeedback {
+					support = append(support, "JSONFeedback")
+				}
+				if outboundMsg.PanelInfo.RawPanelSupport.ASCII_Inbound {
+					support = append(support, "JSONonInbound")
+				}
+				if outboundMsg.PanelInfo.RawPanelSupport.ASCII_Outbound {
+					support = append(support, "JSONonOutbound")
+				}
+				if outboundMsg.PanelInfo.RawPanelSupport.System {
+					support = append(support, "System")
+				}
+				if outboundMsg.PanelInfo.RawPanelSupport.RawADCValues {
+					support = append(support, "RawADCValues")
+				}
+				if outboundMsg.PanelInfo.RawPanelSupport.BurninProfile {
+					support = append(support, "BurninProfile")
+				}
+				if outboundMsg.PanelInfo.RawPanelSupport.EnvHealth {
+					support = append(support, "EnvHealth")
+				}
+				if outboundMsg.PanelInfo.RawPanelSupport.Registers {
+					support = append(support, "Registers")
+				}
+				if outboundMsg.PanelInfo.RawPanelSupport.Calibration {
+					support = append(support, "Calibration")
+				}
+				returnStrings = append(returnStrings, "_support="+strings.Join(support, ","))
 			}
 		}
 		if outboundMsg.PanelTopology != nil {
@@ -2035,7 +2160,8 @@ func OutboundMessagesToRawPanelASCIIstrings(outboundMsgs []*rwp.OutboundMessage)
 	if DebugRWPhelpers {
 		DebugRWPhelpersMU.Lock()
 		fmt.Println("\n-------------------------------------------------------------------------------")
-		fmt.Println(len(outboundMsgs), "Outbound Proto Messages converted back to strings:\n")
+		fmt.Println(len(outboundMsgs), "Outbound Proto Messages converted back to strings:")
+		fmt.Println()
 
 		for key, msg := range outboundMsgs {
 			_ = key
@@ -2049,12 +2175,14 @@ func OutboundMessagesToRawPanelASCIIstrings(outboundMsgs []*rwp.OutboundMessage)
 			fmt.Println("#", key, ": JSON:\n", jsonStr)
 		}
 
-		fmt.Println("\n----\n")
+		fmt.Println("\n----")
+		fmt.Println()
 
 		for _, string := range returnStrings {
 			fmt.Println(string)
 		}
-		fmt.Println("-------------------------------------------------------------------------------\n")
+		fmt.Println("-------------------------------------------------------------------------------")
+		fmt.Println()
 		DebugRWPhelpersMU.Unlock()
 	}
 
