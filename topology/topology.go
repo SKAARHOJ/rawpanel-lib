@@ -33,13 +33,13 @@ type TopologyHWcomponent struct {
 // See DC_SKAARHOJ_RawPanel.odt for descriptions:
 type TopologyHWcTypeDef struct {
 	//UskCompatID int
-	W      int                         `json:"w,omitempty"`      // Width of component
-	H      int                         `json:"h,omitempty"`      // Height of component. If defined, the component will be a rectangle, otherwise a circle with diameter W.
-	Out    string                      `json:"out,omitempty"`    // Output type
-	In     string                      `json:"in,omitempty"`     // Input type
-	Desc   string                      `json:"desc,omitempty"`   // Description
-	Ext    string                      `json:"ext,omitempty"`    // Extended return value mode
-	Subidx int                         `json:"subidx,omitempty"` // A reference to the index of an element in the "sub" element which has a "special" meaning. For analog (av, ah, ar) and intensity (iv, ih, ir) elements, this would be an element suggested for being used as a handle for a fader or joystick.
+	W      int                         `json:"w,omitempty"`    // Width of component
+	H      int                         `json:"h,omitempty"`    // Height of component. If defined, the component will be a rectangle, otherwise a circle with diameter W.
+	Out    string                      `json:"out,omitempty"`  // Output type
+	In     string                      `json:"in,omitempty"`   // Input type
+	Desc   string                      `json:"desc,omitempty"` // Description
+	Ext    string                      `json:"ext,omitempty"`  // Extended return value mode
+	Subidx int                         `json:"subidx"`         // A reference to the index of an element in the "sub" element which has a "special" meaning. For analog (av, ah, ar) and intensity (iv, ih, ir) elements, this would be an element suggested for being used as a handle for a fader or joystick.
 	Rotate float32                     `json:"rotate,omitempty"`
 	Disp   *TopologyHWcTypeDef_Display `json:"disp,omitempty"` // Display description
 	Sub    []TopologyHWcTypeDefSubEl   `json:"sub,omitempty"`
@@ -63,7 +63,7 @@ type TopologyHWcTypeDefSubEl struct {
 type TopologyHWcTypeDef_Display struct {
 	W      int    `json:"w,omitempty"`         // Pixel width of display (alternatively with Type=text: indicates a limited number of characters shown)
 	H      int    `json:"h,omitempty"`         // Pixel height of display (alternatively with Type=text: indicates the number of lines supported, prioritized as Textline1, Title, Textline2)
-	Subidx int    `json:"subidx,omitempty"`    // Index of the sub element which placeholds for the display area. -1 if no sub element is used for that
+	Subidx int    `json:"subidx"`              // Index of the sub element which placeholds for the display area. -1 if no sub element is used for that
 	Type   string `json:"type,omitempty"`      // Additional features of display: "gray" (4bit/pixel) or "color" (5-6-5 rgb/pixel) or "text" for text lines
 	Shrink int    `json:"shrink,omitempty"`    // W+H Shrink. W=bit0, H=bit1. W-shrink cuts a pixel off in the right side of tile. H-shrink cuts a pixel off in the bottom of tile.
 	Border int    `json:"txtborder,omitempty"` // Txt Border (shall match that used by ibeam-hardware and UniSketch for rendering)
