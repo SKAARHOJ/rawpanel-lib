@@ -13,11 +13,10 @@ import (
 )
 
 type Topology struct {
-	Title            string `json:"title,omitempty"` // Controller Title
-	HWc              []TopologyHWcomponent
-	TypeIndex        map[uint32]TopologyHWcTypeDef `json:"typeIndex"`
-	NoUnisketchCompt bool
-	sync.RWMutex     `json:"title,omitempty"`
+	Title        string `json:"title,omitempty"` // Controller Title
+	HWc          []TopologyHWcomponent
+	TypeIndex    map[uint32]TopologyHWcTypeDef `json:"typeIndex"`
+	sync.RWMutex `json:"title,omitempty"`
 }
 type TopologyHWcomponent struct {
 	Id           uint32              `json:"id"`   // The HWCid - follows the index (+1) of the $HWc
