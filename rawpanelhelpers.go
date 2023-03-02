@@ -892,7 +892,7 @@ func RawPanelASCIIstringsToInboundMessages(rp20_ascii []string) []*rwp.InboundMe
 								HWCIDs: HWCidArray,
 								HWCExtended: &rwp.HWCExtended{
 									Interpretation: rwp.HWCExtended_InterpretationE((value >> 12) & 0xF),
-									Value:          uint32(value & 0x3FF),
+									Value:          uint32(value & 0xFFF),
 								},
 							},
 						},
@@ -1468,7 +1468,7 @@ func InboundMessagesToRawPanelASCIIstrings(inboundMsgs []*rwp.InboundMessage) []
 							}
 						}
 						if stateRec.HWCExtended != nil {
-							outputInteger := uint32(stateRec.HWCExtended.Value&0x3FF) | uint32((stateRec.HWCExtended.Interpretation&0xF)<<12)
+							outputInteger := uint32(stateRec.HWCExtended.Value&0xFFF) | uint32((stateRec.HWCExtended.Interpretation&0xF)<<12)
 							returnStrings = append(returnStrings, fmt.Sprintf("HWCx#%s=%d", su.IntImplode(singleHWCIDarray, ","), outputInteger))
 						}
 						if stateRec.HWCText != nil && !proto.Equal(stateRec.HWCText, &rwp.HWCText{}) {
