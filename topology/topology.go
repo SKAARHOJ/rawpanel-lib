@@ -17,7 +17,7 @@ type Topology struct {
 	HWc       []TopologyHWcomponent
 	TypeIndex map[uint32]TopologyHWcTypeDef `json:"typeIndex"`
 
-	sync.RWMutex
+	sync.RWMutex `json:"-"`
 }
 type TopologyHWcomponent struct {
 	Id           uint32              `json:"id"`   // The HWCid - follows the index (+1) of the $HWc
