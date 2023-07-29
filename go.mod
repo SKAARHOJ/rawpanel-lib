@@ -4,11 +4,11 @@ go 1.19
 
 require (
 	github.com/SKAARHOJ/ibeam-lib-utils v1.0.0
-	github.com/SKAARHOJ/rawpanel-processors v0.0.1
+	github.com/SKAARHOJ/rawpanel-processors v1.0.0
 	github.com/s00500/env_logger v0.1.26
 	github.com/subchen/go-xmldom v1.1.2
 	go.uber.org/atomic v1.11.0
-	golang.org/x/exp v0.0.0-20230725093048-515e97ebf090
+	golang.org/x/exp v0.0.0-20230728194245-b0cb94b80691
 	google.golang.org/protobuf v1.31.0
 )
 
