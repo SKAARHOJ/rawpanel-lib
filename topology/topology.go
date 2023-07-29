@@ -191,7 +191,7 @@ func (typeDef *TopologyHWcTypeDef) DisplayInfo() *TopologyHWcTypeDef_Display {
 func (typeDef *TopologyHWcTypeDef) HasLED() bool {
 	typeDef.Lock()
 	defer typeDef.Unlock()
-	return typeDef.Out == "rgb" || typeDef.In == "rg" || typeDef.In == "mono"
+	return typeDef.Out == "rgb" || typeDef.In == "rg" || typeDef.In == "rb" || typeDef.In == "mono"
 }
 
 func (typeDef *TopologyHWcTypeDef) HasSteps() int {
