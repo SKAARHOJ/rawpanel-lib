@@ -9,6 +9,7 @@ import (
 
 	h "github.com/SKAARHOJ/rawpanel-lib"
 	rwp "github.com/SKAARHOJ/rawpanel-lib/ibeam_rawpanel"
+	rawpanelproc "github.com/SKAARHOJ/rawpanel-processors"
 	log "github.com/s00500/env_logger"
 	"google.golang.org/protobuf/proto"
 )
@@ -17,6 +18,7 @@ import (
 // Unfortunately, global variables doesn't seem to work for this. Global strings objects get damaged
 // somehow somewhere in between function calls (garbage collector?). For now, the state gets marshalled
 // and passed to the C-side.
+//
 //export RawPanelASCIIstringToInboundMessage
 func RawPanelASCIIstringToInboundMessage(ascii string, state []byte) (unsafe.Pointer, int, unsafe.Pointer, int) {
 	var reader h.ASCIIreader
@@ -48,6 +50,18 @@ func OutboundMessageToRawPanelASCIIstring(bytes []byte) *C.char {
 		return C.CString("")
 	}
 	return C.CString(strings.Join(strs, "\n"))
+}
+
+//export InboundStateProcessor
+func InboundStateProcessor(bytes []byte) (unsafe.Pointer, int) {
+	msg := &rwp.HWCState{}
+	if proto.Unmarshal(bytes, msg) != nil {
+		return nil, 0
+	}
+	rawpanelproc.StateProcessor(msg)
+
+	jsonmsg, _ := json.Marshal(msg)
+	return C.CBytes(jsonmsg), len(jsonmsg)
 }
 
 func main() {
