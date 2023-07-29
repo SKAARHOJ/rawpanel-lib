@@ -26,25 +26,25 @@ type RawPanelState struct {
 }
 
 func (rps *RawPanelState) GetName() string {
-	rps.Lock()
-	defer rps.Unlock()
+	rps.RLock()
+	defer rps.RUnlock()
 	return rps.name
 }
 
 func (rps *RawPanelState) GetSerial() string {
-	rps.Lock()
-	defer rps.Unlock()
+	rps.RLock()
+	defer rps.RUnlock()
 	return rps.serial
 }
 
 func (rps *RawPanelState) GetModel() string {
-	rps.Lock()
-	defer rps.Unlock()
+	rps.RLock()
+	defer rps.RUnlock()
 	return rps.model
 }
 
 func (rps *RawPanelState) GetTopology() *topology.Topology {
-	rps.Lock()
-	defer rps.Unlock()
+	rps.RLock()
+	defer rps.RUnlock()
 	return rps.topology // Should return copy?
 }

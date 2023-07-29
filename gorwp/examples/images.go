@@ -2,8 +2,11 @@ package main
 
 import (
 	"context"
+	"encoding/json"
+	"flag"
 	"fmt"
 	"image"
+	"io/ioutil"
 	"os"
 
 	gorwp "github.com/SKAARHOJ/rawpanel-lib/gorwp"
@@ -18,7 +21,10 @@ import (
 // This application exemplifies event handlers in a broader sense and how you can send feedback to the panel
 func main() {
 
-	ipAndPort := "10.0.10.100:9923" // Change this to the IP and port of your SKAARHOJ panel
+	useProcessors := flag.Bool("useProcessors", false, "If set, images will be sent as PNG/JPG data using processor conversion")
+	flag.Parse()
+
+	ipAndPort := "localhost:9923" // Change this to the IP and port of your SKAARHOJ panel
 
 	// Connecting to the SKAARHOJ Raw Panel device:
 	log.Printf("Trying to connect to panel on %s...\n", ipAndPort)
@@ -64,9 +70,34 @@ func main() {
 						imageFileName := imageSet[imageIdx[hwc]]
 						log.Println("Loading image ", imageFileName)
 
-						img, err := getImageFile(imageFileName)
-						if !log.Should(err) {
-							rp.DrawImage(hwc, img)
+						if *useProcessors {
+							rawImageFileData, err := ioutil.ReadFile(imageFileName)
+							if err != nil {
+								fmt.Printf("Error reading file: %v\n", err)
+								return
+							}
+							state := &rwp.HWCState{
+								HWCIDs: []uint32{hwc},
+								Processors: &rwp.Processors{
+									GfxConv: &rwp.ProcGfxConverter{
+										W:         uint32(displayInfo.W),
+										H:         uint32(displayInfo.H),
+										ImageData: rawImageFileData,
+										Scaling:   rwp.ProcGfxConverter_FIT,
+									},
+								},
+							}
+
+							jsonData, _ := json.Marshal(state)
+							_ = jsonData
+							//fmt.Println(string(jsonData))
+
+							rp.SendRawState(state)
+						} else {
+							img, err := getImageFile(imageFileName)
+							if !log.Should(err) {
+								rp.DrawImage(hwc, img)
+							}
 						}
 					}
 				}

@@ -10,7 +10,7 @@ import (
 
 func main() {
 
-	ipAndPort := "192.168.11.8:9923"
+	ipAndPort := "192.168.1.68:9923"
 	//ipAndPort = "10.0.10.100:9923"
 
 	// Connecting to the SKAARHOJ Raw Panel device:

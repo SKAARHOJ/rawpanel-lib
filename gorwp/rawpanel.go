@@ -32,6 +32,7 @@ import (
 	monogfx "github.com/SKAARHOJ/rawpanel-lib/ibeam_lib_monogfx"
 	rwp "github.com/SKAARHOJ/rawpanel-lib/ibeam_rawpanel"
 	topology "github.com/SKAARHOJ/rawpanel-lib/topology"
+	rawpanelproc "github.com/SKAARHOJ/rawpanel-processors"
 	log "github.com/s00500/env_logger"
 )
 
@@ -499,16 +500,16 @@ func (rp *RawPanel) DrawImageOptions(hwc uint32, inImg image.Image, displayInfo 
 	}
 
 	// Set up bounds:
-	imgBounds := helpers.ImageBounds{X: 0, Y: 0, W: int(img.W), H: int(img.H)}
+	imgBounds := rawpanelproc.ImageBounds{X: 0, Y: 0, W: int(img.W), H: int(img.H)}
 
 	// Perform scaling and fildering:
 	newImage := inImg
 	if fitting != "" {
-		newImage = helpers.ScalingAndFilters(inImg, string(fitting), imgBounds.W, imgBounds.H, "")
+		newImage = rawpanelproc.ScalingAndFilters(inImg, string(fitting), imgBounds.W, imgBounds.H, "")
 	}
 
 	// Map the image onto the canvas
-	helpers.RenderImageOnCanvas(&img, newImage, imgBounds, "", "", "")
+	rawpanelproc.RenderImageOnCanvas(&img, newImage, imgBounds, "", "", "")
 
 	rp.toPanel <- []*rwp.InboundMessage{
 		&rwp.InboundMessage{
