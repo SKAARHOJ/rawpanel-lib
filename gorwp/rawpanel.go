@@ -148,7 +148,7 @@ func (rp *RawPanel) listen(ctx context.Context) {
 		for {
 			select {
 			case <-ctx.Done():
-				fmt.Println("Stops listening for toPanel messages")
+				//fmt.Println("Stops listening for toPanel messages")
 				return
 			case messagesToPanel := <-rp.toPanel: // Messages from us to the panel.
 				if rp.binaryPanel {
