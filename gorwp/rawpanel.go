@@ -60,7 +60,14 @@ type RawPanel struct {
 // Connects to a SKAARHOJ Raw Panel at a specified URL. If successful it returns a new RawPanel
 func Connect(panelIPAndPort string, ctx context.Context, cancel context.CancelFunc) (*RawPanel, error) {
 
-	c, err := net.Dial("tcp", panelIPAndPort)
+	dialMode := "tcp"
+	//oldIPandPortString := panelIPAndPort
+	if panelIPAndPort == "native" || panelIPAndPort == "host" {
+		dialMode = "unix"
+		panelIPAndPort = "/var/ibeam/sockets/ibeam-hardware.socket"
+	}
+
+	c, err := net.Dial(dialMode, panelIPAndPort)
 	if log.Should(err) {
 		return nil, err
 	}
@@ -106,7 +113,7 @@ func (rp *RawPanel) Close() {
 func (rp *RawPanel) init(ctx context.Context) error {
 
 	// Sending request for various standard information from panel, all things we consider mandatory for initialization:
-	rp.toPanel <- []*rwp.InboundMessage{&rwp.InboundMessage{
+	rp.toPanel <- []*rwp.InboundMessage{{
 		Command: &rwp.Command{
 			SendPanelInfo:         true,
 			SendPanelTopology:     true,
@@ -136,7 +143,7 @@ func (rp *RawPanel) init(ctx context.Context) error {
 	case <-initialized:
 		return nil
 	case <-time.After(2 * time.Second):
-		return fmt.Errorf("Panel did not respond to initialization timely")
+		return fmt.Errorf("panel did not respond to initialization timely")
 	}
 }
 
@@ -164,12 +171,12 @@ func (rp *RawPanel) listen(ctx context.Context) {
 				} else {
 					lines := helpers.InboundMessagesToRawPanelASCIIstrings(messagesToPanel)
 					for _, line := range lines {
-						log.Println(string("System -> Panel: " + strings.TrimSpace(string(line))))
+						log.Debugln(string("System -> Panel: " + strings.TrimSpace(string(line))))
 						rp.connection.Write([]byte(line + "\n"))
 					}
 				}
 			case <-ticker.C: // Sending a ping periodically to the panel to make sure TCP will close connection if it doesn't get through. Strictly, the panel should answer back with ACK, but we don't check for that (seems this is enough)
-				rp.toPanel <- []*rwp.InboundMessage{&rwp.InboundMessage{
+				rp.toPanel <- []*rwp.InboundMessage{{
 					FlowMessage: rwp.InboundMessage_PING,
 				}}
 			case messagesFromPanel := <-rp.fromPanel:
@@ -222,6 +229,10 @@ func (rp *RawPanel) readFromPanel() error {
 			}
 		}
 	} else {
+
+		err := rp.connection.SetReadDeadline(time.Time{}) // Reset deadline, waiting for header
+		log.Should(err)
+
 		connectionReader := bufio.NewReader(rp.connection) // Define OUTSIDE the for loop
 		for {
 			netData, err := connectionReader.ReadString('\n')
@@ -253,7 +264,7 @@ func (rp *RawPanel) procesMessagesFromPanel(messagesFromPanel []*rwp.OutboundMes
 
 		// Respond to ping:
 		if msg.FlowMessage == rwp.OutboundMessage_PING {
-			rp.toPanel <- []*rwp.InboundMessage{&rwp.InboundMessage{
+			rp.toPanel <- []*rwp.InboundMessage{{
 				FlowMessage: rwp.InboundMessage_ACK,
 			}}
 		}
@@ -344,7 +355,7 @@ func (rp *RawPanel) IsInitialized() bool {
 // Sets the panel brightness (same for OLED and LEDs in this case)
 func (rp *RawPanel) SetBrightness(brightness int) {
 	rp.toPanel <- []*rwp.InboundMessage{
-		&rwp.InboundMessage{
+		{
 			Command: &rwp.Command{
 				PanelBrightness: &rwp.Brightness{
 					OLEDs: uint32(brightness),
@@ -359,9 +370,9 @@ func (rp *RawPanel) SetBrightness(brightness int) {
 func (rp *RawPanel) SetLEDColor(hwc uint32, c color.RGBA, intensity rwp.HWCMode_StateE) {
 	r, g, b, _ := c.RGBA()
 	rp.toPanel <- []*rwp.InboundMessage{
-		&rwp.InboundMessage{
+		{
 			States: []*rwp.HWCState{
-				&rwp.HWCState{
+				{
 					HWCIDs: []uint32{hwc},
 					HWCMode: &rwp.HWCMode{
 						State: rwp.HWCMode_StateE(intensity),
@@ -382,9 +393,9 @@ func (rp *RawPanel) SetLEDColor(hwc uint32, c color.RGBA, intensity rwp.HWCMode_
 // Sets the color of a specific LED by index
 func (rp *RawPanel) SetLEDColorByIndex(hwc uint32, colorIndex rwp.ColorIndex_Colors, intensity rwp.HWCMode_StateE) {
 	rp.toPanel <- []*rwp.InboundMessage{
-		&rwp.InboundMessage{
+		{
 			States: []*rwp.HWCState{
-				&rwp.HWCState{
+				{
 					HWCIDs: []uint32{hwc},
 					HWCMode: &rwp.HWCMode{
 						State: rwp.HWCMode_StateE(intensity),
@@ -416,9 +427,9 @@ func (rp *RawPanel) SetRWPText(hwc uint32, title string, text1 string, text2 str
 // Sets the raw panel ASCII text of a display by forwarding a full text struct
 func (rp *RawPanel) SetRWPTextByStruct(hwc uint32, txtStruct *rwp.HWCText) {
 	rp.toPanel <- []*rwp.InboundMessage{
-		&rwp.InboundMessage{
+		{
 			States: []*rwp.HWCState{
-				&rwp.HWCState{
+				{
 					HWCIDs:  []uint32{hwc},
 					HWCText: txtStruct,
 				},
@@ -459,7 +470,7 @@ func (rp *RawPanel) DrawImage(hwc uint32, inImg image.Image) error {
 		return rp.DrawImageOptions(hwc, inImg, displayInfo, Fit, "")
 	}
 
-	return fmt.Errorf("Some error happened.\n")
+	return fmt.Errorf("some error happened")
 }
 
 // Function Draw draws an image onto a specific display of the
@@ -512,9 +523,9 @@ func (rp *RawPanel) DrawImageOptions(hwc uint32, inImg image.Image, displayInfo 
 	rawpanelproc.RenderImageOnCanvas(&img, newImage, imgBounds, "", "", "")
 
 	rp.toPanel <- []*rwp.InboundMessage{
-		&rwp.InboundMessage{
+		{
 			States: []*rwp.HWCState{
-				&rwp.HWCState{
+				{
 					HWCIDs: []uint32{hwc},
 					HWCGfx: &img,
 				},
@@ -529,7 +540,7 @@ func (rp *RawPanel) DrawImageOptions(hwc uint32, inImg image.Image, displayInfo 
 // to the panel
 func (rp *RawPanel) SendRawState(state *rwp.HWCState) {
 	rp.toPanel <- []*rwp.InboundMessage{
-		&rwp.InboundMessage{
+		{
 			States: []*rwp.HWCState{state},
 		},
 	}
