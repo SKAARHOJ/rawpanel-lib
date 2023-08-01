@@ -889,6 +889,10 @@ func InboundMessagesToRawPanelASCIIstrings(inboundMsgs []*rwp.InboundMessage) []
 							outputInteger := uint32(su.Qint(stateRec.PublishRawADCValues.Enabled, 1, 0))
 							returnStrings = append(returnStrings, fmt.Sprintf("HWCrawADCValues#%s=%d", su.IntImplode(singleHWCIDarray, ","), outputInteger))
 						}
+						if stateRec.Processors != nil { // Processors doesn't have any old-school ASCII format, only the JSON format to rely on.
+							jsonData, _ := json.Marshal(stateRec)
+							returnStrings = append(returnStrings, string(jsonData))
+						}
 					}
 				}
 			}
