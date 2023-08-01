@@ -144,7 +144,21 @@ func (typeDef *TopologyHWcTypeDef) LedBarSteps() int {
 }
 
 func (typeDef *TopologyHWcTypeDef) HasDisplay() bool {
+	typeDef.RLock()
+	defer typeDef.RUnlock()
 	return typeDef.Disp != nil
+}
+
+func (typeDef *TopologyHWcTypeDef) GetInputType() string {
+	typeDef.RLock()
+	defer typeDef.RUnlock()
+	inputType, _, _ := strings.Cut(typeDef.In, ",")
+	return inputType
+}
+
+func (typeDef *TopologyHWcTypeDef) getInputType() string {
+	inputType, _, _ := strings.Cut(typeDef.In, ",")
+	return inputType
 }
 
 func (typeDef *TopologyHWcTypeDef) IsButton() bool {
@@ -154,31 +168,28 @@ func (typeDef *TopologyHWcTypeDef) IsButton() bool {
 }
 
 func (typeDef *TopologyHWcTypeDef) isButton() bool {
-	return typeDef.In == "b" || typeDef.In == "b4" || typeDef.In == "b2h" || typeDef.In == "b2v" || typeDef.In == "pb"
+	inputType := typeDef.getInputType()
+	return inputType == "b" || inputType == "b4" || inputType == "b2h" || inputType == "b2v" || inputType == "pb"
 }
 
 func (typeDef *TopologyHWcTypeDef) IsBinary() bool {
-	typeDef.Lock()
-	defer typeDef.Unlock()
-	return typeDef.isButton() || typeDef.In == "gpi"
+	inputType := typeDef.GetInputType()
+	return typeDef.isButton() || inputType == "gpi"
 }
 
 func (typeDef *TopologyHWcTypeDef) IsPulsed() bool {
-	typeDef.Lock()
-	defer typeDef.Unlock()
-	return typeDef.In == "pb" || typeDef.In == "p"
+	inputType := typeDef.GetInputType()
+	return inputType == "pb" || inputType == "p"
 }
 
 func (typeDef *TopologyHWcTypeDef) IsAbsolute() bool {
-	typeDef.Lock()
-	defer typeDef.Unlock()
-	return typeDef.In == "av" || typeDef.In == "ah" || typeDef.In == "ar" || typeDef.In == "a"
+	inputType := typeDef.GetInputType()
+	return inputType == "av" || inputType == "ah" || inputType == "ar" || inputType == "a"
 }
 
 func (typeDef *TopologyHWcTypeDef) IsIntensity() bool {
-	typeDef.Lock()
-	defer typeDef.Unlock()
-	return typeDef.In == "iv" || typeDef.In == "ih" || typeDef.In == "ir" || typeDef.In == "i"
+	inputType := typeDef.GetInputType()
+	return inputType == "iv" || inputType == "ih" || inputType == "ir" || inputType == "i"
 }
 
 func (typeDef *TopologyHWcTypeDef) DisplayInfo() *TopologyHWcTypeDef_Display {
