@@ -343,7 +343,7 @@ func (rp *RawPanel) IsInitialized() bool {
 	rp.State.Lock()
 	defer rp.State.Unlock()
 	if rp.State.model != "" &&
-		rp.State.name != "" &&
+		//rp.State.name != "" &&	// Not all panels send a name!
 		rp.State.serial != "" &&
 		rp.State.topologyJSON != "" &&
 		rp.State.topologySVG != "" {
