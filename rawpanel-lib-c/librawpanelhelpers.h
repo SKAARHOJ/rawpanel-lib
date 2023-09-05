@@ -5,7 +5,7 @@
 
 #line 1 "cgo-builtin-export-prolog"
 
-#include <stddef.h> /* for ptrdiff_t below */
+#include <stddef.h>
 
 #ifndef GO_CGO_EXPORT_PROLOGUE_H
 #define GO_CGO_EXPORT_PROLOGUE_H
@@ -40,11 +40,17 @@ typedef long long GoInt64;
 typedef unsigned long long GoUint64;
 typedef GoInt64 GoInt;
 typedef GoUint64 GoUint;
-typedef __SIZE_TYPE__ GoUintptr;
+typedef size_t GoUintptr;
 typedef float GoFloat32;
 typedef double GoFloat64;
+#ifdef _MSC_VER
+#include <complex.h>
+typedef _Fcomplex GoComplex64;
+typedef _Dcomplex GoComplex128;
+#else
 typedef float _Complex GoComplex64;
 typedef double _Complex GoComplex128;
+#endif
 
 /*
   static assertion to make sure the file is being used on architecture
@@ -81,8 +87,16 @@ struct RawPanelASCIIstringToInboundMessage_return {
 // Unfortunately, global variables doesn't seem to work for this. Global strings objects get damaged
 // somehow somewhere in between function calls (garbage collector?). For now, the state gets marshalled
 // and passed to the C-side.
+//
 extern struct RawPanelASCIIstringToInboundMessage_return RawPanelASCIIstringToInboundMessage(GoString ascii, GoSlice state);
 extern char* OutboundMessageToRawPanelASCIIstring(GoSlice bytes);
+
+/* Return type for InboundStateProcessor */
+struct InboundStateProcessor_return {
+	void* r0;
+	GoInt r1;
+};
+extern struct InboundStateProcessor_return InboundStateProcessor(GoSlice bytes);
 
 #ifdef __cplusplus
 }
