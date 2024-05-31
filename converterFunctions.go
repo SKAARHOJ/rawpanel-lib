@@ -20,7 +20,7 @@ var regex_cmd = regexp.MustCompile("^(HWC#|HWCx#|HWCc#|HWCt#|HWCrawADCValues#)([
 var regex_gfx = regexp.MustCompile("^(HWCgRGB#|HWCgGray#|HWCg#)([0-9,]+)=([0-9]+)(/([0-9]+),([0-9]+)x([0-9]+)(,([0-9]+),([0-9]+)|)|):(.*)$")
 var regex_genericDual = regexp.MustCompile("^(PanelBrightness)=([0-9]+),([0-9]+)$")
 var regex_genericSingle = regexp.MustCompile("^(HeartBeatTimer|DimmedGain|PublishSystemStat|LoadCPU|SleepTimer|SleepMode|SleepScreenSaver|Webserver|JSONonOutbound|PanelBrightness)=([0-9]+)$")
-var regex_genericSingleStr = regexp.MustCompile("^(SetCalibrationProfile|SimulateEnvironmentalHealth)=(.*)$")
+var regex_genericSingleStr = regexp.MustCompile("^(SetCalibrationProfile|SimulateEnvironmentalHealth|SetNetworkConfig)=(.*)$")
 var regex_registers = regexp.MustCompile("^(Flag#|Mem|Shift|State)([A-Z0-9]*)=([0-9]+)$")
 
 // Converts Raw Panel 2.0 ASCII Strings into proto InboundMessage structs
@@ -96,6 +96,12 @@ func RawPanelASCIIstringsToInboundMessages(rp20_ascii []string) []*rwp.InboundMe
 			msg = &rwp.InboundMessage{
 				Command: &rwp.Command{
 					SendCalibrationProfile: true,
+				},
+			}
+		case "NetworkConfig?":
+			msg = &rwp.InboundMessage{
+				Command: &rwp.Command{
+					SendNetworkConfig: true,
 				},
 			}
 		case "Registers?":
@@ -503,6 +509,12 @@ func RawPanelASCIIstringsToInboundMessages(rp20_ascii []string) []*rwp.InboundMe
 							},
 						},
 					}
+				case "SetNetworkConfig":
+					msg = &rwp.InboundMessage{
+						Command: &rwp.Command{
+							SetNetworkConfig: networkConfigFromString(regex_genericSingleStr.FindStringSubmatch(inputString)[2]),
+						},
+					}
 				case "SimulateEnvironmentalHealth":
 					switch regex_genericSingleStr.FindStringSubmatch(inputString)[2] {
 					case "Normal":
@@ -673,6 +685,9 @@ func InboundMessagesToRawPanelASCIIstrings(inboundMsgs []*rwp.InboundMessage) []
 			if inboundMsg.Command.SendCalibrationProfile {
 				returnStrings = append(returnStrings, "CalibrationProfile?")
 			}
+			if inboundMsg.Command.SendNetworkConfig {
+				returnStrings = append(returnStrings, "NetworkConfig?")
+			}
 			if inboundMsg.Command.SendRegisters {
 				returnStrings = append(returnStrings, "Registers?")
 			}
@@ -705,6 +720,9 @@ func InboundMessagesToRawPanelASCIIstrings(inboundMsgs []*rwp.InboundMessage) []
 			}
 			if inboundMsg.Command.SetCalibrationProfile != nil {
 				returnStrings = append(returnStrings, fmt.Sprintf("SetCalibrationProfile=%s", stripLineBreaks(inboundMsg.Command.SetCalibrationProfile.Json)))
+			}
+			if inboundMsg.Command.SetNetworkConfig != nil {
+				returnStrings = append(returnStrings, fmt.Sprintf("SetNetworkConfig=%s", networkStringFromConfig(inboundMsg.Command.SetNetworkConfig)))
 			}
 			if inboundMsg.Command.SimulateEnvironmentalHealth != nil {
 				switch inboundMsg.Command.SimulateEnvironmentalHealth.RunMode {
@@ -945,7 +963,7 @@ func InboundMessagesToRawPanelASCIIstrings(inboundMsgs []*rwp.InboundMessage) []
 }
 
 var regex_map = regexp.MustCompile("^map=([0-9]+):([0-9]+)$")
-var regex_genericSingle_inbound = regexp.MustCompile("^(_model|_serial|_version|_platform|_bluePillReady|_name|_panelType|_support|_isSleeping|_sleepTimer|_panelTopology_svgbase|_panelTopology_HWC|_burninProfile|_calibrationProfile|_defaultCalibrationProfile|_serverModeLockToIP|_serverModeMaxClients|_heartBeatTimer|DimmedGain|_connections|_bootsCount|_totalUptimeMin|_sessionUptimeMin|_screenSaverOnMin|ErrorMsg|Msg|EnvironmentalHealth|SysStat)=(.+)$")
+var regex_genericSingle_inbound = regexp.MustCompile("^(_model|_serial|_version|_platform|_bluePillReady|_name|_panelType|_support|_isSleeping|_sleepTimer|_panelTopology_svgbase|_panelTopology_HWC|_burninProfile|_networkConfig|_calibrationProfile|_defaultCalibrationProfile|_serverModeLockToIP|_serverModeMaxClients|_heartBeatTimer|DimmedGain|_connections|_bootsCount|_totalUptimeMin|_sessionUptimeMin|_screenSaverOnMin|ErrorMsg|Msg|EnvironmentalHealth|SysStat)=(.+)$")
 var regex_cmd_inbound = regexp.MustCompile("^HWC#([0-9]+)(|.([0-9]+))=(Down|Up|Press|Abs|Speed|Enc)(|:([-0-9]+))$")
 var regex_registersOut = regexp.MustCompile("^(Flag#|Mem|Shift|State)([A-Z0-9]*)=([0-9]+)$")
 
@@ -1190,6 +1208,8 @@ func RawPanelASCIIstringsToOutboundMessages(rp20_ascii []string) []*rwp.Outbound
 							supportObj.Calibration = true
 						case "Processors":
 							supportObj.Processors = true
+						case "NetworkSettings":
+							supportObj.NetworkSettings = true
 						}
 					}
 					msg = &rwp.OutboundMessage{
@@ -1232,6 +1252,10 @@ func RawPanelASCIIstringsToOutboundMessages(rp20_ascii []string) []*rwp.Outbound
 						BurninProfile: &rwp.BurninProfile{
 							Json: strValue,
 						},
+					}
+				case "_networkConfig":
+					msg = &rwp.OutboundMessage{
+						NetworkConfig: networkConfigFromString(strValue),
 					}
 				case "_calibrationProfile":
 					msg = &rwp.OutboundMessage{
@@ -1571,6 +1595,9 @@ func OutboundMessagesToRawPanelASCIIstrings(outboundMsgs []*rwp.OutboundMessage)
 				if outboundMsg.PanelInfo.RawPanelSupport.Processors {
 					support = append(support, "Processors")
 				}
+				if outboundMsg.PanelInfo.RawPanelSupport.NetworkSettings {
+					support = append(support, "NetworkSettings")
+				}
 				returnStrings = append(returnStrings, "_support="+strings.Join(support, ","))
 			}
 		}
@@ -1580,6 +1607,9 @@ func OutboundMessagesToRawPanelASCIIstrings(outboundMsgs []*rwp.OutboundMessage)
 		}
 		if outboundMsg.BurninProfile != nil {
 			returnStrings = append(returnStrings, "_burninProfile="+stripLineBreaks(outboundMsg.BurninProfile.Json))
+		}
+		if outboundMsg.NetworkConfig != nil {
+			returnStrings = append(returnStrings, "_networkConfig="+networkStringFromConfig(outboundMsg.NetworkConfig))
 		}
 		if outboundMsg.CalibrationProfile != nil {
 			returnStrings = append(returnStrings, "_calibrationProfile="+stripLineBreaks(outboundMsg.CalibrationProfile.Json))
@@ -1809,4 +1839,24 @@ func stripLineBreaks(in string) string {
 		parts[i] = strings.TrimSpace(parts[i])
 	}
 	return strings.Join(parts, "")
+}
+
+func networkConfigFromString(str string) *rwp.NetworkConfig {
+
+	networkConfig := &rwp.NetworkConfig{}
+
+	err := json.Unmarshal([]byte(str), networkConfig)
+	if err != nil {
+		return nil
+	}
+
+	return networkConfig
+}
+func networkStringFromConfig(config *rwp.NetworkConfig) string {
+	jsonBytes, err := json.Marshal(config)
+	if err != nil {
+		return ""
+	}
+	return string(jsonBytes)
+
 }
