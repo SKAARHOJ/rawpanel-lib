@@ -422,6 +422,9 @@ func (top *Topology) GetHWCTypeDefinition(HWCMapKey int) *TopologyHWcTypeDef {
 		if len(HWcDef.TypeOverride.Sub) > 0 {
 			typeDef.Sub = HWcDef.TypeOverride.Sub
 		}
+		if HWcDef.TypeOverride.Rotate != 0 {
+			typeDef.Rotate = HWcDef.TypeOverride.Rotate
+		}
 	}
 	return &typeDef
 }
