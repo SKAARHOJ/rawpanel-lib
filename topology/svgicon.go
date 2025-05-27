@@ -136,7 +136,7 @@ func GenerateCompositeSVGdoc(topologyJSON string, topologySVG string, theMap map
 				rotate := typeDef.Rotate
 				//if isIn("txt90", renderOptions) {
 				if typeDef.H > typeDef.W*2 {
-					rotate += 90
+					rotate -= 90
 				}
 				if rotate != 0 {
 					textElForHWC.SetAttributeValue("transform", fmt.Sprintf("rotate(%03f %d %d)", rotate, HWcDef.X, HWcDef.Y))
