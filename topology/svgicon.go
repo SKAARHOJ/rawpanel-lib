@@ -216,12 +216,145 @@ func GenerateCompositeSVGdoc(topologyJSON string, topologySVG string, theMap map
 	return svgDoc
 }
 
+func GenerateCompositeGridSVG(topologyJSON string) string {
+
+	svgDoc := GenerateCompositeGridSVGdoc(topologyJSON)
+	if svgDoc == nil {
+		return ""
+	}
+
+	return svgDoc.XMLPretty()
+}
+
+func GenerateCompositeGridSVGdoc(topologyJSON string) *xml.Document {
+
+	// Reading JSON topology:
+	var topology Topology
+	json.Unmarshal([]byte(topologyJSON), &topology)
+	topology.Verify()
+
+	gridCols, gridRows, err := topology.GridCanvasSize()
+
+	if gridCols <= 0 || gridRows <= 0 || err != nil {
+		return nil // If the grid size is not defined, we cannot render the SVG icon
+	}
+
+	scaling := 200.0 // This is the scaling factor for the SVG icon.
+
+	topologySVG := `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ` + strconv.Itoa(int(float64(gridCols)*scaling)) + ` ` + strconv.Itoa(int(float64(gridRows)*scaling)) + `" width="100%">
+	</svg>`
+
+	// Parsing SVG file:
+	svgDoc, err := xmldom.ParseXML(topologySVG)
+	if err != nil {
+		log.Should(err)
+		return nil
+	}
+	if svgDoc.Root == nil {
+		log.Error("svgDoc.Root was nil")
+		return nil
+	}
+
+	for _, grid := range topology.Grids {
+		gridArea := svgDoc.Root.CreateNode("rect")
+		gridArea.SetAttributeValue("x", strconv.Itoa(int((float64(grid.TopLeftCellIndexX)+0.02)*scaling)))
+		gridArea.SetAttributeValue("y", strconv.Itoa(int((float64(grid.TopLeftCellIndexY)+0.02)*scaling)))
+		gridArea.SetAttributeValue("width", strconv.Itoa(int((float64(grid.Cols)-0.04)*scaling)))
+		gridArea.SetAttributeValue("height", strconv.Itoa(int((float64(grid.Rows)-0.04)*scaling)))
+		gridArea.SetAttributeValue("rx", strconv.Itoa(10))
+		gridArea.SetAttributeValue("rx", strconv.Itoa(10))
+
+		gridArea.SetAttributeValue("fill", "#ccffcc")
+		gridArea.SetAttributeValue("stroke", "#666")
+		gridArea.SetAttributeValue("stroke-width", "2")
+
+		tdWidth := len(grid.Title)*8 + 20
+		textBox := svgDoc.Root.CreateNode("rect")
+		textBox.SetAttributeValue("x", strconv.Itoa(int((float64(grid.TopLeftCellIndexX)+float64(grid.Cols)/2)*scaling)-tdWidth/2))
+		textBox.SetAttributeValue("y", strconv.Itoa(int((float64(grid.TopLeftCellIndexY))*scaling)))
+		textBox.SetAttributeValue("width", strconv.Itoa(tdWidth)) // Width is based on the length of the title text
+		textBox.SetAttributeValue("height", strconv.Itoa(18))
+		textBox.SetAttributeValue("rx", strconv.Itoa(8))
+		textBox.SetAttributeValue("rx", strconv.Itoa(8))
+
+		textBox.SetAttributeValue("fill", "#000")
+
+		label := svgDoc.Root.CreateNode("text")
+		label.SetAttributeValue("x", strconv.Itoa(int((float64(grid.TopLeftCellIndexX)+float64(grid.Cols)/2)*scaling)))
+		label.SetAttributeValue("y", strconv.Itoa(int((float64(grid.TopLeftCellIndexY)+0.07)*scaling)))
+
+		label.SetAttributeValue("fill", "white")
+		label.SetAttributeValue("font-size", "15")
+		label.SetAttributeValue("font-family", "sans-serif")
+		label.SetAttributeValue("pointer-events", "none")
+		label.SetAttributeValue("text-anchor", "middle")
+
+		label.Text = grid.Title
+
+		for rIndex, row := range grid.HWcMap {
+
+			for cIndex, element := range row {
+				newHWc := svgDoc.Root.CreateNode("rect")
+				newHWc.SetAttributeValue("x", strconv.Itoa(int((float64(grid.TopLeftCellIndexX)+float64(cIndex)+0.1)*scaling)))
+				newHWc.SetAttributeValue("y", strconv.Itoa(int((float64(grid.TopLeftCellIndexY)+float64(rIndex)+0.1)*scaling)))
+				newHWc.SetAttributeValue("width", strconv.Itoa(int(scaling*0.8)))
+				newHWc.SetAttributeValue("height", strconv.Itoa(int(scaling*0.8)))
+				newHWc.SetAttributeValue("rx", strconv.Itoa(5)) // Rounding corners for visual elegance
+				newHWc.SetAttributeValue("rx", strconv.Itoa(5)) // Rounding corners for visual elegance
+
+				var idStrings []string
+				for _, id := range element.Ids {
+					idStrings = append(idStrings, strconv.FormatUint(uint64(id), 10))
+				}
+				addFormattingStr(newHWc, strings.Join(idStrings, ","))
+
+				numberForHWC := svgDoc.Root.CreateNode("text")
+				numberForHWC.SetAttributeValue("x", strconv.Itoa(int((float64(grid.TopLeftCellIndexX)+float64(cIndex)+0.13)*scaling)))
+				numberForHWC.SetAttributeValue("y", strconv.Itoa(int((float64(grid.TopLeftCellIndexY)+float64(rIndex)+0.20)*scaling)))
+
+				numberForHWC.SetAttributeValue("fill", "#999")
+				numberForHWC.SetAttributeValue("font-size", "20")
+				numberForHWC.SetAttributeValue("font-family", "sans-serif")
+				numberForHWC.SetAttributeValue("pointer-events", "none")
+
+				numberForHWC.Text = strings.Join(idStrings, ",")
+
+				label := svgDoc.Root.CreateNode("text")
+				label.SetAttributeValue("x", strconv.Itoa(int((float64(grid.TopLeftCellIndexX)+float64(cIndex)+0.5)*scaling)))
+				label.SetAttributeValue("y", strconv.Itoa(int((float64(grid.TopLeftCellIndexY)+float64(rIndex)+0.50)*scaling)))
+
+				label.SetAttributeValue("fill", "#000")
+				label.SetAttributeValue("font-size", "30")
+				label.SetAttributeValue("font-family", "sans-serif")
+				label.SetAttributeValue("pointer-events", "none")
+				label.SetAttributeValue("text-anchor", "middle")
+
+				for _, hwcDef := range topology.HWc {
+					if hwcDef.Id == element.Ids[0] {
+						label.Text = hwcDef.Txt
+					}
+				}
+			}
+		}
+	}
+
+	return svgDoc
+}
+
 func addFormatting(newHWc *xml.Node, id int) {
 	// There is some common conventional formatting regardless of rectangle / circle: Like fill and stroke color and stroke width.
 	newHWc.SetAttributeValue("fill", "#dddddd")
 	newHWc.SetAttributeValue("stroke", "#000")
 	newHWc.SetAttributeValue("stroke-width", "2")
 	newHWc.SetAttributeValue("id", "HWc"+strconv.Itoa(id)) // Also, lets add an id to the element! This is not mandatory, but you are likely to want this to program some interaction with the SVG
+}
+
+func addFormattingStr(newHWc *xml.Node, id string) {
+	// There is some common conventional formatting regardless of rectangle / circle: Like fill and stroke color and stroke width.
+	newHWc.SetAttributeValue("fill", "#dddddd")
+	newHWc.SetAttributeValue("stroke", "#000")
+	newHWc.SetAttributeValue("stroke-width", "2")
+	newHWc.SetAttributeValue("id", "HWc"+id) // Also, lets add an id to the element! This is not mandatory, but you are likely to want this to program some interaction with the SVG
 }
 
 func addSubElFormatting(newHWc *xml.Node, subEl *TopologyHWcTypeDefSubEl) {

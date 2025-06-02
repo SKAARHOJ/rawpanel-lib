@@ -16,6 +16,7 @@ type Topology struct {
 	Title     string `json:"title,omitempty"` // Controller Title
 	HWc       []TopologyHWcomponent
 	TypeIndex map[uint32]TopologyHWcTypeDef `json:"typeIndex"`
+	Grids     []Grid                        `json:"grids,omitempty"`
 
 	sync.RWMutex `json:"-"`
 }
@@ -28,6 +29,20 @@ type TopologyHWcomponent struct {
 	TypeOverride *TopologyHWcTypeDef `json:"typeOverride,omitempty"`
 	UIparent     uint32              `json:"UIparent,omitempty"` // UI parent HWc, for simulator to know which elements should move along with a given parent when moved. (NOTICE: I think this is actually wrong, it's encapsulated in an object where used in reactor it seems... Needs clarification and alignment (KS))
 	UIyang       uint32              `json:"UIyang,omitempty"`   // UI counterpart HWc, for joysticks where one element will have an orthogonal component and if this is set, simulation will pair those too into the same operation.
+}
+
+type Grid struct {
+	Title             string          `json:"title"`
+	Rows              uint32          `json:"rows"`                        // Number of rows in the grid. Must be >0 and match the number of elements in the HWcMap's first dimension.
+	Cols              uint32          `json:"cols"`                        // Number of columns in the grid. Must be >0 and match the number of elements in the HWcMap's second dimension.
+	HWcMap            [][]GridElement `json:"HWcMap"`                      // A rows-columns grid of grid elements. Each element is a GridElement which has one or more Ids that matches the Id in the Topology.HWc array. Must be the same size as the Rows and Cols.
+	MasterTypeIndex   uint32          `json:"masterTypeIndex,omitempty"`   // A type index that defines all components in the grid. If this is set, all elements in the grid can be assumed of this type. It's used for uniform grids (and should correspond to traversing all element and conclude that they are all in fact of this type), while if it is not set, each element can have its own type and must be determined by normal traversal.
+	TopLeftCellIndexX uint32          `json:"topLeftCellIndexX,omitempty"` // Represents the X-index of the top-left cell in the grid, within an abstract cell-based rendering space. Each column occupies one cell in the X direction. The value must be >= 0. This is useful for positioning the grid within a larger layout that may include multiple adjacent grids. Multiple grids must not overlap, so this value must be unique for each grid and space them accordingly.
+	TopLeftCellIndexY uint32          `json:"topLeftCellIndexY,omitempty"` // Represents the Y-index of the top-left cell in the grid, within an abstract cell-based rendering space. Each row occupies one cell in the Y direction. The value must be >= 0. This is useful for positioning the grid within a larger layout that may include multiple adjacent grids. Multiple grids must not overlap, so this value must be unique for each grid and space them accordingly.
+}
+
+type GridElement struct {
+	Ids []uint32 `json:"ids"` // Matches one or more Ids in the Topology.HWc array. Any referenced Ids in HWc shall only be used once in all grids.
 }
 
 // See DC_SKAARHOJ_RawPanel.odt for descriptions:
@@ -265,6 +280,105 @@ func (topology *Topology) Verify() {
 			fmt.Printf("Warning: Type %d not used in HWcID index\n", key)
 		}
 	}
+
+	_, _, err := topology.GridCanvasSize()
+	if err != nil {
+		fmt.Printf("ERROR: %s\n", err.Error())
+	}
+}
+
+func (topology *Topology) GridCanvasSize() (uint32, uint32, error) {
+
+	topology.RLock()
+	defer topology.RUnlock()
+
+	if topology.Grids == nil || len(topology.Grids) == 0 {
+		return 0, 0, nil
+	}
+
+	usedIds := make(map[uint32]bool)
+
+	for _, grid := range topology.Grids {
+		if grid.Rows == 0 || grid.Cols == 0 {
+			return 0, 0, fmt.Errorf("Grid '%s' has invalid rows or cols", grid.Title)
+		}
+		if len(grid.HWcMap) != int(grid.Rows) {
+			return 0, 0, fmt.Errorf("Grid '%s' has HWcMap with rows %d but Rows is %d", grid.Title, len(grid.HWcMap), grid.Rows)
+		}
+
+		for _, row := range grid.HWcMap {
+			if len(row) != int(grid.Cols) {
+				return 0, 0, fmt.Errorf("Grid '%s' has HWcMap with cols %d but Cols is %d", grid.Title, len(row), grid.Cols)
+			}
+			for _, elem := range row {
+				if len(elem.Ids) == 0 {
+					return 0, 0, fmt.Errorf("Grid '%s' has element with no Ids", grid.Title)
+				}
+				for _, id := range elem.Ids {
+					if usedIds[id] {
+						return 0, 0, fmt.Errorf("Grid '%s' has duplicate element Id %d", grid.Title, id)
+					}
+					usedIds[id] = true
+
+					// Validate Id exists in Topology
+					found := false
+					for _, hwc := range topology.HWc {
+						if hwc.Id == id {
+							found = true
+							break
+						}
+					}
+					if !found {
+						return 0, 0, fmt.Errorf("Grid '%s' has element with Id %d that does not exist in HWc", grid.Title, id)
+					}
+				}
+			}
+		}
+
+		if grid.MasterTypeIndex != 0 {
+			if _, ok := topology.TypeIndex[grid.MasterTypeIndex]; !ok {
+				return 0, 0, fmt.Errorf("Grid '%s' has MasterTypeIndex %d that does not exist in TypeIndex", grid.Title, grid.MasterTypeIndex)
+			}
+		}
+		if grid.TopLeftCellIndexX >= 1000 || grid.TopLeftCellIndexY >= 1000 {
+			return 0, 0, fmt.Errorf("Grid '%s' has TopLeftCellIndexX or TopLeftCellIndexY that is too large", grid.Title)
+		}
+	}
+
+	// Overlap check:
+	for i := 0; i < len(topology.Grids); i++ {
+		gridA := topology.Grids[i]
+		leftA := gridA.TopLeftCellIndexX
+		rightA := gridA.TopLeftCellIndexX + gridA.Cols
+		topA := gridA.TopLeftCellIndexY
+		bottomA := gridA.TopLeftCellIndexY + gridA.Rows
+
+		for j := i + 1; j < len(topology.Grids); j++ {
+			gridB := topology.Grids[j]
+			leftB := gridB.TopLeftCellIndexX
+			rightB := gridB.TopLeftCellIndexX + gridB.Cols
+			topB := gridB.TopLeftCellIndexY
+			bottomB := gridB.TopLeftCellIndexY + gridB.Rows
+
+			if !(rightA <= leftB || leftA >= rightB || bottomA <= topB || topA >= bottomB) {
+				return 0, 0, fmt.Errorf("Grids %s and %s overlap", gridA.Title, gridB.Title)
+			}
+		}
+	}
+
+	// Find the maximum X and Y coordinates of the grids:
+	maxX := uint32(0)
+	maxY := uint32(0)
+	for _, grid := range topology.Grids {
+		if grid.TopLeftCellIndexX+grid.Cols > maxX {
+			maxX = uint32(grid.TopLeftCellIndexX + grid.Cols)
+		}
+		if grid.TopLeftCellIndexY+grid.Rows > maxY {
+			maxY = uint32(grid.TopLeftCellIndexY + grid.Rows)
+		}
+	}
+
+	return maxX, maxY, nil
 }
 
 func (topology *Topology) RandomizeTypes(sequence bool) {
