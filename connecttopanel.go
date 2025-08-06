@@ -19,8 +19,9 @@ import (
 )
 
 type ConnectToPanelConfig struct {
-	NoConnectionRetryPeriod int // Period in seconds between retries in case of no
-	ReConnectionRetryPeriod int // Period in seconds between retries in case of disconnect
+	NoConnectionRetryPeriod int    // Period in seconds between retries in case of no
+	ReConnectionRetryPeriod int    // Period in seconds between retries in case of disconnect
+	NetworkAlternative      string // Alternative network interface to use, e.g. "en0" for WiFi on macOS
 }
 
 // Connects to a raw panel compliant device on IP:port
@@ -50,10 +51,16 @@ func ConnectToPanel(panelIPAndPort string, msgsToPanel <-chan []*rwp.InboundMess
 		defer wg.Done()
 	}
 
+	network := "tcp"
+	if config != nil && config.NetworkAlternative != "" {
+		network = config.NetworkAlternative
+	}
+
 	// Main loop for continuous connection attempts:
 	for {
-		log.Debugln("Trying to connect to panel on " + panelIPAndPort)
-		conn, err := net.Dial("tcp", panelIPAndPort)
+		log.Debugln("Trying to connect to panel on " + network + " " + panelIPAndPort)
+		conn, err := net.Dial(network, panelIPAndPort)
+		log.Should(err)
 
 		if err != nil {
 			//fmt.Println(err)
