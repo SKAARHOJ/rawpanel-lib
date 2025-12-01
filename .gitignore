@@ -1,3 +1,6 @@
 .vscode
 .DS_Store
 go.work*
+tools/rwp-converter/rwp-converter
+.gitignore
+tools/rwp-converter/rwp-converter.exe
