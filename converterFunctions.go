@@ -872,11 +872,21 @@ func InboundMessagesToRawPanelASCIIstrings(inboundMsgs []*rwp.InboundMessage) []
 							} else if su.IsIntIn(int(stateRec.HWCText.Formatting), []int{10, 11}) {
 								stringSlice[0] = strconv.Itoa(int(stateRec.HWCText.TextStyling.UnformattedFontSize))
 							} else { // Formatting == 7
-								stringSlice[1] = ""
-								stringSlice[0] = ""
+								// Only clear IntegerValue if Scale is not being used
+								// When Scale.ScaleType > 0, IntegerValue is needed for the value indicator bar
+								if stateRec.HWCText.Scale == nil || stateRec.HWCText.Scale.ScaleType == 0 {
+									stringSlice[1] = ""
+									stringSlice[0] = ""
+								} else {
+									// Scale is active, preserve IntegerValue and explicitly set Formatting=7 to hide text
+									stringSlice[1] = "7"
+									stringSlice[0] = strconv.Itoa(int(stateRec.HWCText.IntegerValue))
+								}
 							}
 
-							returnStrings = append(returnStrings, fmt.Sprintf("HWCt#%s=%s", su.IntImplode(singleHWCIDarray, ","), su.StringImplodeRemoveTrailingEmpty(stringSlice, "|")))
+							asciiCmd := fmt.Sprintf("HWCt#%s=%s", su.IntImplode(singleHWCIDarray, ","), su.StringImplodeRemoveTrailingEmpty(stringSlice, "|"))
+
+							returnStrings = append(returnStrings, asciiCmd)
 						}
 						if stateRec.HWCGfx != nil && !proto.Equal(stateRec.HWCGfx, &rwp.HWCGfx{}) {
 							cmdString := "HWCg"
