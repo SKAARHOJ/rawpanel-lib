@@ -438,6 +438,24 @@ func (rp *RawPanel) SetRWPTextByStruct(hwc uint32, txtStruct *rwp.HWCText) {
 	}
 }
 
+// Sets text scrolling on a display. scrollMode: 1=loop, 2=marquee, 3=bounce.
+// scrollTitle/scrollText1/scrollText2 control which fields scroll.
+// speed: 0=default, 1=slow, 2=normal, 3=fast. pauseDwell: 0=default, 1=short, 2=medium, 3=long.
+func (rp *RawPanel) SetRWPTextScroll(hwc uint32, scrollMode rwp.HWCText_TextScrollM_ScrollModeE, scrollTitle bool, scrollText1 bool, scrollText2 bool, speed uint32, pauseDwell uint32) {
+	txtStruct := &rwp.HWCText{
+		Formatting: 7,
+		TextScroll: &rwp.HWCText_TextScrollM{
+			ScrollMode:      scrollMode,
+			ScrollTitle:     scrollTitle,
+			ScrollTextline1: scrollText1,
+			ScrollTextline2: scrollText2,
+			ScrollSpeed:     speed,
+			PauseDwell:      pauseDwell,
+		},
+	}
+	rp.SetRWPTextByStruct(hwc, txtStruct)
+}
+
 // Type DrawFitting represents how the image is scaled
 type DrawFitting string
 

@@ -262,6 +262,21 @@ func RawPanelASCIIstringsToInboundMessages(rp20_ascii []string) []*rwp.InboundMe
 							LimitLow:  int32(su.IndexValueToInt(splitTextString, 12)),
 							LimitHigh: int32(su.IndexValueToInt(splitTextString, 13)),
 						},
+						TextScroll: func() *rwp.HWCText_TextScrollM {
+							val := su.IndexValueToInt(splitTextString, 14)
+							if val == 0 {
+								return nil
+							}
+							return &rwp.HWCText_TextScrollM{
+								ScrollMode:      rwp.HWCText_TextScrollM_ScrollModeE(val & 0x3),
+								ScrollTitle:     (val>>2)&1 != 0,
+								ScrollTextline1: (val>>3)&1 != 0,
+								ScrollTextline2: (val>>4)&1 != 0,
+								ScrollSpeed:     uint32((val >> 5) & 0x3),
+								PauseDwell:      uint32((val >> 7) & 0x3),
+								AdaptiveSpeed:   (val>>9)&1 != 0,
+							}
+						}(),
 						TextStyling: &rwp.HWCText_TextStyle{
 							TextFont: &rwp.HWCText_TextStyle_Font{
 								FontFace:   rwp.HWCText_TextStyle_Font_FontFaceE((su.IndexValueToInt(splitTextString, 15) >> 0) & 0x7),
@@ -830,7 +845,24 @@ func InboundMessagesToRawPanelASCIIstrings(inboundMsgs []*rwp.InboundMessage) []
 									stringSlice[17] = strconv.Itoa(int(extRetAdvancedSettings))
 								}
 							}
-							// Index 14 not supported in v2.0!
+							if stateRec.HWCText.TextScroll != nil && stateRec.HWCText.TextScroll.ScrollMode > 0 {
+								val := int(stateRec.HWCText.TextScroll.ScrollMode) & 0x3
+								if stateRec.HWCText.TextScroll.ScrollTitle {
+									val |= 1 << 2
+								}
+								if stateRec.HWCText.TextScroll.ScrollTextline1 {
+									val |= 1 << 3
+								}
+								if stateRec.HWCText.TextScroll.ScrollTextline2 {
+									val |= 1 << 4
+								}
+								val |= (int(stateRec.HWCText.TextScroll.ScrollSpeed) & 0x3) << 5
+								val |= (int(stateRec.HWCText.TextScroll.PauseDwell) & 0x3) << 7
+								if stateRec.HWCText.TextScroll.AdaptiveSpeed {
+									val |= 1 << 9
+								}
+								stringSlice[14] = strconv.Itoa(val)
+							}
 							if stateRec.HWCText.Scale != nil && stateRec.HWCText.Scale.ScaleType > 0 {
 								stringSlice[9] = strconv.Itoa(int(stateRec.HWCText.Scale.ScaleType))
 								stringSlice[10] = strconv.Itoa(int(stateRec.HWCText.Scale.RangeLow))
@@ -1210,6 +1242,8 @@ func RawPanelASCIIstringsToOutboundMessages(rp20_ascii []string) []*rwp.Outbound
 							supportObj.Processors = true
 						case "NetworkSettings":
 							supportObj.NetworkSettings = true
+						case "TextScroll":
+							supportObj.TextScroll = true
 						}
 					}
 					msg = &rwp.OutboundMessage{
@@ -1597,6 +1631,9 @@ func OutboundMessagesToRawPanelASCIIstrings(outboundMsgs []*rwp.OutboundMessage)
 				}
 				if outboundMsg.PanelInfo.RawPanelSupport.NetworkSettings {
 					support = append(support, "NetworkSettings")
+				}
+				if outboundMsg.PanelInfo.RawPanelSupport.TextScroll {
+					support = append(support, "TextScroll")
 				}
 				returnStrings = append(returnStrings, "_support="+strings.Join(support, ","))
 			}

@@ -1,6 +1,7 @@
 package rawpanellib
 
 import (
+	"encoding/json"
 	"fmt"
 	"testing"
 
@@ -93,6 +94,11 @@ func TestOutbound(t *testing.T) {
 		{
 			[]string{"State=5", "StateA=15", "StateA=52", "StateA=544", "StateG=21"},
 			[]string{"State=5", "StateA=15", "StateA=52", "StateA=544", "StateG=21"},
+		},
+		// Testing Support with TextScroll
+		{
+			[]string{"_support=ASCII,Binary,TextScroll"},
+			[]string{"_support=ASCII,Binary,TextScroll"},
 		},
 	}
 
@@ -212,6 +218,27 @@ func TestInbound(t *testing.T) {
 			[]string{"JSONonOutbound=0"},
 		},
 
+		// TextScroll: loop mode, scroll title + textline1 (1 | 4 | 8 = 13)
+		{
+			[]string{"HWCt#5=|||My Title||Long text here|||||||||13"},
+			[]string{"HWCt#5=|||My Title||Long text here|||||||||13"},
+		},
+		// TextScroll: bounce mode, scroll textline2, speed=2, dwell=1 (2 | 16 | 64 | 128 = 210)
+		{
+			[]string{"HWCt#10=|||Header||Line1|Line2||1||||||210"},
+			[]string{"HWCt#10=|||Header||Line1|Line2||1||||||210"},
+		},
+		// TextScroll: bounce mode, all fields, speed=3, dwell=3 (2 | 4 | 8 | 16 | 96 | 384 = 510)
+		{
+			[]string{"HWCt#1=|||Title||T1|T2||1||||||510"},
+			[]string{"HWCt#1=|||Title||T1|T2||1||||||510"},
+		},
+		// TextScroll: loop mode, all fields, adaptive speed (1 | 4 | 8 | 16 | 512 = 541)
+		{
+			[]string{"HWCt#3=|||Title||T1|T2||1||||||541"},
+			[]string{"HWCt#3=|||Title||T1|T2||1||||||541"},
+		},
+
 		// Register
 		{
 			[]string{"Registers?"},
@@ -254,6 +281,59 @@ func TestInbound(t *testing.T) {
 						continue
 					}
 				}
+			}
+		})
+	}
+}
+
+// TestInboundFromJSON tests the exact path the explorer uses:
+// JSON (from browser) -> json.Unmarshal -> protobuf -> InboundMessagesToRawPanelASCIIstrings
+func TestInboundFromJSON(t *testing.T) {
+	var tests = []struct {
+		name     string
+		json     string
+		wantASCII string
+	}{
+		{
+			"TextScroll loop mode with title",
+			`{"HWCIDs":[5],"HWCText":{"Formatting":7,"Title":"Hello","TextScroll":{"ScrollMode":1,"ScrollTitle":true,"ScrollTextline1":true,"ScrollTextline2":true}}}`,
+			"HWCt#5=|||Hello|1||||||||||29",
+		},
+		{
+			"TextScroll bounce, speed=2, dwell=1",
+			`{"HWCIDs":[10],"HWCText":{"Formatting":7,"Title":"Header","Textline1":"Line1","Textline2":"Line2","TextScroll":{"ScrollMode":2,"ScrollTitle":true,"ScrollTextline1":true,"ScrollTextline2":true,"ScrollSpeed":2,"PauseDwell":1}}}`,
+			"HWCt#10=|||Header|1|Line1|Line2||||||||222",
+		},
+		{
+			"No TextScroll (text only)",
+			`{"HWCIDs":[2],"HWCText":{"Formatting":7,"Title":"Hello","Textline1":"World"}}`,
+			"HWCt#2=|||Hello|1|World",
+		},
+		{
+			"TextScroll loop with adaptive speed",
+			`{"HWCIDs":[3],"HWCText":{"Formatting":7,"Title":"Title","Textline1":"T1","Textline2":"T2","TextScroll":{"ScrollMode":1,"ScrollTitle":true,"ScrollTextline1":true,"ScrollTextline2":true,"AdaptiveSpeed":true}}}`,
+			"HWCt#3=|||Title|1|T1|T2||||||||541",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			state := &ibeam_rawpanel.HWCState{}
+			err := json.Unmarshal([]byte(tt.json), state)
+			if err != nil {
+				t.Fatalf("json.Unmarshal error: %v", err)
+			}
+
+			inboundMessages := []*ibeam_rawpanel.InboundMessage{
+				{States: []*ibeam_rawpanel.HWCState{state}},
+			}
+			ascii := InboundMessagesToRawPanelASCIIstrings(inboundMessages)
+
+			if len(ascii) != 1 {
+				t.Fatalf("Expected 1 ASCII string, got %d: %v", len(ascii), ascii)
+			}
+			if ascii[0] != tt.wantASCII {
+				t.Errorf("ASCII mismatch:\n  got:  %s\n  want: %s", ascii[0], tt.wantASCII)
 			}
 		})
 	}

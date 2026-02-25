@@ -607,6 +607,119 @@ func WriteDisplayTileNew(textStruct *rwp.HWCText, width int, height int, shrink 
 	return disp
 }
 
+// ComputeScrollMaxOffset computes the minimum number of characters to remove from
+// the front of each text field (Title, Textline1, Textline2) so the remaining text
+// fits within the display at the same font settings WriteDisplayTileNew would use.
+// Returns 0 for fields that already fit without scrolling.
+func ComputeScrollMaxOffset(textStruct *rwp.HWCText, width, height, shrink, border int) (titleMax, line1Max, line2Max int) {
+	if textStruct == nil {
+		return
+	}
+
+	// Read styling without mutating the input
+	styling := textStruct.TextStyling
+	if styling == nil {
+		styling = &rwp.HWCText_TextStyle{}
+	}
+	textFont := styling.TextFont
+	if textFont == nil {
+		textFont = &rwp.HWCText_TextStyle_Font{}
+	}
+	titleFontStyle := styling.TitleFont
+	if titleFontStyle == nil {
+		titleFontStyle = &rwp.HWCText_TextStyle_Font{}
+	}
+
+	fontFaceContent := int(textFont.FontFace & 7)
+	fontFaceTitle := int(titleFontStyle.FontFace & 7)
+	fontProportional := !styling.FixedWidth
+
+	fontTextSizeH := int(textFont.TextWidth & 3)
+	fontTextSizeV := int(textFont.TextHeight & 3)
+	titleTextSizeH := int(titleFontStyle.TextWidth & 3)
+	titleTextSizeV := int(titleFontStyle.TextHeight & 3)
+
+	wShrink := su.Qint(shrink&1 > 0, 1, 0)
+	activeWidth := su.Qint(border > 0, width-border*2, width-wShrink)
+
+	// Helper: find smallest charOffset where remaining text fits within activeWidth
+	findMaxOffset := func(measurer *monogfx.MonoImg, text string) int {
+		if measurer.StrWidth(text) <= activeWidth {
+			return 0 // Already fits
+		}
+		runes := []rune(text)
+		for k := 1; k <= len(runes); k++ {
+			if measurer.StrWidth(string(runes[k:])) <= activeWidth {
+				return k
+			}
+		}
+		return len(runes)
+	}
+
+	switch textStruct.Formatting {
+	case 10: // One line - Title rendered with content font
+		contentDisp := monogfx.MonoImg{}
+		contentDisp.SetCharSpacingCompensation(byte(styling.ExtraCharacterSpacing & 3))
+		contentDisp.SetFont(fontFaceContent, fontProportional)
+		textSizeH := su.ConstrainValue(int(styling.UnformattedFontSize), 1, 4)
+		contentDisp.SetTextSize(su.Qint(fontTextSizeH > 0, fontTextSizeH, textSizeH), su.Qint(fontTextSizeV > 0, fontTextSizeV, textSizeH))
+		titleMax = findMaxOffset(&contentDisp, textStruct.Title)
+
+	case 11: // Two lines - Textline1/Textline2 with content font
+		contentDisp := monogfx.MonoImg{}
+		contentDisp.SetCharSpacingCompensation(byte(styling.ExtraCharacterSpacing & 3))
+		contentDisp.SetFont(fontFaceContent, fontProportional)
+		textSizeH := su.ConstrainValue(int(styling.UnformattedFontSize), 1, 4)
+		contentDisp.SetTextSize(su.Qint(fontTextSizeH > 0, fontTextSizeH, textSizeH), su.Qint(fontTextSizeV > 0, fontTextSizeV, textSizeH))
+		line1Max = findMaxOffset(&contentDisp, textStruct.Textline1)
+		line2Max = findMaxOffset(&contentDisp, textStruct.Textline2)
+
+	default: // Standard formatting with title bar + content area
+		// Title measurement
+		titleDisp := monogfx.MonoImg{}
+		titleDisp.SetCharSpacingCompensation(byte(styling.ExtraCharacterSpacing & 3))
+		titleDisp.SetFont(su.Qint(height < 32 && width != 256, 2, fontFaceTitle), fontProportional)
+		titleDisp.SetTextSize(su.Qint(titleTextSizeH > 0, titleTextSizeH, su.Qint(width == 256, 2, 1)), su.Qint(titleTextSizeV > 0, titleTextSizeV, 1))
+		titleMax = findMaxOffset(&titleDisp, textStruct.Title)
+
+		// Content measurement - use the smallest (auto-narrowed) font size
+		// that the renderer would use, so we stop scrolling when text is fully visible
+		pair := textStruct.PairMode
+		contentDisp := monogfx.MonoImg{}
+		contentDisp.SetCharSpacingCompensation(byte(styling.ExtraCharacterSpacing & 3))
+		contentDisp.SetFont(fontFaceContent, fontProportional)
+		if height < 32 && pair > 0 {
+			contentDisp.SetFont(2, fontProportional)
+		}
+
+		// Compute the smallest H size the renderer might use (after auto-narrowing)
+		narrowedH := su.Qint(fontTextSizeH > 0, fontTextSizeH, 1)
+		narrowedV := su.Qint(fontTextSizeV > 0, fontTextSizeV, su.Qint(height >= 48, 2, 0))
+
+		// Mini tile override
+		hShrink := su.Qint(shrink&2 > 0, 1, 0)
+		activeHeight := su.Qint(border > 0, height-border*2, height-hShrink)
+		isTitle := len(textStruct.Title) > 0
+		titlePadding := su.Qint(styling.TitleBarPadding > 0, int(styling.TitleBarPadding), su.Qint(height < 32 && width != 256, 1, su.Qint(width == 256, 3, 1)))
+		titleHeight := int(titleDisp.LineHeight()-1) + 2*titlePadding
+		mainContentTopOffset := su.Qint(isTitle, titleHeight, 0)
+		scaleOffset := 0
+		if textStruct.Scale != nil && textStruct.Scale.ScaleType > 0 {
+			scaleOffset = 3
+		}
+		mainContentAvailableHeight := activeHeight - mainContentTopOffset - scaleOffset
+		if mainContentAvailableHeight < 12 && pair == 0 && fontTextSizeH == 0 && fontTextSizeV == 0 {
+			narrowedH = 1
+			narrowedV = 1
+		}
+
+		contentDisp.SetTextSize(narrowedH, narrowedV)
+		line1Max = findMaxOffset(&contentDisp, textStruct.Textline1)
+		line2Max = findMaxOffset(&contentDisp, textStruct.Textline2)
+	}
+	return
+}
+
 type ASCIIreader struct {
 	HWCGfx_count     int
 	HWCGfx_ImageType string
