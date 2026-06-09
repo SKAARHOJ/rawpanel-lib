@@ -14,7 +14,7 @@ require (
 )
 
 require (
-	github.com/antchfx/xpath v1.2.4 // indirect
+	github.com/antchfx/xpath v1.3.6 // indirect
 	github.com/disintegration/gift v1.2.1 // indirect
 	github.com/fogleman/gg v1.3.0 // indirect
 	github.com/golang/freetype v0.0.0-20170609003504-e2365dfdc4a0 // indirect
@@ -23,6 +23,6 @@ require (
 	github.com/petermattis/goid v0.0.0-20230518223814-80aa455d8761 // indirect
 	github.com/sasha-s/go-deadlock v0.3.1 // indirect
 	github.com/sirupsen/logrus v1.9.4 // indirect
-	golang.org/x/image v0.35.0 // indirect
+	golang.org/x/image v0.38.0 // indirect
 	golang.org/x/sys v0.45.0 // indirect
 )
