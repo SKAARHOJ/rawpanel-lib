@@ -21,3 +21,19 @@ Components made of several LEDs (topology type with `ext: steps` and one `sub` e
 New ASCII line:
 
 - `HWCs#xx=mode,color|mode,color|...` — one entry per LED, with `mode` and `color` as the values of `HWC#` and `HWCc#` (`,color` left out when not set). `HWCs#xx=` with an empty value clears it. Example, a 6 LED strip with two red, one blinking green and three dimmed white LEDs: `HWCs#30=4,132|4,132|772,143|5,130|5,130|5,130`
+
+## TouchUI
+
+Panels with touch surfaces can accept a TouchUI widget configuration from the client (`Command.SetTouchUI` / ASCII `SetTouchUI={json}`). The config declares pages (tabs) of widgets (buttons, toggles, sliders, knobs, meters, labels, image tiles) with layout and options — see the `TouchUI*` messages in `ibeam-rawpanel-proto/ibeam-rawpanel.proto`.
+
+Widgets are addressed as regular HWCs with client-assigned HWC ids: they emit standard `HWCEvent`s and honor standard `HWCState` feedback, so all existing client code works unchanged. After accepting a config the panel reflects the widgets into its topology JSON and re-sends topology plus the availability map.
+
+New ASCII lines:
+
+- `SetTouchUI={json}` — set/replace the widget configuration (inbound)
+- `ClearTouchUI` — remove all widgets (inbound)
+- `TouchUICapabilities?` / `_touchUICapabilities={json}` — query/report screen size, grid geometry and supported widget types
+- `TouchUIConfig?` / `_touchUIConfig={json}` — query/report the currently active config
+- `_support=...,TouchUI` — capability flag
+
+Widget visibility (e.g. hidden behind a non-active tab) is reported via the existing `map=<hwc>:<value>` availability mechanism: bit 31 (`0x80000000`) of the value means "present but offscreen". Legacy semantics (0 = absent, non-zero = present) are unchanged; use the `HWCAvailability*` helper functions to interpret values.

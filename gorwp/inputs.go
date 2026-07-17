@@ -92,3 +92,17 @@ type TriggerFunc func(uint32, *rwp.HWCEvent)
 func (rp *RawPanel) BindTrigger(hwc uint32, f TriggerFunc) {
 	rp.triggerBindings[hwc] = f
 }
+
+// Type VisibilityFunc is a function signature used for callbacks on
+// availability/visibility changes of a hardware component. "present" tells whether
+// the HWC exists on the panel at all, "onscreen" whether it is currently visible
+// (a TouchUI widget on a hidden tab/page is present but not onscreen).
+type VisibilityFunc func(hwc uint32, present bool, onscreen bool)
+
+// Function BindVisibility sets a callback for availability/visibility changes of a
+// specific hardware component, typically a TouchUI widget which can be hidden behind
+// a tab/page. The callback fires whenever the panel reports a changed availability
+// value for the HWC.
+func (rp *RawPanel) BindVisibility(hwc uint32, f VisibilityFunc) {
+	rp.visibilityBindings[hwc] = f
+}
