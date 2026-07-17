@@ -37,7 +37,7 @@ go build ./tools/rwp-converter/
 ### Package Layout
 
 - **Root package (`rawpanellib`)** — Core library: TCP connection management (`connecttopanel.go`), ASCII↔Protobuf conversion (`converterFunctions.go`), image/graphics helpers (`rawpanelhelpers.go`)
-- **`gorwp/`** — High-level event-driven API. Main type `RawPanel` with `Connect()`, event binding (`BindBinary`, `BindPulsed`, `BindAbsolute`, `BindIntensity`), and output methods (`SetLEDColor`, `DrawImage`, `SetRWPText`). See `gorwp/README.md` for usage examples
+- **`gorwp/`** — High-level event-driven API. Main type `RawPanel` with `Connect()`, event binding (`BindBinary`, `BindPulsed`, `BindAbsolute`, `BindIntensity`, `BindVisibility`), and output methods (`SetLEDColor`, `DrawImage`, `SetRWPText`, `SetTouchUI`). See `gorwp/README.md` for usage examples
 - **`topology/`** — Panel topology parsing and SVG icon rendering. Defines hardware component (HWC) types and their capabilities
 - **`ibeam_rawpanel/`** — Auto-generated protobuf Go code (do not edit manually)
 - **`ibeam-rawpanel-proto/`** — Protobuf schema definition (`ibeam-rawpanel.proto`)
@@ -51,4 +51,5 @@ go build ./tools/rwp-converter/
 - **Bidirectional messages**: "Inbound" = system→panel (commands/state), "Outbound" = panel→system (events/info)
 - **HWC (Hardware Component)**: Every button, encoder, fader, or display is identified by a uint32 HWC ID. The topology describes what type each HWC is
 - **Converter functions** round-trip between ASCII strings and protobuf messages. Tests verify this serialization fidelity
+- **TouchUI**: touch-capable panels accept a widget configuration (`Command.SetTouchUI` / ASCII `SetTouchUI={json}`). Widgets are regular HWCs (client-assigned ids) using standard events/states. Visibility of widgets hidden behind tabs is reported via `HWCavailability` bit 31 (`HWCAvailabilityOffscreenFlag`); see the `HWCAvailability*` helpers in `touchui.go` and the Readme
 - **Logging** uses `github.com/s00500/env_logger` — controlled via environment variables

@@ -20,7 +20,7 @@ var regex_cmd = regexp.MustCompile("^(HWC#|HWCx#|HWCj#|HWCc#|HWCt#|HWCrawADCValu
 var regex_gfx = regexp.MustCompile("^(HWCgRGB#|HWCgGray#|HWCg#)([0-9,]+)=([0-9]+)(/([0-9]+),([0-9]+)x([0-9]+)(,([0-9]+),([0-9]+)|)|):(.*)$")
 var regex_genericDual = regexp.MustCompile("^(PanelBrightness)=([0-9]+),([0-9]+)$")
 var regex_genericSingle = regexp.MustCompile("^(HeartBeatTimer|DimmedGain|PublishSystemStat|LoadCPU|SleepTimer|SleepMode|SleepScreenSaver|Webserver|JSONonOutbound|PanelBrightness)=([0-9]+)$")
-var regex_genericSingleStr = regexp.MustCompile("^(SetCalibrationProfile|SimulateEnvironmentalHealth|SetNetworkConfig)=(.*)$")
+var regex_genericSingleStr = regexp.MustCompile("^(SetCalibrationProfile|SimulateEnvironmentalHealth|SetNetworkConfig|SetTouchUI)=(.*)$")
 var regex_registers = regexp.MustCompile("^(Flag#|Mem|Shift|State)([A-Z0-9]*)=([0-9]+)$")
 
 // Converts Raw Panel 2.0 ASCII Strings into proto InboundMessage structs
@@ -96,6 +96,24 @@ func RawPanelASCIIstringsToInboundMessages(rp20_ascii []string) []*rwp.InboundMe
 			msg = &rwp.InboundMessage{
 				Command: &rwp.Command{
 					SendCalibrationProfile: true,
+				},
+			}
+		case "ClearTouchUI":
+			msg = &rwp.InboundMessage{
+				Command: &rwp.Command{
+					ClearTouchUI: true,
+				},
+			}
+		case "TouchUICapabilities?":
+			msg = &rwp.InboundMessage{
+				Command: &rwp.Command{
+					SendTouchUICapabilities: true,
+				},
+			}
+		case "TouchUIConfig?":
+			msg = &rwp.InboundMessage{
+				Command: &rwp.Command{
+					SendTouchUIConfig: true,
 				},
 			}
 		case "NetworkConfig?":
@@ -541,6 +559,12 @@ func RawPanelASCIIstringsToInboundMessages(rp20_ascii []string) []*rwp.InboundMe
 							SetNetworkConfig: networkConfigFromString(regex_genericSingleStr.FindStringSubmatch(inputString)[2]),
 						},
 					}
+				case "SetTouchUI":
+					msg = &rwp.InboundMessage{
+						Command: &rwp.Command{
+							SetTouchUI: touchUIConfigFromString(regex_genericSingleStr.FindStringSubmatch(inputString)[2]),
+						},
+					}
 				case "SimulateEnvironmentalHealth":
 					switch regex_genericSingleStr.FindStringSubmatch(inputString)[2] {
 					case "Normal":
@@ -749,6 +773,18 @@ func InboundMessagesToRawPanelASCIIstrings(inboundMsgs []*rwp.InboundMessage) []
 			}
 			if inboundMsg.Command.SetNetworkConfig != nil {
 				returnStrings = append(returnStrings, fmt.Sprintf("SetNetworkConfig=%s", networkStringFromConfig(inboundMsg.Command.SetNetworkConfig)))
+			}
+			if inboundMsg.Command.SetTouchUI != nil {
+				returnStrings = append(returnStrings, fmt.Sprintf("SetTouchUI=%s", stripLineBreaks(touchUIStringFromConfig(inboundMsg.Command.SetTouchUI))))
+			}
+			if inboundMsg.Command.ClearTouchUI {
+				returnStrings = append(returnStrings, "ClearTouchUI")
+			}
+			if inboundMsg.Command.SendTouchUICapabilities {
+				returnStrings = append(returnStrings, "TouchUICapabilities?")
+			}
+			if inboundMsg.Command.SendTouchUIConfig {
+				returnStrings = append(returnStrings, "TouchUIConfig?")
 			}
 			if inboundMsg.Command.SimulateEnvironmentalHealth != nil {
 				switch inboundMsg.Command.SimulateEnvironmentalHealth.RunMode {
@@ -1019,7 +1055,7 @@ func InboundMessagesToRawPanelASCIIstrings(inboundMsgs []*rwp.InboundMessage) []
 }
 
 var regex_map = regexp.MustCompile("^map=([0-9]+):([0-9]+)$")
-var regex_genericSingle_inbound = regexp.MustCompile("^(_model|_serial|_version|_platform|_bluePillReady|_name|_panelType|_support|_isSleeping|_sleepTimer|_panelTopology_svgbase|_panelTopology_HWC|_burninProfile|_networkConfig|_calibrationProfile|_defaultCalibrationProfile|_serverModeLockToIP|_serverModeMaxClients|_heartBeatTimer|DimmedGain|_connections|_bootsCount|_totalUptimeMin|_sessionUptimeMin|_screenSaverOnMin|ErrorMsg|Msg|EnvironmentalHealth|SysStat)=(.+)$")
+var regex_genericSingle_inbound = regexp.MustCompile("^(_model|_serial|_version|_platform|_bluePillReady|_name|_panelType|_support|_isSleeping|_sleepTimer|_panelTopology_svgbase|_panelTopology_HWC|_burninProfile|_networkConfig|_calibrationProfile|_defaultCalibrationProfile|_serverModeLockToIP|_serverModeMaxClients|_heartBeatTimer|DimmedGain|_connections|_bootsCount|_totalUptimeMin|_sessionUptimeMin|_screenSaverOnMin|_touchUICapabilities|_touchUIConfig|ErrorMsg|Msg|EnvironmentalHealth|SysStat)=(.+)$")
 var regex_cmd_inbound = regexp.MustCompile("^HWC#([0-9]+)(|.([0-9]+))=(Down|Up|Press|Abs|Speed|Enc)(|:([-0-9]+))$")
 var regex_registersOut = regexp.MustCompile("^(Flag#|Mem|Shift|State)([A-Z0-9]*)=([0-9]+)$")
 
@@ -1266,6 +1302,8 @@ func RawPanelASCIIstringsToOutboundMessages(rp20_ascii []string) []*rwp.Outbound
 							supportObj.Processors = true
 						case "NetworkSettings":
 							supportObj.NetworkSettings = true
+						case "TouchUI":
+							supportObj.TouchUI = true
 						}
 					}
 					msg = &rwp.OutboundMessage{
@@ -1324,6 +1362,14 @@ func RawPanelASCIIstringsToOutboundMessages(rp20_ascii []string) []*rwp.Outbound
 						DefaultCalibrationProfile: &rwp.CalibrationProfile{
 							Json: strValue,
 						},
+					}
+				case "_touchUICapabilities":
+					msg = &rwp.OutboundMessage{
+						TouchUICapabilities: touchUICapabilitiesFromString(strValue),
+					}
+				case "_touchUIConfig":
+					msg = &rwp.OutboundMessage{
+						TouchUIConfig: touchUIConfigFromString(strValue),
 					}
 				case "_serverModeLockToIP":
 					msg = &rwp.OutboundMessage{
@@ -1654,6 +1700,9 @@ func OutboundMessagesToRawPanelASCIIstrings(outboundMsgs []*rwp.OutboundMessage)
 				if outboundMsg.PanelInfo.RawPanelSupport.NetworkSettings {
 					support = append(support, "NetworkSettings")
 				}
+				if outboundMsg.PanelInfo.RawPanelSupport.TouchUI {
+					support = append(support, "TouchUI")
+				}
 				returnStrings = append(returnStrings, "_support="+strings.Join(support, ","))
 			}
 		}
@@ -1672,6 +1721,12 @@ func OutboundMessagesToRawPanelASCIIstrings(outboundMsgs []*rwp.OutboundMessage)
 		}
 		if outboundMsg.DefaultCalibrationProfile != nil {
 			returnStrings = append(returnStrings, "_defaultCalibrationProfile="+stripLineBreaks(outboundMsg.DefaultCalibrationProfile.Json))
+		}
+		if outboundMsg.TouchUICapabilities != nil {
+			returnStrings = append(returnStrings, "_touchUICapabilities="+stripLineBreaks(touchUIStringFromCapabilities(outboundMsg.TouchUICapabilities)))
+		}
+		if outboundMsg.TouchUIConfig != nil {
+			returnStrings = append(returnStrings, "_touchUIConfig="+stripLineBreaks(touchUIStringFromConfig(outboundMsg.TouchUIConfig)))
 		}
 		if outboundMsg.SleepTimeout != nil {
 			returnStrings = append(returnStrings, fmt.Sprintf("_sleepTimer=%d", outboundMsg.SleepTimeout.Value))
@@ -1710,6 +1765,8 @@ func OutboundMessagesToRawPanelASCIIstrings(outboundMsgs []*rwp.OutboundMessage)
 		}
 
 		if len(outboundMsg.HWCavailability) > 0 {
+			// Value semantics: 0 = absent; non-zero = present (1 or mapped-to HWC id in the low 31 bits);
+			// bit 31 (HWCAvailabilityOffscreenFlag) = present but offscreen (e.g. TouchUI widget on a hidden tab)
 			for origHWC, available := range outboundMsg.HWCavailability {
 				returnStrings = append(returnStrings, fmt.Sprintf("map=%d:%d", origHWC, available))
 			}

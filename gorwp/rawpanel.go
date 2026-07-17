@@ -47,11 +47,12 @@ type RawPanel struct {
 	fromPanel chan []*rwp.OutboundMessage
 
 	// Trigger Bindings
-	binaryBindings    map[uint32]BinaryFunc
-	pulsedBindings    map[uint32]PulsedFunc
-	absoluteBindings  map[uint32]AbsoluteFunc
-	intensityBindings map[uint32]IntensityFunc
-	triggerBindings   map[uint32]TriggerFunc
+	binaryBindings     map[uint32]BinaryFunc
+	pulsedBindings     map[uint32]PulsedFunc
+	absoluteBindings   map[uint32]AbsoluteFunc
+	intensityBindings  map[uint32]IntensityFunc
+	triggerBindings    map[uint32]TriggerFunc
+	visibilityBindings map[uint32]VisibilityFunc
 
 	// State
 	State RawPanelState
@@ -81,11 +82,12 @@ func Connect(panelIPAndPort string, ctx context.Context, cancel context.CancelFu
 		toPanel:    make(chan []*rwp.InboundMessage, 10),
 		fromPanel:  make(chan []*rwp.OutboundMessage, 10),
 
-		binaryBindings:    make(map[uint32]BinaryFunc),
-		pulsedBindings:    make(map[uint32]PulsedFunc),
-		absoluteBindings:  make(map[uint32]AbsoluteFunc),
-		intensityBindings: make(map[uint32]IntensityFunc),
-		triggerBindings:   make(map[uint32]TriggerFunc),
+		binaryBindings:     make(map[uint32]BinaryFunc),
+		pulsedBindings:     make(map[uint32]PulsedFunc),
+		absoluteBindings:   make(map[uint32]AbsoluteFunc),
+		intensityBindings:  make(map[uint32]IntensityFunc),
+		triggerBindings:    make(map[uint32]TriggerFunc),
+		visibilityBindings: make(map[uint32]VisibilityFunc),
 
 		binaryPanel: binaryPanel,
 	}
@@ -284,15 +286,36 @@ func (rp *RawPanel) procesMessagesFromPanel(messagesFromPanel []*rwp.OutboundMes
 				rp.State.name = msg.PanelInfo.Name
 				log.Debugln("Name:", msg.PanelInfo.Name)
 			}
+			if msg.PanelInfo.RawPanelSupport != nil {
+				rp.State.rawPanelSupport = msg.PanelInfo.RawPanelSupport
+			}
 			rp.State.Unlock()
 		}
 
 		// Panel availability:
 		if msg.HWCavailability != nil {
+			changed := make(map[uint32]uint32)
 			rp.State.Lock()
 			for k, v := range msg.HWCavailability {
+				if prev, exists := rp.State.hwcAvailability[k]; !exists || prev != v {
+					changed[k] = v
+				}
 				rp.State.hwcAvailability[k] = v
 			}
+			rp.State.Unlock()
+
+			// Notify visibility bindings about presence/visibility changes (outside the lock):
+			for k, v := range changed {
+				if receiverFunc, exists := rp.visibilityBindings[k]; exists {
+					receiverFunc(k, helpers.HWCAvailabilityPresent(v), helpers.HWCAvailabilityOnscreen(v))
+				}
+			}
+		}
+
+		// TouchUI capabilities:
+		if msg.TouchUICapabilities != nil {
+			rp.State.Lock()
+			rp.State.touchUICapabilities = msg.TouchUICapabilities
 			rp.State.Unlock()
 		}
 
@@ -542,6 +565,52 @@ func (rp *RawPanel) SendRawState(state *rwp.HWCState) {
 	rp.toPanel <- []*rwp.InboundMessage{
 		{
 			States: []*rwp.HWCState{state},
+		},
+	}
+}
+
+// Sets (replaces) the TouchUI widget configuration on a touch-capable panel.
+// Widgets are addressed as regular HWCs with the client-assigned HWC ids from the config,
+// so events are received via the normal Bind* functions and feedback is sent via the
+// normal state setters (SetLEDColor, SetRWPText, DrawImage, SendRawState).
+// Topology and availability map are re-requested so State reflects the widget HWCs.
+func (rp *RawPanel) SetTouchUI(config *rwp.TouchUIConfig) {
+	rp.toPanel <- []*rwp.InboundMessage{
+		{
+			Command: &rwp.Command{
+				SetTouchUI: config,
+			},
+		},
+		{
+			Command: &rwp.Command{
+				SendPanelTopology:     true,
+				ReportHWCavailability: true,
+			},
+		},
+	}
+}
+
+// Removes all TouchUI widgets from the panel, reverting it to its native topology.
+func (rp *RawPanel) ClearTouchUI() {
+	rp.toPanel <- []*rwp.InboundMessage{
+		{
+			Command: &rwp.Command{
+				ClearTouchUI:          true,
+				SendPanelTopology:     true,
+				ReportHWCavailability: true,
+			},
+		},
+	}
+}
+
+// Asks the panel to send its TouchUI capabilities (screen size, grid geometry, supported
+// widget types). The response is stored in State and available via GetTouchUICapabilities().
+func (rp *RawPanel) RequestTouchUICapabilities() {
+	rp.toPanel <- []*rwp.InboundMessage{
+		{
+			Command: &rwp.Command{
+				SendTouchUICapabilities: true,
+			},
 		},
 	}
 }
