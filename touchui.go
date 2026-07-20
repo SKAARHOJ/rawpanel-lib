@@ -42,6 +42,7 @@ const (
 	TouchUIStateText     uint32 = 1 << 2
 	TouchUIStateExtended uint32 = 1 << 3
 	TouchUIStateGfx      uint32 = 1 << 4
+	TouchUIStateOverlay  uint32 = 1 << 5
 )
 
 func touchUIConfigFromString(str string) *rwp.TouchUIConfig {
@@ -55,6 +56,23 @@ func touchUIConfigFromString(str string) *rwp.TouchUIConfig {
 
 func touchUIStringFromConfig(config *rwp.TouchUIConfig) string {
 	jsonBytes, err := json.Marshal(config)
+	if err != nil {
+		return ""
+	}
+	return string(jsonBytes)
+}
+
+func overlayFromString(str string) *rwp.HWCOverlay {
+	overlay := &rwp.HWCOverlay{}
+	err := json.Unmarshal([]byte(str), overlay)
+	if err != nil {
+		return nil
+	}
+	return overlay
+}
+
+func stringFromOverlay(overlay *rwp.HWCOverlay) string {
+	jsonBytes, err := json.Marshal(overlay)
 	if err != nil {
 		return ""
 	}
