@@ -56,8 +56,11 @@ func touchUITypeDef(t rwp.TouchUIWidget_WidgetTypeE, vertical bool) topology.Top
 			def.W = 2*touchUICellTenthMM - touchUICellGapTenthMM
 		}
 	case rwp.TouchUIWidget_KNOB:
-		def.In = "pb" // pulsed + push (tap)
-		def.Desc = "TouchUI knob"
+		def.In = "ar" // analog rotary (absolute 0..1000 dial)
+		def.Desc = "TouchUI knob (rotary fader)"
+	case rwp.TouchUIWidget_ENCODER:
+		def.In = "pb" // pulsed + push (the -/+ taps pulse, the center is the push)
+		def.Desc = "TouchUI encoder"
 	case rwp.TouchUIWidget_METER:
 		def.Desc = "TouchUI meter"
 		def.Ext = "steps"
@@ -72,6 +75,23 @@ func touchUITypeDef(t rwp.TouchUIWidget_WidgetTypeE, vertical bool) topology.Top
 		def.In = "b" // tap events (unless NoTapEvents)
 		def.Desc = "TouchUI video region"
 		def.Disp = &topology.TopologyHWcTypeDef_Display{W: 320, H: 180, Subidx: -1, Type: "touch"}
+	case rwp.TouchUIWidget_ROLLER:
+		def.In = "av" // absolute: selected index (0..N-1)
+		def.Ext = "steps"
+		def.Desc = "TouchUI roller"
+		def.H = 2*touchUICellTenthMM - touchUICellGapTenthMM // a wheel shows several choices at once
+		def.Disp = &topology.TopologyHWcTypeDef_Display{W: 64, H: 32, Subidx: -1, Type: "text"}
+	case rwp.TouchUIWidget_XYPAD:
+		def.In = "xy" // 2D absolute (or relative) vector input
+		def.Desc = "TouchUI XY pad"
+		def.W = 2*touchUICellTenthMM - touchUICellGapTenthMM
+		def.H = 2*touchUICellTenthMM - touchUICellGapTenthMM
+		def.Disp = &topology.TopologyHWcTypeDef_Display{W: 128, H: 128, Subidx: -1, Type: "touch"}
+	case rwp.TouchUIWidget_COMPRESSOR:
+		def.Desc = "TouchUI compressor curve" // container emits nothing; member params are separate fader HWCs
+		def.W = 2*touchUICellTenthMM - touchUICellGapTenthMM
+		def.H = 2*touchUICellTenthMM - touchUICellGapTenthMM
+		def.Disp = &topology.TopologyHWcTypeDef_Display{W: 160, H: 128, Subidx: -1, Type: "touch"}
 	}
 	return def
 }
