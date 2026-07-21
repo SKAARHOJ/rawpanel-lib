@@ -41,7 +41,7 @@ func touchUITypeDef(t rwp.TouchUIWidget_WidgetTypeE, vertical bool) topology.Top
 		def.In = "b"
 		def.Out = "rgb"
 		def.Desc = "TouchUI button"
-		def.Disp = &topology.TopologyHWcTypeDef_Display{W: 64, H: 32, Subidx: -1, Type: "color"}
+		def.Disp = &topology.TopologyHWcTypeDef_Display{W: 64, H: 32, Subidx: -1, Type: "touch"}
 	case rwp.TouchUIWidget_TOGGLE:
 		def.In = "b"
 		def.Out = "rgb"
@@ -67,11 +67,11 @@ func touchUITypeDef(t rwp.TouchUIWidget_WidgetTypeE, vertical bool) topology.Top
 	case rwp.TouchUIWidget_IMAGE:
 		def.In = "b" // tap events (unless NoTapEvents)
 		def.Desc = "TouchUI image"
-		def.Disp = &topology.TopologyHWcTypeDef_Display{W: 128, H: 96, Subidx: -1, Type: "color"}
+		def.Disp = &topology.TopologyHWcTypeDef_Display{W: 128, H: 96, Subidx: -1, Type: "touch"}
 	case rwp.TouchUIWidget_VIDEO:
 		def.In = "b" // tap events (unless NoTapEvents)
 		def.Desc = "TouchUI video region"
-		def.Disp = &topology.TopologyHWcTypeDef_Display{W: 320, H: 180, Subidx: -1, Type: "color"}
+		def.Disp = &topology.TopologyHWcTypeDef_Display{W: 320, H: 180, Subidx: -1, Type: "touch"}
 	}
 	return def
 }
@@ -168,4 +168,75 @@ func TouchUIConfigToTopology(cfg *rwp.TouchUIConfig) *topology.Topology {
 	}
 
 	return top
+}
+
+// mergeTypeKeyOffset shifts TouchUI widget type-index keys into a high range when merging
+// with a native topology. Widget type keys are touchUITypeBase (100) + widget-type ordinal
+// (+50 vertical), i.e. ~100..157 — squarely inside the range panels use for native type
+// keys (the AirFlyTouch uses 130/132/135/136/140/324). Offsetting by a large constant keeps
+// the two sets disjoint in the merged TypeIndex.
+const mergeTypeKeyOffset uint32 = 100000
+
+// MergeTopology combines a panel's native topology (base) with the TouchUI widget topology
+// (widget, from TouchUIConfigToTopology) into the single PanelTopology a hybrid panel (e.g.
+// AirFlyTouch: physical buttons + a touchscreen) advertises while a config is active. The
+// HWc arrays and Grids are concatenated so native components and widgets coexist; the widget
+// TypeIndex keys are offset by mergeTypeKeyOffset (rewriting each widget component's Type and
+// any grid MasterTypeIndex) so they never collide with native type keys. Widget grids are
+// stacked below the native grids in the abstract cell space. Either argument may be nil.
+func MergeTopology(base, widget *topology.Topology) *topology.Topology {
+	if base == nil {
+		base = &topology.Topology{}
+	}
+	if widget == nil {
+		widget = &topology.Topology{}
+	}
+
+	out := &topology.Topology{TypeIndex: map[uint32]topology.TopologyHWcTypeDef{}}
+	out.Title = base.Title
+	if out.Title == "" {
+		out.Title = widget.Title
+	}
+
+	// Native components + type index, verbatim.
+	out.HWc = append(out.HWc, base.HWc...)
+	for k, v := range base.TypeIndex {
+		out.TypeIndex[k] = v
+	}
+	out.Grids = append(out.Grids, base.Grids...)
+
+	// Widget type index, offset into a clear range.
+	for k, v := range widget.TypeIndex {
+		out.TypeIndex[k+mergeTypeKeyOffset] = v
+	}
+	// Widget components, with Type rewritten to the offset key.
+	for _, comp := range widget.HWc {
+		if comp.Type != 0 {
+			comp.Type += mergeTypeKeyOffset
+		}
+		out.HWc = append(out.HWc, comp)
+	}
+	// Widget grids, stacked below the native grids so the two never overlap.
+	yOffset := gridExtentY(base.Grids)
+	for _, g := range widget.Grids {
+		g.TopLeftCellIndexY += yOffset
+		if g.MasterTypeIndex != 0 {
+			g.MasterTypeIndex += mergeTypeKeyOffset
+		}
+		out.Grids = append(out.Grids, g)
+	}
+
+	return out
+}
+
+// gridExtentY returns the largest TopLeftCellIndexY+Rows across the grids (0 for none),
+// i.e. the first free row index below them in the abstract cell space.
+func gridExtentY(grids []topology.Grid) uint32 {
+	var maxY uint32
+	for _, g := range grids {
+		if end := g.TopLeftCellIndexY + g.Rows; end > maxY {
+			maxY = end
+		}
+	}
+	return maxY
 }

@@ -79,7 +79,7 @@ type TopologyHWcTypeDef_Display struct {
 	W      int    `json:"w,omitempty"`         // Pixel width of display (alternatively with Type=text: indicates a limited number of characters shown)
 	H      int    `json:"h,omitempty"`         // Pixel height of display (alternatively with Type=text: indicates the number of lines supported, prioritized as Textline1, Title, Textline2)
 	Subidx int    `json:"subidx"`              // Index of the sub element which placeholds for the display area. -1 if no sub element is used for that
-	Type   string `json:"type,omitempty"`      // Additional features of display: "gray" (4bit/pixel) or "color" (5-6-5 rgb/pixel) or "text" for text lines
+	Type   string `json:"type,omitempty"`      // Additional features of display: "gray" (4bit/pixel) or "color" (5-6-5 rgb/pixel) or "text" for text lines or "touch" (a color pixel display that is also a touch surface, e.g. a TouchUI widget region or a touch panel's screen)
 	Shrink int    `json:"shrink,omitempty"`    // W+H Shrink. W=bit0, H=bit1. W-shrink cuts a pixel off in the right side of tile. H-shrink cuts a pixel off in the bottom of tile.
 	Border int    `json:"txtborder,omitempty"` // Txt Border (shall match that used by ibeam-hardware and UniSketch for rendering)
 
