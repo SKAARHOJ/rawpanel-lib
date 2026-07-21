@@ -1080,7 +1080,7 @@ func InboundMessagesToRawPanelASCIIstrings(inboundMsgs []*rwp.InboundMessage) []
 
 var regex_map = regexp.MustCompile("^map=([0-9]+):([0-9]+)$")
 var regex_genericSingle_inbound = regexp.MustCompile("^(_model|_serial|_version|_platform|_bluePillReady|_name|_panelType|_support|_isSleeping|_sleepTimer|_panelTopology_svgbase|_panelTopology_HWC|_burninProfile|_networkConfig|_calibrationProfile|_defaultCalibrationProfile|_serverModeLockToIP|_serverModeMaxClients|_heartBeatTimer|DimmedGain|_connections|_bootsCount|_totalUptimeMin|_sessionUptimeMin|_screenSaverOnMin|_touchUICapabilities|_touchUIConfig|ErrorMsg|Msg|EnvironmentalHealth|SysStat)=(.+)$")
-var regex_cmd_inbound = regexp.MustCompile("^HWC#([0-9]+)(|.([0-9]+))=(Down|Up|Press|Abs|Speed|Enc)(|:([-0-9]+))$")
+var regex_cmd_inbound = regexp.MustCompile("^HWC#([0-9]+)(|.([0-9]+))=(Down|Up|Press|Abs|Speed|Enc)(|:([-0-9,]+))$")
 var regex_registersOut = regexp.MustCompile("^(Flag#|Mem|Shift|State)([A-Z0-9]*)=([0-9]+)$")
 
 // Converts Raw Panel 1.0 ASCII Strings into proto OutboundMessage structs
@@ -1179,29 +1179,31 @@ func RawPanelASCIIstringsToOutboundMessages(rp20_ascii []string) []*rwp.Outbound
 						},
 					}
 				case "Abs":
-					value := su.Intval(regex_cmd_inbound.FindStringSubmatch(inputString)[6])
-					msg = &rwp.OutboundMessage{
-						Events: []*rwp.HWCEvent{
-							&rwp.HWCEvent{
-								HWCID: uint32(HWCid),
-								Absolute: &rwp.AbsoluteEvent{
-									Value: uint32(value),
-								},
-							},
-						},
+					parts := strings.Split(regex_cmd_inbound.FindStringSubmatch(inputString)[6], ",")
+					event := &rwp.HWCEvent{HWCID: uint32(HWCid)}
+					if len(parts) > 1 { // multi-value form (e.g. XYPAD "Abs:x,y") -> AbsoluteVector
+						values := make([]uint32, len(parts))
+						for i, p := range parts {
+							values[i] = uint32(su.Intval(p))
+						}
+						event.AbsoluteVector = &rwp.AbsoluteVectorEvent{Value: values}
+					} else {
+						event.Absolute = &rwp.AbsoluteEvent{Value: uint32(su.Intval(parts[0]))}
 					}
+					msg = &rwp.OutboundMessage{Events: []*rwp.HWCEvent{event}}
 				case "Speed":
-					value := su.Intval(regex_cmd_inbound.FindStringSubmatch(inputString)[6])
-					msg = &rwp.OutboundMessage{
-						Events: []*rwp.HWCEvent{
-							&rwp.HWCEvent{
-								HWCID: uint32(HWCid),
-								Speed: &rwp.SpeedEvent{
-									Value: int32(value),
-								},
-							},
-						},
+					parts := strings.Split(regex_cmd_inbound.FindStringSubmatch(inputString)[6], ",")
+					event := &rwp.HWCEvent{HWCID: uint32(HWCid)}
+					if len(parts) > 1 { // multi-value form (e.g. XYPAD relative "Speed:dx,dy") -> SpeedVector
+						values := make([]int32, len(parts))
+						for i, p := range parts {
+							values[i] = int32(su.Intval(p))
+						}
+						event.SpeedVector = &rwp.SpeedVectorEvent{Value: values}
+					} else {
+						event.Speed = &rwp.SpeedEvent{Value: int32(su.Intval(parts[0]))}
 					}
+					msg = &rwp.OutboundMessage{Events: []*rwp.HWCEvent{event}}
 				case "Raw":
 					value := su.Intval(regex_cmd.FindStringSubmatch(inputString)[6])
 					msg = &rwp.OutboundMessage{
@@ -1863,6 +1865,20 @@ func OutboundMessagesToRawPanelASCIIstrings(outboundMsgs []*rwp.OutboundMessage)
 				}
 				if eventRec.Speed != nil {
 					returnStrings = append(returnStrings, fmt.Sprintf("HWC#%d=Speed:%d", eventRec.HWCID, eventRec.Speed.Value))
+				}
+				if eventRec.AbsoluteVector != nil { // vector = comma-joined multi-value form of Abs (e.g. XYPAD "Abs:x,y")
+					parts := make([]string, len(eventRec.AbsoluteVector.Value))
+					for i, v := range eventRec.AbsoluteVector.Value {
+						parts[i] = strconv.FormatUint(uint64(v), 10)
+					}
+					returnStrings = append(returnStrings, fmt.Sprintf("HWC#%d=Abs:%s", eventRec.HWCID, strings.Join(parts, ",")))
+				}
+				if eventRec.SpeedVector != nil { // vector = comma-joined multi-value form of Speed (e.g. XYPAD relative "Speed:dx,dy")
+					parts := make([]string, len(eventRec.SpeedVector.Value))
+					for i, v := range eventRec.SpeedVector.Value {
+						parts[i] = strconv.FormatInt(int64(v), 10)
+					}
+					returnStrings = append(returnStrings, fmt.Sprintf("HWC#%d=Speed:%s", eventRec.HWCID, strings.Join(parts, ",")))
 				}
 				if eventRec.RawAnalog != nil {
 					returnStrings = append(returnStrings, fmt.Sprintf("HWC#%d=Raw:%d", eventRec.HWCID, eventRec.RawAnalog.Value))
