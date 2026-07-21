@@ -5,8 +5,80 @@ import (
 	"testing"
 
 	rwp "github.com/SKAARHOJ/rawpanel-lib/ibeam_rawpanel"
+	"github.com/SKAARHOJ/rawpanel-lib/topology"
 	"google.golang.org/protobuf/proto"
 )
+
+// MergeTopology must keep native and widget components disjoint even when the widget type
+// keys (100..157) collide numerically with native type keys (e.g. 132) — the widget keys
+// get offset, native keys are preserved, and every component keeps a resolvable type.
+func TestMergeTopologyNoCollision(t *testing.T) {
+	base := &topology.Topology{
+		Title: "AirFlyTouch",
+		TypeIndex: map[uint32]topology.TopologyHWcTypeDef{
+			132: {Desc: "Elastomer Four-Way Button", In: "b4", Out: "rgb"},
+			900: {Desc: "Touch screen", Disp: &topology.TopologyHWcTypeDef_Display{W: 1280, H: 400, Type: "touch"}}, // static screen HWc marker
+		},
+		HWc: []topology.TopologyHWcomponent{
+			{Id: 1, Txt: "PRV 1", Type: 132},
+			{Id: 45, Txt: "Screen", Type: 900},
+		},
+	}
+	// A widget config whose vertical-slider/etc. type keys land in the native range.
+	widget := TouchUIConfigToTopology(&rwp.TouchUIConfig{
+		Title: "Client",
+		Pages: []*rwp.TouchUIPage{{
+			Id: 1, Title: "P", GridRows: 1, GridCols: 2,
+			Widgets: []*rwp.TouchUIWidget{
+				{HWCID: 100, Type: rwp.TouchUIWidget_BUTTON, Label: "Cut", Row: 1, Col: 1},
+				{HWCID: 101, Type: rwp.TouchUIWidget_LABEL, Label: "L", Row: 1, Col: 2},
+			},
+		}},
+	})
+
+	merged := MergeTopology(base, widget)
+
+	// All native + widget components present.
+	ids := map[uint32]bool{}
+	for _, c := range merged.HWc {
+		if ids[c.Id] {
+			t.Fatalf("duplicate HWc id %d after merge", c.Id)
+		}
+		ids[c.Id] = true
+	}
+	for _, want := range []uint32{1, 45, 100, 101} {
+		if !ids[want] {
+			t.Errorf("merged topology missing HWc id %d", want)
+		}
+	}
+
+	// Native type key preserved; every component's Type resolves in the merged TypeIndex.
+	if _, ok := merged.TypeIndex[132]; !ok {
+		t.Error("native type key 132 lost in merge")
+	}
+	for _, c := range merged.HWc {
+		if c.Type == 0 {
+			continue // disabled/marker components may carry their def via TypeOverride
+		}
+		if _, ok := merged.TypeIndex[c.Type]; !ok {
+			t.Errorf("HWc %d references type key %d absent from merged TypeIndex", c.Id, c.Type)
+		}
+	}
+
+	// Widget button keeps its touch display descriptor through the offset.
+	var buttonType uint32
+	for _, c := range merged.HWc {
+		if c.Id == 100 {
+			buttonType = c.Type
+		}
+	}
+	if buttonType < mergeTypeKeyOffset {
+		t.Errorf("widget type key %d was not offset (< %d)", buttonType, mergeTypeKeyOffset)
+	}
+	if d := merged.TypeIndex[buttonType].Disp; d == nil || d.Type != "touch" {
+		t.Errorf("widget button lost its touch display descriptor after merge: %+v", d)
+	}
+}
 
 // HWCo# overlay state: proto -> ASCII -> proto full fidelity.
 func TestHWCOverlayRoundtrip(t *testing.T) {

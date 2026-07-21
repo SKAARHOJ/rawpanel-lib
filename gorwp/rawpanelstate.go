@@ -28,6 +28,7 @@ type RawPanelState struct {
 	hwcAvailability     map[uint32]uint32        // Enabled/mapped hardware components. See HWCAvailability* helpers for value semantics (incl. offscreen bit)
 	rawPanelSupport     *rwp.RawPanelSupport     // Support flags from panel info
 	touchUICapabilities *rwp.TouchUICapabilities // TouchUI capabilities (response to RequestTouchUICapabilities)
+	touchUIConfig       *rwp.TouchUIConfig       // Currently active TouchUI config (response to RequestTouchUIConfig)
 }
 
 func (rps *RawPanelState) GetName() string {
@@ -59,6 +60,14 @@ func (rps *RawPanelState) GetTouchUICapabilities() *rwp.TouchUICapabilities {
 	rps.RLock()
 	defer rps.RUnlock()
 	return rps.touchUICapabilities
+}
+
+// Returns the currently active TouchUI config as last reported by the panel (see
+// RequestTouchUIConfig / BindTouchUIConfig). May be nil if none has been received.
+func (rps *RawPanelState) GetTouchUIConfig() *rwp.TouchUIConfig {
+	rps.RLock()
+	defer rps.RUnlock()
+	return rps.touchUIConfig
 }
 
 // Returns whether the panel reports support for TouchUI widget configuration

@@ -20,7 +20,7 @@ var regex_cmd = regexp.MustCompile("^(HWC#|HWCx#|HWCj#|HWCc#|HWCt#|HWCo#|HWCrawA
 var regex_gfx = regexp.MustCompile("^(HWCgRGB#|HWCgGray#|HWCg#)([0-9,]+)=([0-9]+)(/([0-9]+),([0-9]+)x([0-9]+)(,([0-9]+),([0-9]+)|)|):(.*)$")
 var regex_genericDual = regexp.MustCompile("^(PanelBrightness)=([0-9]+),([0-9]+)$")
 var regex_genericSingle = regexp.MustCompile("^(HeartBeatTimer|DimmedGain|PublishSystemStat|LoadCPU|SleepTimer|SleepMode|SleepScreenSaver|Webserver|JSONonOutbound|PanelBrightness)=([0-9]+)$")
-var regex_genericSingleStr = regexp.MustCompile("^(SetCalibrationProfile|SimulateEnvironmentalHealth|SetNetworkConfig|SetTouchUI)=(.*)$")
+var regex_genericSingleStr = regexp.MustCompile("^(SetCalibrationProfile|SimulateEnvironmentalHealth|SetNetworkConfig|SetTouchUIActivePage|SetTouchUI)=(.*)$")
 var regex_registers = regexp.MustCompile("^(Flag#|Mem|Shift|State)([A-Z0-9]*)=([0-9]+)$")
 
 // Converts Raw Panel 2.0 ASCII Strings into proto InboundMessage structs
@@ -574,6 +574,15 @@ func RawPanelASCIIstringsToInboundMessages(rp20_ascii []string) []*rwp.InboundMe
 							SetTouchUI: touchUIConfigFromString(regex_genericSingleStr.FindStringSubmatch(inputString)[2]),
 						},
 					}
+				case "SetTouchUIActivePage":
+					pageId, _ := strconv.Atoi(regex_genericSingleStr.FindStringSubmatch(inputString)[2])
+					msg = &rwp.InboundMessage{
+						Command: &rwp.Command{
+							SetTouchUIActivePage: &rwp.TouchUISetActivePage{
+								PageId: uint32(pageId),
+							},
+						},
+					}
 				case "SimulateEnvironmentalHealth":
 					switch regex_genericSingleStr.FindStringSubmatch(inputString)[2] {
 					case "Normal":
@@ -794,6 +803,9 @@ func InboundMessagesToRawPanelASCIIstrings(inboundMsgs []*rwp.InboundMessage) []
 			}
 			if inboundMsg.Command.SendTouchUIConfig {
 				returnStrings = append(returnStrings, "TouchUIConfig?")
+			}
+			if inboundMsg.Command.SetTouchUIActivePage != nil {
+				returnStrings = append(returnStrings, fmt.Sprintf("SetTouchUIActivePage=%d", inboundMsg.Command.SetTouchUIActivePage.PageId))
 			}
 			if inboundMsg.Command.SimulateEnvironmentalHealth != nil {
 				switch inboundMsg.Command.SimulateEnvironmentalHealth.RunMode {

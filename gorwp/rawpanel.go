@@ -53,6 +53,7 @@ type RawPanel struct {
 	intensityBindings  map[uint32]IntensityFunc
 	triggerBindings    map[uint32]TriggerFunc
 	visibilityBindings map[uint32]VisibilityFunc
+	touchUIConfigFunc  TouchUIConfigFunc // Called when the panel reports its active TouchUI config
 
 	// State
 	State RawPanelState
@@ -319,6 +320,16 @@ func (rp *RawPanel) procesMessagesFromPanel(messagesFromPanel []*rwp.OutboundMes
 			rp.State.Unlock()
 		}
 
+		// TouchUI config (response to RequestTouchUIConfig, or a multi-client sync push):
+		if msg.TouchUIConfig != nil {
+			rp.State.Lock()
+			rp.State.touchUIConfig = msg.TouchUIConfig
+			rp.State.Unlock()
+			if rp.touchUIConfigFunc != nil {
+				rp.touchUIConfigFunc(msg.TouchUIConfig)
+			}
+		}
+
 		// Topology:
 		if msg.PanelTopology != nil { // Receiving topology
 			rp.State.Lock()
@@ -522,7 +533,9 @@ func (rp *RawPanel) DrawImageOptions(hwc uint32, inImg image.Image, displayInfo 
 		imageType = "color"
 	}
 	switch imageType {
-	case "color":
+	case "color", "touch":
+		// "touch" is a color pixel display that also accepts touch input (TouchUI
+		// widget regions); it encodes identically to "color".
 		img.ImageType = rwp.HWCGfx_RGB16bit
 		img.ImageData = monoImg.GetImgSliceRGB()
 	case "gray":
@@ -590,6 +603,21 @@ func (rp *RawPanel) SetTouchUI(config *rwp.TouchUIConfig) {
 	}
 }
 
+// SetTouchUIActivePage switches the panel's currently displayed TouchUI page/tab at runtime
+// (pageId is the 1-based page id from the active config). The panel updates HWCavailability
+// so all clients observe the switch — no full config re-push is needed.
+func (rp *RawPanel) SetTouchUIActivePage(pageId uint32) {
+	rp.toPanel <- []*rwp.InboundMessage{
+		{
+			Command: &rwp.Command{
+				SetTouchUIActivePage: &rwp.TouchUISetActivePage{
+					PageId: pageId,
+				},
+			},
+		},
+	}
+}
+
 // Removes all TouchUI widgets from the panel, reverting it to its native topology.
 func (rp *RawPanel) ClearTouchUI() {
 	rp.toPanel <- []*rwp.InboundMessage{
@@ -613,4 +641,27 @@ func (rp *RawPanel) RequestTouchUICapabilities() {
 			},
 		},
 	}
+}
+
+// Asks the panel to (re)send its currently active TouchUI config. The response is stored
+// in State (see GetTouchUIConfig) and delivered to the callback set via BindTouchUIConfig.
+// This is the multi-client sync path: a client that did not push the active config can
+// still learn what is currently on the panel.
+func (rp *RawPanel) RequestTouchUIConfig() {
+	rp.toPanel <- []*rwp.InboundMessage{
+		{
+			Command: &rwp.Command{
+				SendTouchUIConfig: true,
+			},
+		},
+	}
+}
+
+// Type TouchUIConfigFunc is the callback signature for TouchUI config updates from the panel.
+type TouchUIConfigFunc func(config *rwp.TouchUIConfig)
+
+// BindTouchUIConfig sets a callback invoked whenever the panel reports its active TouchUI
+// config — in response to RequestTouchUIConfig, or as a spontaneous multi-client sync push.
+func (rp *RawPanel) BindTouchUIConfig(f TouchUIConfigFunc) {
+	rp.touchUIConfigFunc = f
 }
