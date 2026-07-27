@@ -22,6 +22,12 @@ const touchUITypeBase uint32 = 100
 const touchUICellTenthMM = 400
 const touchUICellGapTenthMM = 20
 
+// A derived widget display resolution must stay within the dispatch graphic renderer's
+// limits (it rejects displays wider than touchUIMaxDispW or taller than touchUIMaxDispH,
+// see reactor dispatch/DFeedback.go) or no graphic is produced at all.
+const touchUIMaxDispW = 256
+const touchUIMaxDispH = 160
+
 func touchUITypeIndexKey(t rwp.TouchUIWidget_WidgetTypeE, vertical bool) uint32 {
 	key := touchUITypeBase + uint32(t)
 	if vertical {
@@ -449,6 +455,23 @@ func placeWidgetsOnTouchScreen(base, widget *topology.Topology) []topology.Topol
 			}
 			override.W = int(float64(w) * uniform)
 			override.H = 0
+		}
+
+		if def.Disp != nil && def.Disp.Type == "touch" && pixelW > 0 && pixelH > 0 {
+			dispW := override.W * pixelW / screenW
+			dispH := override.H * pixelH / screenH
+			// Scale down to fit the dispatch renderer's limits, preserving the cell aspect.
+			if dispW > touchUIMaxDispW {
+				dispH = dispH * touchUIMaxDispW / dispW
+				dispW = touchUIMaxDispW
+			}
+			if dispH > touchUIMaxDispH {
+				dispW = dispW * touchUIMaxDispH / dispH
+				dispH = touchUIMaxDispH
+			}
+			if dispW > 0 && dispH > 0 {
+				override.Disp = &topology.TopologyHWcTypeDef_Display{Type: def.Disp.Type, Subidx: def.Disp.Subidx, W: dispW, H: dispH}
+			}
 		}
 		comp.TypeOverride = &override
 
