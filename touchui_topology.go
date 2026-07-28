@@ -457,21 +457,33 @@ func placeWidgetsOnTouchScreen(base, widget *topology.Topology) []topology.Topol
 			override.H = 0
 		}
 
-		if def.Disp != nil && def.Disp.Type == "touch" && pixelW > 0 && pixelH > 0 {
-			dispW := override.W * pixelW / screenW
-			dispH := override.H * pixelH / screenH
-			// Scale down to fit the dispatch renderer's limits, preserving the cell aspect.
-			if dispW > touchUIMaxDispW {
-				dispH = dispH * touchUIMaxDispW / dispW
-				dispW = touchUIMaxDispW
+		if def.Disp != nil && def.Disp.Type == "touch" {
+			// A widget draws onto the panel's touch screen, which is a full colour display.
+			// "touch" says how the screen takes input, not what it can show, and renderers pick
+			// a colour depth from this type — left as "touch" it matches neither "color" nor
+			// "gray" and the widget is rendered monochrome, dropping every colour in it.
+			// Always a fresh Disp: scaleTypeDef copies the def by value, so the pointer is
+			// still the screen's own and must not be written through.
+			disp := &topology.TopologyHWcTypeDef_Display{Type: "color", Subidx: def.Disp.Subidx, W: def.Disp.W, H: def.Disp.H}
+
+			if pixelW > 0 && pixelH > 0 {
+				dispW := override.W * pixelW / screenW
+				dispH := override.H * pixelH / screenH
+				// Scale down to fit the dispatch renderer's limits, preserving the cell aspect.
+				if dispW > touchUIMaxDispW {
+					dispH = dispH * touchUIMaxDispW / dispW
+					dispW = touchUIMaxDispW
+				}
+				if dispH > touchUIMaxDispH {
+					dispW = dispW * touchUIMaxDispH / dispH
+					dispH = touchUIMaxDispH
+				}
+				if dispW > 0 && dispH > 0 {
+					disp.W = dispW
+					disp.H = dispH
+				}
 			}
-			if dispH > touchUIMaxDispH {
-				dispW = dispW * touchUIMaxDispH / dispH
-				dispH = touchUIMaxDispH
-			}
-			if dispW > 0 && dispH > 0 {
-				override.Disp = &topology.TopologyHWcTypeDef_Display{Type: def.Disp.Type, Subidx: def.Disp.Subidx, W: dispW, H: dispH}
-			}
+			override.Disp = disp
 		}
 		comp.TypeOverride = &override
 
