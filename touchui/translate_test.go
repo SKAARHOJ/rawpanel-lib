@@ -196,3 +196,25 @@ func TestValidateRejects(t *testing.T) {
 		t.Errorf("pristine config should validate: %v", err)
 	}
 }
+
+// The RGB16bit wire format packs (b<<11)|(g<<5)|r, so a colour must survive the trip to the
+// renderer's RGB565 frame with red and blue where they started. Dark blue read as plain
+// RGB565 comes back dark red, which is the failure this pins down.
+func TestGfxRGB16ChannelOrder(t *testing.T) {
+	darkBlue := uint16((17 & 0x1F) << 11) // b=17, g=0, r=0 in the wire's b-g-r order
+	g, err := GfxToWidgetGfx(1, &rwp.HWCGfx{
+		ImageType: rwp.HWCGfx_RGB16bit, W: 1, H: 1,
+		ImageData: []byte{byte(darkBlue >> 8), byte(darkBlue)},
+	}, 1)
+	if err != nil {
+		t.Fatalf("GfxToWidgetGfx: %v", err)
+	}
+
+	// Frame is little-endian RGB565 for LVGL: red in the top bits, blue in the bottom.
+	out := uint16(g.GetRgb565()[0]) | uint16(g.GetRgb565()[1])<<8
+	red := (out >> 11) & 0x1F
+	blue := out & 0x1F
+	if blue != 17 || red != 0 {
+		t.Errorf("dark blue came back as r=%d b=%d, want r=0 b=17 (channels swapped)", red, blue)
+	}
+}

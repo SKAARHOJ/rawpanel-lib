@@ -115,15 +115,19 @@ func decodeGfx(g *rwp.HWCGfx, w, h int) ([]uint32, error) {
 		}
 
 	case rwp.HWCGfx_RGB16bit:
-		// 2 bytes per pixel, big-endian RGB565.
+		// 2 bytes per pixel, big-endian, and the channels run blue-green-red from the top bit
+		// down rather than red-green-blue: every writer packs (b<<11)|(g<<5)|r — see the
+		// pixelColor in Reactor's DFeedback and SetOLEDPixelColor in ibeam_lib_monogfx — and
+		// the reader in rawpanelhelpers.go takes them back out in that order. Reading this as
+		// plain RGB565 swaps red and blue, which is what turned dark blue into dark red.
 		if w*h*2 > len(data) {
 			return nil, fmt.Errorf("touchui: RGB16 gfx short: %d < %d", len(data), w*h*2)
 		}
 		for i := 0; i < w*h; i++ {
 			v := uint16(data[i*2])<<8 | uint16(data[i*2+1])
-			r := uint32(v>>11) & 0x1F
+			b := uint32(v>>11) & 0x1F
 			gch := uint32(v>>5) & 0x3F
-			b := uint32(v) & 0x1F
+			r := uint32(v) & 0x1F
 			pix[i] = (r<<3|r>>2)<<16 | (gch<<2|gch>>4)<<8 | (b<<3 | b>>2)
 		}
 
