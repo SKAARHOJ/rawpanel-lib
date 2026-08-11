@@ -355,6 +355,66 @@ func MergeTopology(base, widget *topology.Topology) *topology.Topology {
 	return out
 }
 
+// StripMergedTouchUI returns a copy of t with the folded TouchUI widget layer removed, leaving
+// only the panel's native (physical) topology — the inverse of the widget half of
+// MergeTopology. Widget components carry a Type at or above mergeTypeKeyOffset, widget
+// type-index keys sit in the same high range, and widget grids reference those components; all
+// three are dropped. Persisting a panel's advertised topology as its physical profile must go
+// through this: a hybrid touch panel (e.g. AirFlyTouch) advertises native HWCs plus the
+// current config's widgets, and saving that verbatim bakes the widgets into the base, which is
+// then re-folded on every later load. Returns nil when t is nil.
+func StripMergedTouchUI(t *topology.Topology) *topology.Topology {
+	if t == nil {
+		return nil
+	}
+
+	out := &topology.Topology{
+		Title:     t.Title,
+		TypeIndex: map[uint32]topology.TopologyHWcTypeDef{},
+	}
+
+	widgetIDs := map[uint32]bool{}
+	for _, comp := range t.HWc {
+		if comp.Type >= mergeTypeKeyOffset {
+			widgetIDs[comp.Id] = true
+			continue
+		}
+		out.HWc = append(out.HWc, comp)
+	}
+	for k, v := range t.TypeIndex {
+		if k >= mergeTypeKeyOffset {
+			continue
+		}
+		out.TypeIndex[k] = v
+	}
+	for _, g := range t.Grids {
+		if gridReferencesWidgets(g, widgetIDs) {
+			continue
+		}
+		out.Grids = append(out.Grids, g)
+	}
+	return out
+}
+
+// gridReferencesWidgets reports whether a grid belongs to the TouchUI widget layer: its master
+// type is in the offset range, or any cell references a widget component. Native and widget
+// HWCs are disjoint (MergeTopology keeps them so), so a single widget reference is decisive.
+func gridReferencesWidgets(g topology.Grid, widgetIDs map[uint32]bool) bool {
+	if g.MasterTypeIndex >= mergeTypeKeyOffset {
+		return true
+	}
+	for _, row := range g.HWcMap {
+		for _, cell := range row {
+			for _, id := range cell.Ids {
+				if widgetIDs[id] {
+					return true
+				}
+			}
+		}
+	}
+	return false
+}
+
 // touchScreenArea returns the rectangle a panel's touch display occupies in its native
 // topology, in the same 1/10 mm units as every other component: the HWc whose type
 // declares a "touch" display (e.g. the AirFlyTouch's "Screen" component). Coordinates are
