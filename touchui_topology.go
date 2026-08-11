@@ -116,6 +116,7 @@ func touchUITypeDef(t rwp.TouchUIWidget_WidgetTypeE, vertical bool) topology.Top
 		}
 	case rwp.TouchUIWidget_SLIDER:
 		def.Desc = "TouchUI slider"
+		def.Ext = "pos" // position feedback: driven like a motorized fader when the value changes externally
 		if vertical {
 			def.In = "av"
 			def.H = 2*touchUICellTenthMM - touchUICellGapTenthMM
@@ -134,6 +135,7 @@ func touchUITypeDef(t rwp.TouchUIWidget_WidgetTypeE, vertical bool) topology.Top
 		def.Subidx = 1 // the handle: clients move this element with the absolute value
 	case rwp.TouchUIWidget_KNOB:
 		def.In = "ar" // analog rotary (absolute 0..1000 dial)
+		def.Ext = "pos" // position feedback: driven like a motorized fader when the value changes externally
 		def.Desc = "TouchUI knob (rotary fader)"
 		def.Sub = []topology.TopologyHWcTypeDefSubEl{
 			subCircle(0, 0, 150, touchUIStyleTrack),
