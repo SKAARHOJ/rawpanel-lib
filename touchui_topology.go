@@ -22,6 +22,14 @@ const touchUITypeBase uint32 = 100
 const touchUICellTenthMM = 400
 const touchUICellGapTenthMM = 20
 
+// Every grid-mode page fills the whole touch screen: pages overlap rather than stack, and a
+// client shows one at a time (which is visible rides HWCavailability bit 31). Each page's
+// cells are laid out on this fixed nominal canvas regardless of the page's row/col count, so
+// a single canvas→screen scale in placeWidgetsOnTouchScreen fits every page. The absolute
+// size is scaled away downstream; only the per-page proportions matter.
+const touchUIPageCanvasW = 1000
+const touchUIPageCanvasH = 1000
+
 // A derived widget display resolution must stay within the dispatch graphic renderer's
 // limits (it rejects displays wider than touchUIMaxDispW or taller than touchUIMaxDispH,
 // see reactor dispatch/DFeedback.go) or no graphic is produced at all.
@@ -110,6 +118,7 @@ func touchUITypeDef(t rwp.TouchUIWidget_WidgetTypeE, vertical bool) topology.Top
 		def.In = "b"
 		def.Out = "rgb"
 		def.Desc = "TouchUI toggle"
+		def.Disp = &topology.TopologyHWcTypeDef_Display{W: 64, H: 32, Subidx: -1, Type: "touch"}
 		def.Sub = []topology.TopologyHWcTypeDefSubEl{
 			subRect(-90, -40, 180, 80, 40, touchUIStyleTrack),
 			subCircle(-45, 0, 32, touchUIStyleAccent),
@@ -200,27 +209,27 @@ func touchUITypeDef(t rwp.TouchUIWidget_WidgetTypeE, vertical bool) topology.Top
 }
 
 // TouchUIConfigToTopology derives the PanelTopology a panel advertises while the given
-// TouchUI config is active. Grid-mode pages become topology Grids (stacked vertically via
-// TopLeftCellIndexY so they never overlap); widgets with row/col spans are referenced from
-// their top-left cell only (topology rules forbid multiple references to the same HWC id).
-// The caller merges the result with any native topology before sending PanelTopology.
+// TouchUI config is active. Grid-mode pages become topology Grids, each laid out to fill the
+// whole screen (pages overlap; a client shows one at a time and reads which via
+// HWCavailability bit 31); widgets with row/col spans are referenced from their top-left cell
+// only (topology rules forbid multiple references to the same HWC id). The caller merges the
+// result with any native topology before sending PanelTopology.
 func TouchUIConfigToTopology(cfg *rwp.TouchUIConfig) *topology.Topology {
 	top := &topology.Topology{
 		Title:     cfg.GetTitle(),
 		TypeIndex: map[uint32]topology.TopologyHWcTypeDef{},
 	}
 
-	gridRowOffset := uint32(0)
 	for _, page := range cfg.GetPages() {
 		gridMode := page.GetGridRows() > 0 && page.GetGridCols() > 0
 
 		var grid *topology.Grid
+		var cellW, cellH, gapW, gapH float64
 		if gridMode {
 			grid = &topology.Grid{
-				Title:             page.GetTitle(),
-				Rows:              page.GetGridRows(),
-				Cols:              page.GetGridCols(),
-				TopLeftCellIndexY: gridRowOffset,
+				Title: page.GetTitle(),
+				Rows:  page.GetGridRows(),
+				Cols:  page.GetGridCols(),
 			}
 			grid.HWcMap = make([][]topology.GridElement, page.GetGridRows())
 			for r := range grid.HWcMap {
@@ -229,7 +238,14 @@ func TouchUIConfigToTopology(cfg *rwp.TouchUIConfig) *topology.Topology {
 					grid.HWcMap[r][c] = topology.GridElement{Ids: []uint32{}}
 				}
 			}
-			gridRowOffset += page.GetGridRows()
+			// Fit this page's cells to the fixed nominal canvas so it fills the whole
+			// screen. A gap proportional to the cell keeps the visual spacing constant
+			// across pages of different densities.
+			cellW = float64(touchUIPageCanvasW) / float64(page.GetGridCols())
+			cellH = float64(touchUIPageCanvasH) / float64(page.GetGridRows())
+			gapFrac := float64(touchUICellGapTenthMM) / float64(touchUICellTenthMM)
+			gapW = cellW * gapFrac
+			gapH = cellH * gapFrac
 		}
 
 		for _, widget := range page.GetWidgets() {
@@ -253,8 +269,8 @@ func TouchUIConfigToTopology(cfg *rwp.TouchUIConfig) *topology.Topology {
 				if row < 1 || col < 1 || row > page.GetGridRows() || col > page.GetGridCols() {
 					continue // out-of-grid widgets are dropped from the topology; validation rejects them earlier
 				}
-				comp.X = int(col-1)*touchUICellTenthMM + touchUICellGapTenthMM/2
-				comp.Y = int(gridRowOffset-page.GetGridRows()+row-1)*touchUICellTenthMM + touchUICellGapTenthMM/2
+				comp.X = int(float64(col-1)*cellW + gapW/2)
+				comp.Y = int(float64(row-1)*cellH + gapH/2)
 				rowSpan, colSpan := widget.GetRowSpan(), widget.GetColSpan()
 				if rowSpan == 0 {
 					rowSpan = 1
@@ -267,8 +283,8 @@ func TouchUIConfigToTopology(cfg *rwp.TouchUIConfig) *topology.Topology {
 				// tall), so scale to the span always — not only when it is >1 — otherwise a
 				// single-cell widget keeps its oversized default and spills past the screen.
 				base := touchUITypeDef(widget.GetType(), vertical)
-				spanW := int(colSpan)*touchUICellTenthMM - touchUICellGapTenthMM
-				spanH := int(rowSpan)*touchUICellTenthMM - touchUICellGapTenthMM
+				spanW := int(float64(colSpan)*cellW - gapW)
+				spanH := int(float64(rowSpan)*cellH - gapH)
 				override := scaleTypeDef(base, ratio(spanW, base.W), ratio(spanH, base.H))
 				comp.TypeOverride = &override
 				grid.HWcMap[row-1][col-1].Ids = append(grid.HWcMap[row-1][col-1].Ids, widget.GetHWCID())
@@ -440,20 +456,12 @@ func touchScreenArea(base *topology.Topology) (left, top, width, height int, ok 
 }
 
 // widgetCanvasSize returns the extent of the coordinate space TouchUIConfigToTopology laid
-// the widgets out in: the stacked grid pages in cell units for grid-mode configs, or the
-// screen's pixel dimensions for free-layout ones (where widget X/Y/W/H are screen pixels).
+// the widgets out in: the fixed nominal canvas for grid-mode configs (every page is fitted
+// to it, so the pages overlap and each fills the screen), or the screen's pixel dimensions
+// for free-layout ones (where widget X/Y/W/H are screen pixels).
 func widgetCanvasSize(widget *topology.Topology, screenPixelW, screenPixelH int) (w, h int) {
-	var cols, rows uint32
-	for _, g := range widget.Grids {
-		if end := g.TopLeftCellIndexX + g.Cols; end > cols {
-			cols = end
-		}
-		if end := g.TopLeftCellIndexY + g.Rows; end > rows {
-			rows = end
-		}
-	}
-	if cols > 0 && rows > 0 {
-		return int(cols) * touchUICellTenthMM, int(rows) * touchUICellTenthMM
+	if len(widget.Grids) > 0 {
+		return touchUIPageCanvasW, touchUIPageCanvasH
 	}
 	return screenPixelW, screenPixelH
 }
@@ -465,9 +473,9 @@ func widgetCanvasSize(widget *topology.Topology, screenPixelW, screenPixelH int)
 // components use. Widgets are returned unchanged when the base topology declares no touch
 // display, or when either coordinate space is degenerate.
 //
-// All grid pages share the one physical screen, so a multi-page config is scaled to fit its
-// stacked pages inside the screen area rather than overlapping them; which pages are
-// currently visible is reported separately via HWCavailability (bit 31 = offscreen).
+// All grid pages share the one physical screen, so each page is fitted to the whole screen
+// area and the pages overlap rather than stack; which page is currently visible is reported
+// separately via HWCavailability (bit 31 = offscreen).
 func placeWidgetsOnTouchScreen(base, widget *topology.Topology) []topology.TopologyHWcomponent {
 	left, top, screenW, screenH, ok := touchScreenArea(base)
 	if !ok {
