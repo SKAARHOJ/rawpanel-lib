@@ -19,6 +19,7 @@ import (
 var regex_cmd = regexp.MustCompile("^(HWC#|HWCx#|HWCj#|HWCc#|HWCt#|HWCo#|HWCrawADCValues#)([0-9,]+)=(.*)$")
 var regex_gfx = regexp.MustCompile("^(HWCgRGB#|HWCgGray#|HWCg#)([0-9,]+)=([0-9]+)(/([0-9]+),([0-9]+)x([0-9]+)(,([0-9]+),([0-9]+)|)|):(.*)$")
 var regex_genericDual = regexp.MustCompile("^(PanelBrightness)=([0-9]+),([0-9]+)$")
+var regex_genericTriple = regexp.MustCompile("^(PanelBrightness)=([0-9]+),([0-9]+),([0-9]+)$")
 var regex_genericSingle = regexp.MustCompile("^(HeartBeatTimer|DimmedGain|PublishSystemStat|LoadCPU|SleepTimer|SleepMode|SleepScreenSaver|Webserver|JSONonOutbound|PanelBrightness)=([0-9]+)$")
 var regex_genericSingleStr = regexp.MustCompile("^(SetCalibrationProfile|SimulateEnvironmentalHealth|SetNetworkConfig|SetTouchUIActivePage|SetTouchUI)=(.*)$")
 var regex_registers = regexp.MustCompile("^(Flag#|Mem|Shift|State)([A-Z0-9]*)=([0-9]+)$")
@@ -538,6 +539,23 @@ func RawPanelASCIIstringsToInboundMessages(rp20_ascii []string) []*rwp.InboundMe
 						},
 					}
 				}
+			} else if regex_genericTriple.MatchString(inputString) {
+				param1, _ := strconv.Atoi(regex_genericTriple.FindStringSubmatch(inputString)[2])
+				param2, _ := strconv.Atoi(regex_genericTriple.FindStringSubmatch(inputString)[3])
+				param3, _ := strconv.Atoi(regex_genericTriple.FindStringSubmatch(inputString)[4])
+				switch regex_genericTriple.FindStringSubmatch(inputString)[1] {
+				case "PanelBrightness":
+					screen := uint32(param3)
+					msg = &rwp.InboundMessage{
+						Command: &rwp.Command{
+							PanelBrightness: &rwp.Brightness{
+								LEDs:   uint32(param1),
+								OLEDs:  uint32(param2),
+								Screen: &screen,
+							},
+						},
+					}
+				}
 			} else if regex_genericDual.MatchString(inputString) {
 				param1, _ := strconv.Atoi(regex_genericDual.FindStringSubmatch(inputString)[2])
 				param2, _ := strconv.Atoi(regex_genericDual.FindStringSubmatch(inputString)[3])
@@ -783,8 +801,15 @@ func InboundMessagesToRawPanelASCIIstrings(inboundMsgs []*rwp.InboundMessage) []
 			if inboundMsg.Command.Reboot {
 				returnStrings = append(returnStrings, "Reboot")
 			}
-			if inboundMsg.Command.PanelBrightness != nil {
-				returnStrings = append(returnStrings, fmt.Sprintf("PanelBrightness=%d,%d", inboundMsg.Command.PanelBrightness.LEDs, inboundMsg.Command.PanelBrightness.OLEDs))
+			if b := inboundMsg.Command.PanelBrightness; b != nil {
+				if b.Screen != nil {
+					// Only emit the three-value form when a screen level is actually
+					// present, so an ASCII parser older than the Screen field still
+					// matches every line we send.
+					returnStrings = append(returnStrings, fmt.Sprintf("PanelBrightness=%d,%d,%d", b.LEDs, b.OLEDs, b.GetScreen()))
+				} else {
+					returnStrings = append(returnStrings, fmt.Sprintf("PanelBrightness=%d,%d", b.LEDs, b.OLEDs))
+				}
 			}
 			if inboundMsg.Command.SetCalibrationProfile != nil {
 				returnStrings = append(returnStrings, fmt.Sprintf("SetCalibrationProfile=%s", stripLineBreaks(inboundMsg.Command.SetCalibrationProfile.Json)))

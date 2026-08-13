@@ -1837,7 +1837,7 @@ type Command struct {
 	SetSleepMode                *SleepMode            `protobuf:"bytes,28,opt,name=SetSleepMode,proto3" json:"SetSleepMode,omitempty"`                      // SleepMode=xx
 	SetSleepScreenSaver         *SleepScreenSaver     `protobuf:"bytes,29,opt,name=SetSleepScreenSaver,proto3" json:"SetSleepScreenSaver,omitempty"`        // SleepScreenSaver=xx
 	SetWebserverEnabled         *WebserverState       `protobuf:"bytes,22,opt,name=SetWebserverEnabled,proto3" json:"SetWebserverEnabled,omitempty"`        // Webserver=x
-	PanelBrightness             *Brightness           `protobuf:"bytes,23,opt,name=PanelBrightness,proto3" json:"PanelBrightness,omitempty"`                // PanelBrightness=x,y
+	PanelBrightness             *Brightness           `protobuf:"bytes,23,opt,name=PanelBrightness,proto3" json:"PanelBrightness,omitempty"`                // PanelBrightness=x,y  (or x,y,z incl. the screen backlight)
 	SetHeartBeatTimer           *HeartBeatTimer       `protobuf:"bytes,24,opt,name=SetHeartBeatTimer,proto3" json:"SetHeartBeatTimer,omitempty"`            // HeartBeatTimer=
 	GetConnections              bool                  `protobuf:"varint,25,opt,name=GetConnections,proto3" json:"GetConnections,omitempty"`                 // "Connections?",
 	SetDimmedGain               *DimmedGain           `protobuf:"bytes,26,opt,name=SetDimmedGain,proto3" json:"SetDimmedGain,omitempty"`                    // DimmedGain=
@@ -2494,9 +2494,14 @@ func (x *DimmedGain) GetValue() uint32 {
 }
 
 type Brightness struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	OLEDs         uint32                 `protobuf:"varint,1,opt,name=OLEDs,proto3" json:"OLEDs,omitempty"`
-	LEDs          uint32                 `protobuf:"varint,2,opt,name=LEDs,proto3" json:"LEDs,omitempty"`
+	state protoimpl.MessageState `protogen:"open.v1"`
+	OLEDs uint32                 `protobuf:"varint,1,opt,name=OLEDs,proto3" json:"OLEDs,omitempty"`
+	LEDs  uint32                 `protobuf:"varint,2,opt,name=LEDs,proto3" json:"LEDs,omitempty"`
+	// Screen backlight of a panel that has an LCD (touch panels), on the same 0-8
+	// scale as LEDs/OLEDs. 0 turns the backlight fully off. `optional` because
+	// absence ("a client older than this field: leave the screen alone") must stay
+	// distinguishable from 0 ("turn it off"). Panels without a screen ignore it.
+	Screen        *uint32 `protobuf:"varint,3,opt,name=Screen,proto3,oneof" json:"Screen,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -2541,6 +2546,13 @@ func (x *Brightness) GetOLEDs() uint32 {
 func (x *Brightness) GetLEDs() uint32 {
 	if x != nil {
 		return x.LEDs
+	}
+	return 0
+}
+
+func (x *Brightness) GetScreen() uint32 {
+	if x != nil && x.Screen != nil {
+		return *x.Screen
 	}
 	return 0
 }
@@ -7231,11 +7243,13 @@ const file_ibeam_rawpanel_proto_ibeam_rawpanel_proto_rawDesc = "" +
 	"\x05Value\x18\x01 \x01(\rR\x05Value\"\"\n" +
 	"\n" +
 	"DimmedGain\x12\x14\n" +
-	"\x05Value\x18\x01 \x01(\rR\x05Value\"6\n" +
+	"\x05Value\x18\x01 \x01(\rR\x05Value\"^\n" +
 	"\n" +
 	"Brightness\x12\x14\n" +
 	"\x05OLEDs\x18\x01 \x01(\rR\x05OLEDs\x12\x12\n" +
-	"\x04LEDs\x18\x02 \x01(\rR\x04LEDs\"1\n" +
+	"\x04LEDs\x18\x02 \x01(\rR\x04LEDs\x12\x1b\n" +
+	"\x06Screen\x18\x03 \x01(\rH\x00R\x06Screen\x88\x01\x01B\t\n" +
+	"\a_Screen\"1\n" +
 	"\x11PublishSystemStat\x12\x1c\n" +
 	"\tPeriodSec\x18\x02 \x01(\rR\tPeriodSec\"\x8d\x01\n" +
 	"\aLoadCPU\x124\n" +
@@ -8130,6 +8144,7 @@ func file_ibeam_rawpanel_proto_ibeam_rawpanel_proto_init() {
 	if File_ibeam_rawpanel_proto_ibeam_rawpanel_proto != nil {
 		return
 	}
+	file_ibeam_rawpanel_proto_ibeam_rawpanel_proto_msgTypes[10].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{

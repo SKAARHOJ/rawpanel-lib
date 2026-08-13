@@ -6,6 +6,7 @@ import (
 
 	"github.com/SKAARHOJ/rawpanel-lib/ibeam_rawpanel"
 	log "github.com/s00500/env_logger"
+	"google.golang.org/protobuf/proto"
 )
 
 func TestOutbound(t *testing.T) {
@@ -233,6 +234,28 @@ func TestInbound(t *testing.T) {
 			[]string{"State=5", "StateA=15", "StateA=52", "StateA=544", "StateG=21"},
 			[]string{"State=5", "StateA=15", "StateA=52", "StateA=544", "StateG=21"},
 		},
+
+		// Panel brightness. The one-value form widens to LEDs=OLEDs and deliberately
+		// leaves the screen alone, so a client older than the Screen field can never
+		// black out a touch panel's backlight.
+		{
+			[]string{"PanelBrightness=4"},
+			[]string{"PanelBrightness=4,4"},
+		},
+		{
+			[]string{"PanelBrightness=8,4"},
+			[]string{"PanelBrightness=8,4"},
+		},
+		{
+			[]string{"PanelBrightness=8,4,2"},
+			[]string{"PanelBrightness=8,4,2"},
+		},
+		// Screen 0 means "backlight off" and must survive the round trip as a
+		// three-value line rather than collapsing into the two-value form.
+		{
+			[]string{"PanelBrightness=8,4,0"},
+			[]string{"PanelBrightness=8,4,0"},
+		},
 	}
 
 	for i, tt := range tests {
@@ -284,6 +307,31 @@ func TestInboundFromBinary(t *testing.T) {
 				},
 			},
 			[]string{`SetCalibrationProfile=[{"Test": {"Json": " TEST "}}]`},
+		},
+
+		// These two guard the presence of Brightness.Screen: an absent screen level
+		// must encode as the two-value form, a present zero as the three-value form.
+		// If they ever produce the same string, presence has been lost and a legacy
+		// client's PanelBrightness would start switching touch backlights off.
+		{
+			[]*ibeam_rawpanel.InboundMessage{
+				{
+					Command: &ibeam_rawpanel.Command{
+						PanelBrightness: &ibeam_rawpanel.Brightness{LEDs: 8, OLEDs: 4},
+					},
+				},
+			},
+			[]string{"PanelBrightness=8,4"},
+		},
+		{
+			[]*ibeam_rawpanel.InboundMessage{
+				{
+					Command: &ibeam_rawpanel.Command{
+						PanelBrightness: &ibeam_rawpanel.Brightness{LEDs: 8, OLEDs: 4, Screen: proto.Uint32(0)},
+					},
+				},
+			},
+			[]string{"PanelBrightness=8,4,0"},
 		},
 	}
 
