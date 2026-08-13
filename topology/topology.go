@@ -82,6 +82,23 @@ type TopologyHWcTypeDef_Display struct {
 	Type   string `json:"type,omitempty"`      // Additional features of display: "gray" (4bit/pixel) or "color" (5-6-5 rgb/pixel) or "text" for text lines
 	Shrink int    `json:"shrink,omitempty"`    // W+H Shrink. W=bit0, H=bit1. W-shrink cuts a pixel off in the right side of tile. H-shrink cuts a pixel off in the bottom of tile.
 	Border int    `json:"txtborder,omitempty"` // Txt Border (shall match that used by ibeam-hardware and UniSketch for rendering)
+
+	Curve *TopologyHWcTypeDef_DisplayCurve `json:"curve,omitempty"` // If set, the display is drawn bent along a circular arc (physically wrapped around e.g. a jog wheel) instead of as a flat rectangle.
+}
+
+// TopologyHWcTypeDef_DisplayCurve bends a rectangular display onto a circular annular sector.
+// The display bitmap's W (short dimension) maps across the radial band (InnerR..OuterR) and its
+// H (long dimension) maps along the angular span (StartAngle..EndAngle). Angles are in degrees,
+// measured clockwise from the positive X axis (SVG convention where +Y points down). The arc is
+// centered on the hardware component's own X,Y coordinates (in 1/10 mm, same as all topology coords).
+type TopologyHWcTypeDef_DisplayCurve struct {
+	InnerR     int     `json:"innerR"`               // Inner radius of the band
+	OuterR     int     `json:"outerR"`               // Outer radius of the band
+	StartAngle float64 `json:"startAngle"`           // Start angle in degrees
+	EndAngle   float64 `json:"endAngle"`             // End angle in degrees
+	SwapAxes   bool    `json:"swapAxes,omitempty"`   // If true, bitmap W runs along the arc (angular) and H across the band (radial). Default: H along the arc, W across the band.
+	FlipRadial bool    `json:"flipRadial,omitempty"` // Swap which bitmap edge maps to inner vs outer radius
+	FlipAngle  bool    `json:"flipAngle,omitempty"`  // Swap which bitmap edge maps to start vs end angle
 }
 
 // Returns the hardware component ids of the topology (should range successively from 1 to the number of components on the panel) and there should really be no duplicates inside.

@@ -7,6 +7,7 @@ package topology
 import (
 	"encoding/json"
 	"fmt"
+	"math"
 	"strconv"
 	"strings"
 
@@ -65,21 +66,32 @@ func GenerateCompositeSVGdoc(topologyJSON string, topologySVG string, theMap map
 		}
 
 		// Main elements:
-		newHWc := svgDoc.Root.CreateNode(su.Qstr(typeDef.H > 0, "rect", "circle"))
-		if typeDef.H > 0 { // Rectangle
-			newHWc.SetAttributeValue("x", strconv.Itoa(HWcDef.X-typeDef.W/2)) // SVG elements have their reference point in upper left corner, so we subtract half the width from the center x-coordinate of the element
-			newHWc.SetAttributeValue("y", strconv.Itoa(HWcDef.Y-typeDef.H/2)) // SVG elements have their reference point in upper left corner, so we subtract half the height from the center y-coordinate of the element
-			newHWc.SetAttributeValue("width", strconv.Itoa(typeDef.W))
-			newHWc.SetAttributeValue("height", strconv.Itoa(typeDef.H))
-			newHWc.SetAttributeValue("rx", strconv.Itoa(10)) // Rounding corners for visual elegance
-			newHWc.SetAttributeValue("rx", strconv.Itoa(10)) // Rounding corners for visual elegance
-		} else { // Circle
-			newHWc.SetAttributeValue("cx", strconv.Itoa(HWcDef.X))
-			newHWc.SetAttributeValue("cy", strconv.Itoa(HWcDef.Y))
-			newHWc.SetAttributeValue("r", strconv.Itoa(typeDef.W/2)) // Radius is half the width
+		var curve *TopologyHWcTypeDef_DisplayCurve
+		if typeDef.Disp != nil {
+			curve = typeDef.Disp.Curve
 		}
-		if typeDef.Rotate != 0 {
-			newHWc.SetAttributeValue("transform", fmt.Sprintf("rotate(%03f %d %d)", typeDef.Rotate, HWcDef.X, HWcDef.Y))
+
+		var newHWc *xml.Node
+		if curve != nil { // Curved display: draw an annular sector bent around the component's center point
+			newHWc = svgDoc.Root.CreateNode("path")
+			newHWc.SetAttributeValue("d", annularSectorPath(HWcDef.X, HWcDef.Y, curve.InnerR, curve.OuterR, curve.StartAngle, curve.EndAngle))
+		} else {
+			newHWc = svgDoc.Root.CreateNode(su.Qstr(typeDef.H > 0, "rect", "circle"))
+			if typeDef.H > 0 { // Rectangle
+				newHWc.SetAttributeValue("x", strconv.Itoa(HWcDef.X-typeDef.W/2)) // SVG elements have their reference point in upper left corner, so we subtract half the width from the center x-coordinate of the element
+				newHWc.SetAttributeValue("y", strconv.Itoa(HWcDef.Y-typeDef.H/2)) // SVG elements have their reference point in upper left corner, so we subtract half the height from the center y-coordinate of the element
+				newHWc.SetAttributeValue("width", strconv.Itoa(typeDef.W))
+				newHWc.SetAttributeValue("height", strconv.Itoa(typeDef.H))
+				newHWc.SetAttributeValue("rx", strconv.Itoa(10)) // Rounding corners for visual elegance
+				newHWc.SetAttributeValue("rx", strconv.Itoa(10)) // Rounding corners for visual elegance
+			} else { // Circle
+				newHWc.SetAttributeValue("cx", strconv.Itoa(HWcDef.X))
+				newHWc.SetAttributeValue("cy", strconv.Itoa(HWcDef.Y))
+				newHWc.SetAttributeValue("r", strconv.Itoa(typeDef.W/2)) // Radius is half the width
+			}
+			if typeDef.Rotate != 0 {
+				newHWc.SetAttributeValue("transform", fmt.Sprintf("rotate(%03f %d %d)", typeDef.Rotate, HWcDef.X, HWcDef.Y))
+			}
 		}
 		addFormatting(newHWc, int(HWcDef.Id))
 
@@ -373,6 +385,32 @@ func addSubElFormatting(newHWc *xml.Node, subEl *TopologyHWcTypeDefSubEl) {
 	newHWc.SetAttributeValue("fill", "#cccccc")
 	newHWc.SetAttributeValue("stroke", "#666")
 	newHWc.SetAttributeValue("stroke-width", "1")
+}
+
+// annularSectorPath returns an SVG path "d" string for an annular sector (a curved band /
+// crescent) centered at (cx,cy), spanning radii innerR..outerR and angles a0..a1 (degrees,
+// measured clockwise from the positive X axis, SVG convention with +Y down).
+func annularSectorPath(cx, cy, innerR, outerR int, a0, a1 float64) string {
+	rad := func(deg float64) float64 { return deg * math.Pi / 180 }
+	pt := func(r, deg float64) (float64, float64) {
+		return float64(cx) + r*math.Cos(rad(deg)), float64(cy) + r*math.Sin(rad(deg))
+	}
+
+	ro := float64(outerR)
+	ri := float64(innerR)
+	largeArc := 0
+	if math.Abs(a1-a0) > 180 {
+		largeArc = 1
+	}
+
+	ox0, oy0 := pt(ro, a0) // outer start
+	ox1, oy1 := pt(ro, a1) // outer end
+	ix1, iy1 := pt(ri, a1) // inner end
+	ix0, iy0 := pt(ri, a0) // inner start
+
+	return fmt.Sprintf("M %.2f %.2f A %.2f %.2f 0 %d 1 %.2f %.2f L %.2f %.2f A %.2f %.2f 0 %d 0 %.2f %.2f Z",
+		ox0, oy0, ro, ro, largeArc, ox1, oy1,
+		ix1, iy1, ri, ri, largeArc, ix0, iy0)
 }
 
 func isIn(searchFor string, in []string) bool {
