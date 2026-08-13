@@ -335,13 +335,14 @@ SUPPORTED INBOUND COMMANDS (endpoint → panel):
     DimmedGain=<value>                Set dimmed gain
     PublishSystemStat=<sec>           Set system stat publish period
     LoadCPU=<level>                   Set CPU load level
-    SleepTimer=<sec>                  Set sleep timeout
+    SleepTimer=<ms>                   Set sleep timeout (0 = never sleep)
     SleepMode=<mode>                  Set sleep mode
     SleepScreenSaver=<type>           Set screen saver type
     Webserver=<0|1>                   Enable/disable webserver
     JSONonOutbound=<0|1>              Enable/disable JSON on outbound
     PanelBrightness=<value>           Set brightness (LEDs=OLEDs)
     PanelBrightness=<leds>,<oleds>    Set brightness separately
+    PanelBrightness=<l>,<o>,<screen>  ... incl. the LCD backlight (0 = off)
     SetCalibrationProfile=<json>      Set calibration profile
     SetNetworkConfig=<json>           Set network configuration
     SimulateEnvironmentalHealth=<v>   Simulate env health (Normal/Safemode/Blocked)
