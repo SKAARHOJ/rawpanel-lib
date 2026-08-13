@@ -16,7 +16,7 @@ import (
 )
 
 // Set up regular expressions:
-var regex_cmd = regexp.MustCompile("^(HWC#|HWCx#|HWCc#|HWCt#|HWCrawADCValues#)([0-9,]+)=(.*)$")
+var regex_cmd = regexp.MustCompile("^(HWC#|HWCx#|HWCj#|HWCc#|HWCt#|HWCrawADCValues#)([0-9,]+)=(.*)$")
 var regex_gfx = regexp.MustCompile("^(HWCgRGB#|HWCgGray#|HWCg#)([0-9,]+)=([0-9]+)(/([0-9]+),([0-9]+)x([0-9]+)(,([0-9]+),([0-9]+)|)|):(.*)$")
 var regex_genericDual = regexp.MustCompile("^(PanelBrightness)=([0-9]+),([0-9]+)$")
 var regex_genericSingle = regexp.MustCompile("^(HeartBeatTimer|DimmedGain|PublishSystemStat|LoadCPU|SleepTimer|SleepMode|SleepScreenSaver|Webserver|JSONonOutbound|PanelBrightness)=([0-9]+)$")
@@ -201,6 +201,32 @@ func RawPanelASCIIstringsToInboundMessages(rp20_ascii []string) []*rwp.InboundMe
 									Interpretation: rwp.HWCExtended_InterpretationE((value >> 12) & 0xF),
 									Value:          uint32(value & 0xFFF),
 								},
+							},
+						},
+					}
+				case "HWCj#":
+					// mode|autoStopShuttle|stopShuttle|detentsPerRev|targetPosition
+					// An empty (or missing) target position field means the motor shall not be
+					// driven - that is why it is a submessage rather than a plain value.
+					splitJogString := strings.Split(regex_cmd.FindStringSubmatch(inputString)[3], "|")
+
+					jogStruct := &rwp.HWCJog{
+						Mode:            rwp.HWCJog_ModeE(su.IndexValueToInt(splitJogString, 0)),
+						AutoStopShuttle: su.IndexValueToInt(splitJogString, 1) != 0,
+						StopShuttle:     su.IndexValueToInt(splitJogString, 2) != 0,
+						DetentsPerRev:   uint32(su.IndexValueToInt(splitJogString, 3)),
+					}
+					if su.IndexValueToString(splitJogString, 4) != "" {
+						jogStruct.TargetPosition = &rwp.HWCJog_TargetPositionM{
+							Value: uint32(su.IndexValueToInt(splitJogString, 4)),
+						}
+					}
+
+					msg = &rwp.InboundMessage{
+						States: []*rwp.HWCState{
+							&rwp.HWCState{
+								HWCIDs: HWCidArray,
+								HWCJog: jogStruct,
 							},
 						},
 					}
@@ -789,6 +815,26 @@ func InboundMessagesToRawPanelASCIIstrings(inboundMsgs []*rwp.InboundMessage) []
 						if stateRec.HWCExtended != nil {
 							outputInteger := uint32(stateRec.HWCExtended.Value&0xFFF) | uint32((stateRec.HWCExtended.Interpretation&0xF)<<12)
 							returnStrings = append(returnStrings, fmt.Sprintf("HWCx#%s=%d", su.IntImplode(singleHWCIDarray, ","), outputInteger))
+						}
+						if stateRec.HWCJog != nil {
+							// mode|autoStopShuttle|stopShuttle|detentsPerRev|targetPosition
+							// Trailing empties are trimmed, so an absent target position (the wheel
+							// should not be driven) simply shortens the string.
+							stringSlice := make([]string, 5)
+							stringSlice[0] = strconv.Itoa(int(stateRec.HWCJog.Mode)) // Always written, so the command is never empty
+							if stateRec.HWCJog.AutoStopShuttle {
+								stringSlice[1] = "1"
+							}
+							if stateRec.HWCJog.StopShuttle {
+								stringSlice[2] = "1"
+							}
+							if stateRec.HWCJog.DetentsPerRev != 0 {
+								stringSlice[3] = strconv.Itoa(int(stateRec.HWCJog.DetentsPerRev))
+							}
+							if stateRec.HWCJog.TargetPosition != nil {
+								stringSlice[4] = strconv.Itoa(int(stateRec.HWCJog.TargetPosition.Value))
+							}
+							returnStrings = append(returnStrings, fmt.Sprintf("HWCj#%s=%s", su.IntImplode(singleHWCIDarray, ","), su.StringImplodeRemoveTrailingEmpty(stringSlice, "|")))
 						}
 						if stateRec.HWCText != nil && !proto.Equal(stateRec.HWCText, &rwp.HWCText{}) {
 							stringSlice := make([]string, 21)
