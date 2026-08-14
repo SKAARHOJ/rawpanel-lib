@@ -463,6 +463,7 @@ type ServerMessage struct {
 	//	*ServerMessage_MenuCtl
 	//	*ServerMessage_Orientation
 	//	*ServerMessage_Sleep
+	//	*ServerMessage_PageBg
 	Kind          isServerMessage_Kind `protobuf_oneof:"kind"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -586,6 +587,15 @@ func (x *ServerMessage) GetSleep() *SetSleep {
 	return nil
 }
 
+func (x *ServerMessage) GetPageBg() *PageGfx {
+	if x != nil {
+		if x, ok := x.Kind.(*ServerMessage_PageBg); ok {
+			return x.PageBg
+		}
+	}
+	return nil
+}
+
 type isServerMessage_Kind interface {
 	isServerMessage_Kind()
 }
@@ -626,6 +636,10 @@ type ServerMessage_Sleep struct {
 	Sleep *SetSleep `protobuf:"bytes,9,opt,name=sleep,proto3,oneof"` // put the UI to sleep / wake it
 }
 
+type ServerMessage_PageBg struct {
+	PageBg *PageGfx `protobuf:"bytes,10,opt,name=page_bg,json=pageBg,proto3,oneof"` // per-page background image blob (bottom layer, behind widgets)
+}
+
 func (*ServerMessage_Tree) isServerMessage_Kind() {}
 
 func (*ServerMessage_State) isServerMessage_Kind() {}
@@ -643,6 +657,8 @@ func (*ServerMessage_MenuCtl) isServerMessage_Kind() {}
 func (*ServerMessage_Orientation) isServerMessage_Kind() {}
 
 func (*ServerMessage_Sleep) isServerMessage_Kind() {}
+
+func (*ServerMessage_PageBg) isServerMessage_Kind() {}
 
 // Rotate the rendered UI. `deg` is the ABSOLUTE effective rotation of the GUI against
 // the panel's scanout — Go has already composed it from the hwconfig mount rotation and
@@ -3088,11 +3104,92 @@ func (x *RawTouch) GetPhase() uint32 {
 	return 0
 }
 
+// Per-page background image (Go resolves TouchUIPage.Background to native-endian
+// RGB565, downscaled to fit the same 128 KiB cap as WidgetGfx; the renderer draws
+// it as the page's bottom layer and stretches it to the screen, so widgets on top
+// are unaffected). Keyed by page id, not hwc id. A zero-size blob clears the page
+// background. Rides its own arm like WidgetGfx so the union stays size-bounded.
+type PageGfx struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Epoch         uint32                 `protobuf:"varint,1,opt,name=epoch,proto3" json:"epoch,omitempty"`
+	PageId        uint32                 `protobuf:"varint,2,opt,name=page_id,json=pageId,proto3" json:"page_id,omitempty"`
+	W             uint32                 `protobuf:"varint,3,opt,name=w,proto3" json:"w,omitempty"`
+	H             uint32                 `protobuf:"varint,4,opt,name=h,proto3" json:"h,omitempty"`
+	Rgb565        []byte                 `protobuf:"bytes,5,opt,name=rgb565,proto3" json:"rgb565,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *PageGfx) Reset() {
+	*x = PageGfx{}
+	mi := &file_touchmanager_proto_msgTypes[32]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PageGfx) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PageGfx) ProtoMessage() {}
+
+func (x *PageGfx) ProtoReflect() protoreflect.Message {
+	mi := &file_touchmanager_proto_msgTypes[32]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PageGfx.ProtoReflect.Descriptor instead.
+func (*PageGfx) Descriptor() ([]byte, []int) {
+	return file_touchmanager_proto_rawDescGZIP(), []int{32}
+}
+
+func (x *PageGfx) GetEpoch() uint32 {
+	if x != nil {
+		return x.Epoch
+	}
+	return 0
+}
+
+func (x *PageGfx) GetPageId() uint32 {
+	if x != nil {
+		return x.PageId
+	}
+	return 0
+}
+
+func (x *PageGfx) GetW() uint32 {
+	if x != nil {
+		return x.W
+	}
+	return 0
+}
+
+func (x *PageGfx) GetH() uint32 {
+	if x != nil {
+		return x.H
+	}
+	return 0
+}
+
+func (x *PageGfx) GetRgb565() []byte {
+	if x != nil {
+		return x.Rgb565
+	}
+	return nil
+}
+
 var File_touchmanager_proto protoreflect.FileDescriptor
 
 const file_touchmanager_proto_rawDesc = "" +
 	"\n" +
-	"\x12touchmanager.proto\x12\ftouchmanager\"\xea\x03\n" +
+	"\x12touchmanager.proto\x12\ftouchmanager\"\x9c\x04\n" +
 	"\rServerMessage\x12.\n" +
 	"\x04tree\x18\x01 \x01(\v2\x18.touchmanager.WidgetTreeH\x00R\x04tree\x121\n" +
 	"\x05state\x18\x02 \x01(\v2\x19.touchmanager.WidgetStateH\x00R\x05state\x12+\n" +
@@ -3102,7 +3199,9 @@ const file_touchmanager_proto_rawDesc = "" +
 	"\tmenu_page\x18\x06 \x01(\v2\x1c.touchmanager.ConfigMenuPageH\x00R\bmenuPage\x128\n" +
 	"\bmenu_ctl\x18\a \x01(\v2\x1b.touchmanager.ConfigMenuCtlH\x00R\amenuCtl\x12@\n" +
 	"\vorientation\x18\b \x01(\v2\x1c.touchmanager.SetOrientationH\x00R\vorientation\x12.\n" +
-	"\x05sleep\x18\t \x01(\v2\x16.touchmanager.SetSleepH\x00R\x05sleepB\x06\n" +
+	"\x05sleep\x18\t \x01(\v2\x16.touchmanager.SetSleepH\x00R\x05sleep\x120\n" +
+	"\apage_bg\x18\n" +
+	" \x01(\v2\x15.touchmanager.PageGfxH\x00R\x06pageBgB\x06\n" +
 	"\x04kind\"\"\n" +
 	"\x0eSetOrientation\x12\x10\n" +
 	"\x03deg\x18\x01 \x01(\rR\x03deg\"\x99\x01\n" +
@@ -3373,7 +3472,13 @@ const file_touchmanager_proto_rawDesc = "" +
 	"\bRawTouch\x12\f\n" +
 	"\x01x\x18\x01 \x01(\rR\x01x\x12\f\n" +
 	"\x01y\x18\x02 \x01(\rR\x01y\x12\x14\n" +
-	"\x05phase\x18\x03 \x01(\rR\x05phaseB+Z)github.com/SKAARHOJ/touch-manager/gen;genb\x06proto3"
+	"\x05phase\x18\x03 \x01(\rR\x05phase\"l\n" +
+	"\aPageGfx\x12\x14\n" +
+	"\x05epoch\x18\x01 \x01(\rR\x05epoch\x12\x17\n" +
+	"\apage_id\x18\x02 \x01(\rR\x06pageId\x12\f\n" +
+	"\x01w\x18\x03 \x01(\rR\x01w\x12\f\n" +
+	"\x01h\x18\x04 \x01(\rR\x01h\x12\x16\n" +
+	"\x06rgb565\x18\x05 \x01(\fR\x06rgb565B+Z)github.com/SKAARHOJ/touch-manager/gen;genb\x06proto3"
 
 var (
 	file_touchmanager_proto_rawDescOnce sync.Once
@@ -3388,7 +3493,7 @@ func file_touchmanager_proto_rawDescGZIP() []byte {
 }
 
 var file_touchmanager_proto_enumTypes = make([]protoimpl.EnumInfo, 7)
-var file_touchmanager_proto_msgTypes = make([]protoimpl.MessageInfo, 32)
+var file_touchmanager_proto_msgTypes = make([]protoimpl.MessageInfo, 33)
 var file_touchmanager_proto_goTypes = []any{
 	(WidgetDef_Type)(0),         // 0: touchmanager.WidgetDef.Type
 	(WidgetDef_EditKind)(0),     // 1: touchmanager.WidgetDef.EditKind
@@ -3429,6 +3534,7 @@ var file_touchmanager_proto_goTypes = []any{
 	(*TextEv)(nil),              // 36: touchmanager.TextEv
 	(*PageSelect)(nil),          // 37: touchmanager.PageSelect
 	(*RawTouch)(nil),            // 38: touchmanager.RawTouch
+	(*PageGfx)(nil),             // 39: touchmanager.PageGfx
 }
 var file_touchmanager_proto_depIdxs = []int32{
 	10, // 0: touchmanager.ServerMessage.tree:type_name -> touchmanager.WidgetTree
@@ -3440,39 +3546,40 @@ var file_touchmanager_proto_depIdxs = []int32{
 	27, // 6: touchmanager.ServerMessage.menu_ctl:type_name -> touchmanager.ConfigMenuCtl
 	8,  // 7: touchmanager.ServerMessage.orientation:type_name -> touchmanager.SetOrientation
 	9,  // 8: touchmanager.ServerMessage.sleep:type_name -> touchmanager.SetSleep
-	12, // 9: touchmanager.WidgetTree.pages:type_name -> touchmanager.PageDef
-	11, // 10: touchmanager.WidgetTree.options:type_name -> touchmanager.GlobalOptions
-	13, // 11: touchmanager.PageDef.widgets:type_name -> touchmanager.WidgetDef
-	0,  // 12: touchmanager.WidgetDef.type:type_name -> touchmanager.WidgetDef.Type
-	15, // 13: touchmanager.WidgetDef.feed:type_name -> touchmanager.VideoFeed
-	14, // 14: touchmanager.WidgetDef.params:type_name -> touchmanager.CompressorParam
-	1,  // 15: touchmanager.WidgetDef.edit_kind:type_name -> touchmanager.WidgetDef.EditKind
-	2,  // 16: touchmanager.CompressorParam.role:type_name -> touchmanager.CompressorParam.Role
-	3,  // 17: touchmanager.VideoFeed.hidden_policy:type_name -> touchmanager.VideoFeed.HiddenPolicy
-	17, // 18: touchmanager.WidgetState.mode:type_name -> touchmanager.ModeState
-	18, // 19: touchmanager.WidgetState.text:type_name -> touchmanager.TextState
-	19, // 20: touchmanager.WidgetState.value:type_name -> touchmanager.ValueState
-	20, // 21: touchmanager.WidgetState.overlay:type_name -> touchmanager.OverlayState
-	21, // 22: touchmanager.OverlayState.boxes:type_name -> touchmanager.OverlayBox
-	4,  // 23: touchmanager.ConfigMenuItem.type:type_name -> touchmanager.ConfigMenuItem.Type
-	25, // 24: touchmanager.ConfigMenuPage.items:type_name -> touchmanager.ConfigMenuItem
-	5,  // 25: touchmanager.ConfigMenuCtl.op:type_name -> touchmanager.ConfigMenuCtl.Op
-	6,  // 26: touchmanager.ConfigMenuEvent.kind:type_name -> touchmanager.ConfigMenuEvent.Kind
-	30, // 27: touchmanager.UiEvent.hello:type_name -> touchmanager.Hello
-	31, // 28: touchmanager.UiEvent.widget:type_name -> touchmanager.WidgetEvent
-	37, // 29: touchmanager.UiEvent.page_select:type_name -> touchmanager.PageSelect
-	38, // 30: touchmanager.UiEvent.touch:type_name -> touchmanager.RawTouch
-	28, // 31: touchmanager.UiEvent.menu:type_name -> touchmanager.ConfigMenuEvent
-	32, // 32: touchmanager.WidgetEvent.binary:type_name -> touchmanager.BinaryEv
-	33, // 33: touchmanager.WidgetEvent.pulsed:type_name -> touchmanager.PulsedEv
-	34, // 34: touchmanager.WidgetEvent.absolute:type_name -> touchmanager.AbsoluteEv
-	35, // 35: touchmanager.WidgetEvent.vector:type_name -> touchmanager.VectorEv
-	36, // 36: touchmanager.WidgetEvent.text:type_name -> touchmanager.TextEv
-	37, // [37:37] is the sub-list for method output_type
-	37, // [37:37] is the sub-list for method input_type
-	37, // [37:37] is the sub-list for extension type_name
-	37, // [37:37] is the sub-list for extension extendee
-	0,  // [0:37] is the sub-list for field type_name
+	39, // 9: touchmanager.ServerMessage.page_bg:type_name -> touchmanager.PageGfx
+	12, // 10: touchmanager.WidgetTree.pages:type_name -> touchmanager.PageDef
+	11, // 11: touchmanager.WidgetTree.options:type_name -> touchmanager.GlobalOptions
+	13, // 12: touchmanager.PageDef.widgets:type_name -> touchmanager.WidgetDef
+	0,  // 13: touchmanager.WidgetDef.type:type_name -> touchmanager.WidgetDef.Type
+	15, // 14: touchmanager.WidgetDef.feed:type_name -> touchmanager.VideoFeed
+	14, // 15: touchmanager.WidgetDef.params:type_name -> touchmanager.CompressorParam
+	1,  // 16: touchmanager.WidgetDef.edit_kind:type_name -> touchmanager.WidgetDef.EditKind
+	2,  // 17: touchmanager.CompressorParam.role:type_name -> touchmanager.CompressorParam.Role
+	3,  // 18: touchmanager.VideoFeed.hidden_policy:type_name -> touchmanager.VideoFeed.HiddenPolicy
+	17, // 19: touchmanager.WidgetState.mode:type_name -> touchmanager.ModeState
+	18, // 20: touchmanager.WidgetState.text:type_name -> touchmanager.TextState
+	19, // 21: touchmanager.WidgetState.value:type_name -> touchmanager.ValueState
+	20, // 22: touchmanager.WidgetState.overlay:type_name -> touchmanager.OverlayState
+	21, // 23: touchmanager.OverlayState.boxes:type_name -> touchmanager.OverlayBox
+	4,  // 24: touchmanager.ConfigMenuItem.type:type_name -> touchmanager.ConfigMenuItem.Type
+	25, // 25: touchmanager.ConfigMenuPage.items:type_name -> touchmanager.ConfigMenuItem
+	5,  // 26: touchmanager.ConfigMenuCtl.op:type_name -> touchmanager.ConfigMenuCtl.Op
+	6,  // 27: touchmanager.ConfigMenuEvent.kind:type_name -> touchmanager.ConfigMenuEvent.Kind
+	30, // 28: touchmanager.UiEvent.hello:type_name -> touchmanager.Hello
+	31, // 29: touchmanager.UiEvent.widget:type_name -> touchmanager.WidgetEvent
+	37, // 30: touchmanager.UiEvent.page_select:type_name -> touchmanager.PageSelect
+	38, // 31: touchmanager.UiEvent.touch:type_name -> touchmanager.RawTouch
+	28, // 32: touchmanager.UiEvent.menu:type_name -> touchmanager.ConfigMenuEvent
+	32, // 33: touchmanager.WidgetEvent.binary:type_name -> touchmanager.BinaryEv
+	33, // 34: touchmanager.WidgetEvent.pulsed:type_name -> touchmanager.PulsedEv
+	34, // 35: touchmanager.WidgetEvent.absolute:type_name -> touchmanager.AbsoluteEv
+	35, // 36: touchmanager.WidgetEvent.vector:type_name -> touchmanager.VectorEv
+	36, // 37: touchmanager.WidgetEvent.text:type_name -> touchmanager.TextEv
+	38, // [38:38] is the sub-list for method output_type
+	38, // [38:38] is the sub-list for method input_type
+	38, // [38:38] is the sub-list for extension type_name
+	38, // [38:38] is the sub-list for extension extendee
+	0,  // [0:38] is the sub-list for field type_name
 }
 
 func init() { file_touchmanager_proto_init() }
@@ -3490,6 +3597,7 @@ func file_touchmanager_proto_init() {
 		(*ServerMessage_MenuCtl)(nil),
 		(*ServerMessage_Orientation)(nil),
 		(*ServerMessage_Sleep)(nil),
+		(*ServerMessage_PageBg)(nil),
 	}
 	file_touchmanager_proto_msgTypes[9].OneofWrappers = []any{}
 	file_touchmanager_proto_msgTypes[20].OneofWrappers = []any{}
@@ -3513,7 +3621,7 @@ func file_touchmanager_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_touchmanager_proto_rawDesc), len(file_touchmanager_proto_rawDesc)),
 			NumEnums:      7,
-			NumMessages:   32,
+			NumMessages:   33,
 			NumExtensions: 0,
 			NumServices:   0,
 		},
