@@ -2,6 +2,7 @@ package touchui
 
 import (
 	"fmt"
+	"image"
 
 	rwp "github.com/SKAARHOJ/rawpanel-lib/ibeam_rawpanel"
 
@@ -20,36 +21,79 @@ const (
 // formats, see ibeam_lib_monogfx for the layout reference) into a
 // little-endian RGB565 WidgetGfx frame, downscaling to the transport bounds.
 func GfxToWidgetGfx(hwc uint32, g *rwp.HWCGfx, epoch uint32) (*gen.WidgetGfx, error) {
+	outW, outH, rgb565, err := gfxToRGB565(g)
+	if err != nil {
+		return nil, err
+	}
+	return &gen.WidgetGfx{Epoch: epoch, HwcId: hwc, W: uint32(outW), H: uint32(outH), Rgb565: rgb565}, nil
+}
+
+// PageGfxFromGfx converts an already-resolved per-page background HWCGfx into a
+// PageGfx frame (little-endian RGB565, downscaled to the transport bounds). The
+// renderer stretches it to the screen as the page's bottom layer, so the widgets
+// drawn on top are unaffected. Keyed by page id, not hwc id.
+func PageGfxFromGfx(pageID uint32, g *rwp.HWCGfx, epoch uint32) (*gen.PageGfx, error) {
+	outW, outH, rgb565, err := gfxToRGB565(g)
+	if err != nil {
+		return nil, err
+	}
+	return &gen.PageGfx{Epoch: epoch, PageId: pageID, W: uint32(outW), H: uint32(outH), Rgb565: rgb565}, nil
+}
+
+// PageGfxFromImage packs a decoded background image into a PageGfx frame
+// (little-endian RGB565, downscaled to the transport bounds). For callers that
+// resolve TouchUIPage.Background from an image file — e.g. an icon reactor holds
+// — rather than an HWCGfx. The renderer stretches it to the screen behind the
+// widgets, so they are unaffected. Keyed by page id, not hwc id.
+func PageGfxFromImage(pageID uint32, img image.Image, epoch uint32) *gen.PageGfx {
+	b := img.Bounds()
+	w, h := b.Dx(), b.Dy()
+	if w <= 0 || h <= 0 {
+		return &gen.PageGfx{Epoch: epoch, PageId: pageID} // zero-size blob clears the page background
+	}
+	outW, outH := fitWithin(w, h, maxGfxW, maxGfxH)
+	rgb565 := make([]byte, outW*outH*2)
+	for y := 0; y < outH; y++ {
+		srcY := b.Min.Y + y*h/outH
+		for x := 0; x < outW; x++ {
+			srcX := b.Min.X + x*w/outW
+			r, g, bl, _ := img.At(srcX, srcY).RGBA() // 16-bit per channel, straight alpha
+			v := packRGB565(uint32(r>>8)<<16 | uint32(g>>8)<<8 | uint32(bl>>8))
+			i := (y*outW + x) * 2
+			rgb565[i] = byte(v)
+			rgb565[i+1] = byte(v >> 8)
+		}
+	}
+	return &gen.PageGfx{Epoch: epoch, PageId: pageID, W: uint32(outW), H: uint32(outH), Rgb565: rgb565}
+}
+
+// gfxToRGB565 decodes an HWCGfx to 0xRRGGBB pixels and downscales it (aspect
+// preserved) into a little-endian RGB565 buffer within the transport bounds.
+// Shared by the per-widget and per-page image frames.
+func gfxToRGB565(g *rwp.HWCGfx) (outW, outH int, rgb565 []byte, err error) {
 	w, h := int(g.GetW()), int(g.GetH())
 	if w <= 0 || h <= 0 {
-		return nil, fmt.Errorf("touchui: gfx without dimensions")
+		return 0, 0, nil, fmt.Errorf("touchui: gfx without dimensions")
 	}
 
 	pix, err := decodeGfx(g, w, h) // 0xRRGGBB per pixel, row-major
 	if err != nil {
-		return nil, err
+		return 0, 0, nil, err
 	}
 
-	outW, outH := fitWithin(w, h, maxGfxW, maxGfxH)
-	out := &gen.WidgetGfx{
-		Epoch: epoch,
-		HwcId: hwc,
-		W:     uint32(outW),
-		H:     uint32(outH),
-	}
-	out.Rgb565 = make([]byte, outW*outH*2)
+	outW, outH = fitWithin(w, h, maxGfxW, maxGfxH)
+	rgb565 = make([]byte, outW*outH*2)
 	for y := 0; y < outH; y++ {
 		srcY := y * h / outH
 		for x := 0; x < outW; x++ {
 			srcX := x * w / outW
-			rgb := pix[srcY*w+srcX]
-			v := packRGB565(rgb)
+			v := packRGB565(pix[srcY*w+srcX])
 			i := (y*outW + x) * 2
-			out.Rgb565[i] = byte(v)        // little-endian: LVGL-native on all targets
-			out.Rgb565[i+1] = byte(v >> 8)
+			rgb565[i] = byte(v)        // little-endian: LVGL-native on all targets
+			rgb565[i+1] = byte(v >> 8)
 		}
 	}
-	return out, nil
+	return outW, outH, rgb565, nil
 }
 
 func fitWithin(w, h, maxW, maxH int) (int, int) {
