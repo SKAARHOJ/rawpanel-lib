@@ -206,3 +206,71 @@ func TestTouchUIConfigToTopology(t *testing.T) {
 		t.Errorf("topology JSON missing HWc array")
 	}
 }
+
+// An editable LABEL draws differently from a plain one, so the two must land on
+// DIFFERENT TypeIndex keys. If the key does not discriminate, the second widget
+// silently inherits the first's drawing — no error anywhere, just a wrong panel.
+func TestEditableLabelGetsItsOwnTypeDef(t *testing.T) {
+	top := TouchUIConfigToTopology(&rwp.TouchUIConfig{
+		Pages: []*rwp.TouchUIPage{{
+			Id: 1, GridRows: 1, GridCols: 2,
+			Widgets: []*rwp.TouchUIWidget{
+				{HWCID: 301, Type: rwp.TouchUIWidget_LABEL, Label: "Plain", Row: 1, Col: 1},
+				{HWCID: 302, Type: rwp.TouchUIWidget_LABEL, Label: "Editable", Row: 1, Col: 2,
+					Options: &rwp.TouchUIWidgetOptions{EditKind: rwp.TouchUIWidgetOptions_TEXT}},
+			},
+		}},
+	})
+
+	var plain, editable uint32
+	for _, comp := range top.HWc {
+		switch comp.Id {
+		case 301:
+			plain = comp.Type
+		case 302:
+			editable = comp.Type
+		}
+	}
+	if plain == 0 || editable == 0 {
+		t.Fatalf("both labels should appear as components: %+v", top.HWc)
+	}
+	if plain == editable {
+		t.Fatalf("editable and plain LABEL collided on type key %d", plain)
+	}
+
+	// And the editable one must actually describe a field that takes input.
+	def := top.TypeIndex[editable]
+	if def.In != "b" {
+		t.Errorf("editable label should declare an input: %+v", def)
+	}
+	if len(def.Sub) == 0 {
+		t.Errorf("editable label should draw a field, not a bare caption: %+v", def)
+	}
+}
+
+// A compressor is ONE topology component: its member faders are addressable HWCs
+// but are known only to compressor-aware clients, so they must not leak into the
+// topology as components of their own.
+func TestCompressorMembersAreNotTopologyComponents(t *testing.T) {
+	top := TouchUIConfigToTopology(&rwp.TouchUIConfig{
+		Pages: []*rwp.TouchUIPage{{
+			Id: 1, GridRows: 1, GridCols: 1,
+			Widgets: []*rwp.TouchUIWidget{
+				{HWCID: 310, Type: rwp.TouchUIWidget_COMPRESSOR, Row: 1, Col: 1,
+					Options: &rwp.TouchUIWidgetOptions{Params: []*rwp.TouchUICompressorParam{
+						{HWCID: 401, Role: rwp.TouchUICompressorParam_THRESHOLD},
+						{HWCID: 402, Role: rwp.TouchUICompressorParam_RATIO},
+					}}},
+			},
+		}},
+	})
+
+	if len(top.HWc) != 1 {
+		t.Fatalf("expected only the container as a component, got %d", len(top.HWc))
+	}
+	for _, comp := range top.HWc {
+		if comp.Id == 401 || comp.Id == 402 {
+			t.Errorf("compressor member %d leaked into the topology", comp.Id)
+		}
+	}
+}

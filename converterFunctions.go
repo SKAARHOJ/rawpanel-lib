@@ -1106,6 +1106,12 @@ func InboundMessagesToRawPanelASCIIstrings(inboundMsgs []*rwp.InboundMessage) []
 var regex_map = regexp.MustCompile("^map=([0-9]+):([0-9]+)$")
 var regex_genericSingle_inbound = regexp.MustCompile("^(_model|_serial|_version|_platform|_bluePillReady|_name|_panelType|_support|_isSleeping|_sleepTimer|_panelTopology_svgbase|_panelTopology_HWC|_burninProfile|_networkConfig|_calibrationProfile|_defaultCalibrationProfile|_serverModeLockToIP|_serverModeMaxClients|_heartBeatTimer|DimmedGain|_connections|_bootsCount|_totalUptimeMin|_sessionUptimeMin|_screenSaverOnMin|_touchUICapabilities|_touchUIConfig|ErrorMsg|Msg|EnvironmentalHealth|SysStat)=(.+)$")
 var regex_cmd_inbound = regexp.MustCompile("^HWC#([0-9]+)(|.([0-9]+))=(Down|Up|Press|Abs|Speed|Enc)(|:([-0-9,]+))$")
+
+// Text events carry free text, so their value is the whole rest of the line and needs no escaping.
+// They get their own regex rather than joining the alternation above: widening that value class from
+// ([-0-9,]+) to (.*) would make a malformed "HWC#5=Abs:banana" parse as Abs:0, because su.Intval
+// returns 0 for anything it cannot read. Keeping the two disjoint keeps the numeric forms strict.
+var regex_text_inbound = regexp.MustCompile("^HWC#([0-9]+)=Text:(.*)$")
 var regex_registersOut = regexp.MustCompile("^(Flag#|Mem|Shift|State)([A-Z0-9]*)=([0-9]+)$")
 
 // Converts Raw Panel 1.0 ASCII Strings into proto OutboundMessage structs
@@ -1153,7 +1159,20 @@ func RawPanelASCIIstringsToOutboundMessages(rp20_ascii []string) []*rwp.Outbound
 				FlowMessage: rwp.OutboundMessage_HELLO,
 			}
 		default:
-			if regex_cmd_inbound.MatchString(inputString) { // regexp.Compile("^HWC#([0-9,]+)(|.([0-9]+))=(Down|Up|Press|Abs|Speed|Enc)(|:([-0-9]+))$")
+			if m := regex_text_inbound.FindStringSubmatch(inputString); m != nil {
+				// The value is the rest of the line verbatim - an empty one is legal and means
+				// the user cleared the field, so this must not be conflated with "no match".
+				msg = &rwp.OutboundMessage{
+					Events: []*rwp.HWCEvent{
+						&rwp.HWCEvent{
+							HWCID: uint32(su.Intval(m[1])),
+							Text: &rwp.TextEvent{
+								Value: m[2],
+							},
+						},
+					},
+				}
+			} else if regex_cmd_inbound.MatchString(inputString) { // regexp.Compile("^HWC#([0-9,]+)(|.([0-9]+))=(Down|Up|Press|Abs|Speed|Enc)(|:([-0-9]+))$")
 				//su.Debug(regex_cmd.FindStringSubmatch(inputString))
 				HWCid := su.Intval(regex_cmd_inbound.FindStringSubmatch(inputString)[1])
 				eventType := regex_cmd_inbound.FindStringSubmatch(inputString)[4]
@@ -1905,6 +1924,9 @@ func OutboundMessagesToRawPanelASCIIstrings(outboundMsgs []*rwp.OutboundMessage)
 					}
 					returnStrings = append(returnStrings, fmt.Sprintf("HWC#%d=Speed:%s", eventRec.HWCID, strings.Join(parts, ",")))
 				}
+				if eventRec.Text != nil { // free text: the value is the rest of the line, so nothing needs escaping
+					returnStrings = append(returnStrings, fmt.Sprintf("HWC#%d=Text:%s", eventRec.HWCID, sanitizeASCIILine(eventRec.Text.Value)))
+				}
 				if eventRec.RawAnalog != nil {
 					returnStrings = append(returnStrings, fmt.Sprintf("HWC#%d=Raw:%d", eventRec.HWCID, eventRec.RawAnalog.Value))
 				}
@@ -2017,6 +2039,14 @@ func stripLineBreaks(in string) string {
 		parts[i] = strings.TrimSpace(parts[i])
 	}
 	return strings.Join(parts, "")
+}
+
+// sanitizeASCIILine makes a free-text value safe for the line-oriented ASCII transport without
+// otherwise touching it: CR and LF become spaces and everything else survives byte for byte, so a
+// value the user typed round-trips exactly. Deliberately not stripLineBreaks, which TrimSpaces every
+// line and would silently eat a trailing space in a password or the indentation in a name.
+func sanitizeASCIILine(in string) string {
+	return strings.NewReplacer("\r", " ", "\n", " ").Replace(in)
 }
 
 func networkConfigFromString(str string) *rwp.NetworkConfig {

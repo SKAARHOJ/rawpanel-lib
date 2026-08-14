@@ -34,6 +34,7 @@ const (
 	TouchUIEventAbsolute uint32 = 1 << 2
 	TouchUIEventSpeed    uint32 = 1 << 3
 	TouchUIEventVector   uint32 = 1 << 4 // Absolute/Speed carried as a *Vector event (e.g. XYPAD [x,y]/[dx,dy])
+	TouchUIEventText     uint32 = 1 << 5 // a string value (e.g. an editable LABEL commit)
 )
 
 // TouchUI widget state ability bits, used in TouchUIWidgetTypeCap.StateMask

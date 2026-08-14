@@ -184,6 +184,52 @@ func TestValidateRejects(t *testing.T) {
 					&rwp.TouchUIWidget{HWCID: uint32(300 + i), Type: rwp.TouchUIWidget_LABEL})
 			}
 		},
+
+		"roller without choices": func(c *rwp.TouchUIConfig) {
+			c.Pages[0].Widgets[0].Type = rwp.TouchUIWidget_ROLLER
+		},
+		"choice with a newline": func(c *rwp.TouchUIConfig) {
+			c.Pages[0].Widgets[0].Type = rwp.TouchUIWidget_ROLLER
+			c.Pages[0].Widgets[0].Options.Choices = []string{"a\nb"}
+		},
+		"relative xypad that also center-returns": func(c *rwp.TouchUIConfig) {
+			c.Pages[0].Widgets[0].Type = rwp.TouchUIWidget_XYPAD
+			c.Pages[0].Widgets[0].Options.Relative = true
+			c.Pages[0].Widgets[0].Options.CenterReturn = true
+		},
+		"compressor without params": func(c *rwp.TouchUIConfig) {
+			c.Pages[0].Widgets[0].Type = rwp.TouchUIWidget_COMPRESSOR
+		},
+		"compressor with duplicate roles": func(c *rwp.TouchUIConfig) {
+			c.Pages[0].Widgets[0].Type = rwp.TouchUIWidget_COMPRESSOR
+			c.Pages[0].Widgets[0].Options.Params = []*rwp.TouchUICompressorParam{
+				{HWCID: 401, Role: rwp.TouchUICompressorParam_THRESHOLD},
+				{HWCID: 402, Role: rwp.TouchUICompressorParam_THRESHOLD},
+			}
+		},
+		// The important one: a member id sharing the widget id space would make the
+		// renderer's lookup and the core's state store ambiguous.
+		"compressor member colliding with a widget": func(c *rwp.TouchUIConfig) {
+			c.Pages[0].Widgets[0].Type = rwp.TouchUIWidget_COMPRESSOR
+			c.Pages[0].Widgets[0].Options.Params = []*rwp.TouchUICompressorParam{
+				{HWCID: 203, Role: rwp.TouchUICompressorParam_THRESHOLD}, // 203 is a VIDEO widget
+			}
+		},
+		"compressor members colliding with each other": func(c *rwp.TouchUIConfig) {
+			c.Pages[0].Widgets[0].Type = rwp.TouchUIWidget_COMPRESSOR
+			c.Pages[0].Widgets[0].Options.Params = []*rwp.TouchUICompressorParam{
+				{HWCID: 401, Role: rwp.TouchUICompressorParam_THRESHOLD},
+				{HWCID: 401, Role: rwp.TouchUICompressorParam_RATIO},
+			}
+		},
+		"editkind on a non-label": func(c *rwp.TouchUIConfig) {
+			c.Pages[0].Widgets[0].Options.EditKind = rwp.TouchUIWidgetOptions_TEXT
+		},
+		"edit length beyond the cap": func(c *rwp.TouchUIConfig) {
+			c.Pages[0].Widgets[0].Type = rwp.TouchUIWidget_LABEL
+			c.Pages[0].Widgets[0].Options.EditKind = rwp.TouchUIWidgetOptions_TEXT
+			c.Pages[0].Widgets[0].Options.EditMaxLen = MaxEditLen + 1
+		},
 	}
 	for name, mutate := range cases {
 		cfg := testConfig()

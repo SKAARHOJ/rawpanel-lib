@@ -1,0 +1,203 @@
+package touchui
+
+import (
+	"strings"
+	"testing"
+
+	helpers "github.com/SKAARHOJ/rawpanel-lib"
+	rwp "github.com/SKAARHOJ/rawpanel-lib/ibeam_rawpanel"
+
+	gen "github.com/SKAARHOJ/rawpanel-lib/touchui/gen"
+)
+
+// EditKind enables and EventMask narrows — a client should never have to set both.
+func TestEffectiveEventMask(t *testing.T) {
+	label := func(mutate func(*rwp.TouchUIWidget)) *rwp.TouchUIWidget {
+		w := &rwp.TouchUIWidget{
+			HWCID:   100,
+			Type:    rwp.TouchUIWidget_LABEL,
+			Options: &rwp.TouchUIWidgetOptions{},
+		}
+		if mutate != nil {
+			mutate(w)
+		}
+		return w
+	}
+
+	cases := []struct {
+		name string
+		give *rwp.TouchUIWidget
+		want uint32
+	}{
+		{
+			"plain label taps only",
+			label(nil),
+			helpers.TouchUIEventBinary,
+		},
+		{
+			"no-tap label is silent",
+			label(func(w *rwp.TouchUIWidget) { w.Options.NoTapEvents = true }),
+			0,
+		},
+		{
+			// EditKind alone must turn Text on: this is the whole "the Option enables" rule.
+			"editable label taps and commits",
+			label(func(w *rwp.TouchUIWidget) { w.Options.EditKind = rwp.TouchUIWidgetOptions_TEXT }),
+			helpers.TouchUIEventBinary | helpers.TouchUIEventText,
+		},
+		{
+			// ...and EventMask can take the tap away without disabling the edit.
+			"editable label narrowed to commits only",
+			label(func(w *rwp.TouchUIWidget) {
+				w.Options.EditKind = rwp.TouchUIWidgetOptions_TEXT
+				w.EventMask = helpers.TouchUIEventText
+			}),
+			helpers.TouchUIEventText,
+		},
+		{
+			// A mask can only remove: it must never talk the panel into an ability
+			// the type does not have.
+			"override cannot add an ability",
+			label(func(w *rwp.TouchUIWidget) { w.EventMask = helpers.TouchUIEventAbsolute }),
+			0,
+		},
+		{
+			"xypad reports a vector plus touch",
+			&rwp.TouchUIWidget{HWCID: 101, Type: rwp.TouchUIWidget_XYPAD},
+			helpers.TouchUIEventVector | helpers.TouchUIEventBinary,
+		},
+		{
+			"roller reports an index",
+			&rwp.TouchUIWidget{HWCID: 102, Type: rwp.TouchUIWidget_ROLLER},
+			helpers.TouchUIEventAbsolute,
+		},
+		{
+			// The container is passive; its members emit under their own ids.
+			"compressor container is silent",
+			&rwp.TouchUIWidget{HWCID: 103, Type: rwp.TouchUIWidget_COMPRESSOR},
+			0,
+		},
+	}
+
+	for _, tt := range cases {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := EffectiveEventMask(tt.give); got != tt.want {
+				t.Errorf("EffectiveEventMask = %d, want %d", got, tt.want)
+			}
+		})
+	}
+}
+
+// The renderer feeds choices straight into lv_roller_set_options, so they must
+// arrive newline-joined, capped, and free of embedded newlines (which would split
+// one option into two and shift every index after it).
+func TestJoinChoices(t *testing.T) {
+	if got := joinChoices([]string{"1080p50", "2160p30"}); got != "1080p50\n2160p30" {
+		t.Errorf("joined = %q", got)
+	}
+	if got := joinChoices([]string{"a\nb"}); got != "a b" {
+		t.Errorf("embedded newline survived: %q", got)
+	}
+	if got := joinChoices(strings.Split(strings.Repeat("x,", MaxChoices+5), ",")); strings.Count(got, "\n") >= MaxChoices+5 {
+		t.Errorf("choice list was not capped: %d entries", strings.Count(got, "\n")+1)
+	}
+	long := strings.Repeat("y", MaxChoiceLen+10)
+	if got := joinChoices([]string{long}); len(got) != MaxChoiceLen {
+		t.Errorf("long choice not truncated: %d bytes", len(got))
+	}
+}
+
+// 0/0 means "panel default for the role", and resolving it in Go keeps the role
+// table out of the renderer.
+func TestCompressorRoleDefaults(t *testing.T) {
+	out := compressorParams([]*rwp.TouchUICompressorParam{
+		{HWCID: 401, Role: rwp.TouchUICompressorParam_THRESHOLD},
+		{HWCID: 402, Role: rwp.TouchUICompressorParam_RATIO, Min: 2, Max: 8},
+	})
+	if len(out) != 2 {
+		t.Fatalf("got %d params", len(out))
+	}
+	if out[0].GetMin() != -60 || out[0].GetMax() != 0 {
+		t.Errorf("threshold default = %d..%d, want -60..0", out[0].GetMin(), out[0].GetMax())
+	}
+	if out[1].GetMin() != 2 || out[1].GetMax() != 8 {
+		t.Errorf("explicit range was overwritten: %d..%d", out[1].GetMin(), out[1].GetMax())
+	}
+}
+
+// An XYPAD's two axes must travel together, and the mode decides which rwp
+// message carries them.
+func TestEventToRWPVectorAndText(t *testing.T) {
+	abs := EventToRWP(&gen.WidgetEvent{
+		HwcId: 100,
+		Kind:  &gen.WidgetEvent_Vector{Vector: &gen.VectorEv{Value: []int32{250, 750}}},
+	})
+	if abs.GetAbsoluteVector() == nil || abs.GetSpeedVector() != nil {
+		t.Fatalf("absolute mode produced %+v", abs)
+	}
+	if v := abs.GetAbsoluteVector().GetValue(); len(v) != 2 || v[0] != 250 || v[1] != 750 {
+		t.Errorf("absolute vector = %v", v)
+	}
+
+	rel := EventToRWP(&gen.WidgetEvent{
+		HwcId: 100,
+		Kind:  &gen.WidgetEvent_Vector{Vector: &gen.VectorEv{Value: []int32{-3, 4}, Relative: true}},
+	})
+	if rel.GetSpeedVector() == nil || rel.GetAbsoluteVector() != nil {
+		t.Fatalf("relative mode produced %+v", rel)
+	}
+	if v := rel.GetSpeedVector().GetValue(); len(v) != 2 || v[0] != -3 || v[1] != 4 {
+		t.Errorf("speed vector = %v", v)
+	}
+
+	// AbsoluteVector is unsigned on the wire, so a stray negative must clamp rather
+	// than wrap into a coordinate near 4 billion.
+	clamped := EventToRWP(&gen.WidgetEvent{
+		HwcId: 100,
+		Kind:  &gen.WidgetEvent_Vector{Vector: &gen.VectorEv{Value: []int32{-5, 10}}},
+	})
+	if v := clamped.GetAbsoluteVector().GetValue(); v[0] != 0 {
+		t.Errorf("negative absolute axis = %d, want 0", v[0])
+	}
+
+	txt := EventToRWP(&gen.WidgetEvent{
+		HwcId: 100,
+		Kind:  &gen.WidgetEvent_Text{Text: &gen.TextEv{Value: "CAM 4"}},
+	})
+	if txt.GetText().GetValue() != "CAM 4" {
+		t.Errorf("text event = %+v", txt.GetText())
+	}
+}
+
+// The new option fields must actually reach the renderer — widgetToDef silently
+// dropped every one of them before this change.
+func TestWidgetOptionsReachTheRenderer(t *testing.T) {
+	tree := ConfigToWidgetTree(&rwp.TouchUIConfig{
+		Pages: []*rwp.TouchUIPage{{
+			Id: 1,
+			Widgets: []*rwp.TouchUIWidget{
+				{HWCID: 100, Type: rwp.TouchUIWidget_ROLLER,
+					Options: &rwp.TouchUIWidgetOptions{Choices: []string{"a", "b"}}},
+				{HWCID: 101, Type: rwp.TouchUIWidget_XYPAD,
+					Options: &rwp.TouchUIWidgetOptions{Relative: true}},
+				{HWCID: 102, Type: rwp.TouchUIWidget_LABEL,
+					Options: &rwp.TouchUIWidgetOptions{
+						EditKind: rwp.TouchUIWidgetOptions_PASSWORD, EditMaxLen: 32}},
+			},
+		}},
+	}, 1, nil)
+
+	defs := tree.GetPages()[0].GetWidgets()
+	if defs[0].GetChoices() != "a\nb" {
+		t.Errorf("choices = %q", defs[0].GetChoices())
+	}
+	if !defs[1].GetRelative() {
+		t.Error("relative was dropped")
+	}
+	if defs[2].GetEditKind() != gen.WidgetDef_EDIT_PASSWORD || defs[2].GetEditMaxLen() != 32 {
+		t.Errorf("edit options = %v/%d", defs[2].GetEditKind(), defs[2].GetEditMaxLen())
+	}
+	if defs[2].GetEventMask()&helpers.TouchUIEventText == 0 {
+		t.Error("editable label did not advertise Text in its event mask")
+	}
+}

@@ -6,6 +6,7 @@ package touchui
 
 import (
 	"fmt"
+	"strings"
 
 	rwp "github.com/SKAARHOJ/rawpanel-lib/ibeam_rawpanel"
 
@@ -105,7 +106,81 @@ func widgetToDef(w *rwp.TouchUIWidget) *gen.WidgetDef {
 		NoTap:     opts.GetNoTapEvents(),
 		Momentary: opts.GetMomentary(),
 		FourWay:   opts.GetFourWay(),
+
+		Choices:      joinChoices(opts.GetChoices()),
+		Relative:     opts.GetRelative(),
+		CenterReturn: opts.GetCenterReturn(),
+		Params:       compressorParams(opts.GetParams()),
+		EditKind:     gen.WidgetDef_EditKind(opts.GetEditKind()),
+		EditMaxLen:   opts.GetEditMaxLen(),
+		EventMask:    EffectiveEventMask(w),
 	}
+}
+
+// joinChoices renders a ROLLER's options as the single '\n'-joined string the renderer wants
+// (it feeds lv_roller_set_options directly). Truncation happens here rather than being an
+// error, because ConfigToWidgetTree also runs on panel-local configs that never pass through
+// Validate — a too-long list should degrade, not produce a broken widget.
+func joinChoices(choices []string) string {
+	if len(choices) == 0 {
+		return ""
+	}
+	if len(choices) > MaxChoices {
+		choices = choices[:MaxChoices]
+	}
+	out := make([]string, len(choices))
+	for i, c := range choices {
+		// A newline inside a label would split one option into two and shift every index
+		// after it, desyncing the domain the client emits against.
+		c = strings.NewReplacer("\r", " ", "\n", " ").Replace(c)
+		if len(c) > MaxChoiceLen {
+			c = c[:MaxChoiceLen]
+		}
+		out[i] = c
+	}
+	return strings.Join(out, "\n")
+}
+
+// compressorRoleDefaults is the natural-unit range each role gets when a client leaves
+// Min/Max at 0/0. Resolved here, in Go, so the renderer never has to carry a role table and
+// the mapping stays in one testable place.
+var compressorRoleDefaults = map[rwp.TouchUICompressorParam_RoleE][2]int32{
+	rwp.TouchUICompressorParam_THRESHOLD: {-60, 0},  // dB
+	rwp.TouchUICompressorParam_RATIO:     {1, 20},   // n:1
+	rwp.TouchUICompressorParam_KNEE:      {0, 24},   // dB
+	rwp.TouchUICompressorParam_MAKEUP:    {0, 24},   // dB
+	rwp.TouchUICompressorParam_ATTACK:    {0, 500},  // ms
+	rwp.TouchUICompressorParam_RELEASE:   {0, 5000}, // ms
+}
+
+func compressorParams(params []*rwp.TouchUICompressorParam) []*gen.CompressorParam {
+	if len(params) == 0 {
+		return nil
+	}
+	if len(params) > MaxCompressorParams {
+		params = params[:MaxCompressorParams]
+	}
+	out := make([]*gen.CompressorParam, 0, len(params))
+	for _, p := range params {
+		min, max := p.GetMin(), p.GetMax()
+		if min == 0 && max == 0 {
+			if def, ok := compressorRoleDefaults[p.GetRole()]; ok {
+				min, max = def[0], def[1]
+			}
+		}
+		label := p.GetLabel()
+		if len(label) > MaxParamLabelLen {
+			label = label[:MaxParamLabelLen]
+		}
+		out = append(out, &gen.CompressorParam{
+			HwcId: p.GetHWCID(),
+			Role:  gen.CompressorParam_Role(p.GetRole()),
+			Min:   min,
+			Max:   max,
+			Label: label,
+		})
+	}
+	return out
 }
 
 func resolveFeed(w *rwp.TouchUIWidget, ordinal int, resolve FeedResolver) *gen.VideoFeed {
@@ -198,6 +273,25 @@ func EventToRWP(ev *gen.WidgetEvent) *rwp.HWCEvent {
 		out.Pulsed = &rwp.PulsedEvent{Value: kind.Pulsed.GetValue()}
 	case *gen.WidgetEvent_Absolute:
 		out.Absolute = &rwp.AbsoluteEvent{Value: uint32(kind.Absolute.GetValue())}
+	case *gen.WidgetEvent_Vector:
+		// One renderer arm, two RWP messages: an XYPAD in relative mode reports movement
+		// (SpeedVector), otherwise position (AbsoluteVector). The absolute form is unsigned
+		// on the wire, so clamp — a negative here would wrap into a huge coordinate.
+		vals := kind.Vector.GetValue()
+		if kind.Vector.GetRelative() {
+			out.SpeedVector = &rwp.SpeedVectorEvent{Value: append([]int32(nil), vals...)}
+		} else {
+			abs := make([]uint32, len(vals))
+			for i, v := range vals {
+				if v < 0 {
+					v = 0
+				}
+				abs[i] = uint32(v)
+			}
+			out.AbsoluteVector = &rwp.AbsoluteVectorEvent{Value: abs}
+		}
+	case *gen.WidgetEvent_Text:
+		out.Text = &rwp.TextEvent{Value: kind.Text.GetValue()}
 	default:
 		return nil
 	}
