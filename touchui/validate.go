@@ -2,6 +2,7 @@ package touchui
 
 import (
 	"fmt"
+	"strings"
 
 	rwp "github.com/SKAARHOJ/rawpanel-lib/ibeam_rawpanel"
 )
@@ -15,6 +16,12 @@ const (
 	MaxTitleLen       = 23
 	MaxSourceLen      = 127
 	MaxVideoWidgets   = 4 // pi DRM video planes
+
+	MaxChoices          = 32 // ROLLER: entries in Options.Choices
+	MaxChoiceLen        = 23
+	MaxCompressorParams = 6 // COMPRESSOR: one per RoleE
+	MaxParamLabelLen    = 15
+	MaxEditLen          = 63 // LABEL: Options.EditMaxLen ceiling
 )
 
 // Validate checks a TouchUIConfig against the panel's static limits and its
@@ -72,6 +79,9 @@ func Validate(cfg *rwp.TouchUIConfig) error {
 					return fmt.Errorf("widget %d video source exceeds %d bytes", widget.GetHWCID(), MaxSourceLen)
 				}
 			}
+			if err := validateWidgetOptions(widget, hwcIDs); err != nil {
+				return err
+			}
 		}
 	}
 
@@ -80,6 +90,84 @@ func Validate(cfg *rwp.TouchUIConfig) error {
 	}
 	if want := cfg.GetActivePage(); want != 0 && !pageIDs[want] {
 		return fmt.Errorf("ActivePage %d is not a declared page", want)
+	}
+	return nil
+}
+
+// validateWidgetOptions checks the per-type Options of one widget. hwcIDs is the running
+// set of ids claimed so far and is MUTATED here: compressor member parameters are
+// addressable HWCs in their own right and share the widget id space, so they must be
+// registered alongside widget ids. A member colliding with a widget (or with another
+// compressor's member) would make the renderer's lookup and the core's state store
+// ambiguous, routing a fader's state to the wrong thing — so it is rejected up front.
+func validateWidgetOptions(widget *rwp.TouchUIWidget, hwcIDs map[uint32]bool) error {
+	id := widget.GetHWCID()
+	opts := widget.GetOptions()
+
+	if opts.GetEditKind() != rwp.TouchUIWidgetOptions_NONE && widget.GetType() != rwp.TouchUIWidget_LABEL {
+		return fmt.Errorf("widget %d: EditKind is only valid on a LABEL", id)
+	}
+	if opts.GetEditMaxLen() > MaxEditLen {
+		return fmt.Errorf("widget %d: EditMaxLen %d exceeds the maximum of %d", id, opts.GetEditMaxLen(), MaxEditLen)
+	}
+
+	switch widget.GetType() {
+	case rwp.TouchUIWidget_ROLLER:
+		choices := opts.GetChoices()
+		if len(choices) == 0 {
+			return fmt.Errorf("widget %d: ROLLER has no Choices", id)
+		}
+		if len(choices) > MaxChoices {
+			return fmt.Errorf("widget %d: %d Choices exceeds the maximum of %d", id, len(choices), MaxChoices)
+		}
+		for i, c := range choices {
+			if len(c) > MaxChoiceLen {
+				return fmt.Errorf("widget %d: choice %d exceeds %d bytes", id, i, MaxChoiceLen)
+			}
+			// Choices reach the renderer newline-joined (the format lv_roller wants), so an
+			// embedded newline would silently split one option into two and shift every
+			// index after it — exactly the desync the fixed-list rule exists to prevent.
+			if strings.ContainsAny(c, "\r\n") {
+				return fmt.Errorf("widget %d: choice %d contains a line break", id, i)
+			}
+		}
+
+	case rwp.TouchUIWidget_XYPAD:
+		if opts.GetRelative() && opts.GetCenterReturn() {
+			return fmt.Errorf("widget %d: CenterReturn is meaningless with Relative — a delta pad has no position to return to", id)
+		}
+
+	case rwp.TouchUIWidget_COMPRESSOR:
+		params := opts.GetParams()
+		if len(params) == 0 {
+			return fmt.Errorf("widget %d: COMPRESSOR has no Params", id)
+		}
+		if len(params) > MaxCompressorParams {
+			return fmt.Errorf("widget %d: %d Params exceeds the maximum of %d", id, len(params), MaxCompressorParams)
+		}
+		roles := map[rwp.TouchUICompressorParam_RoleE]bool{}
+		for _, p := range params {
+			pid := p.GetHWCID()
+			if pid == 0 {
+				return fmt.Errorf("widget %d: compressor param HWC id 0 is reserved", id)
+			}
+			if hwcIDs[pid] {
+				return fmt.Errorf("compressor param HWC id %d (widget %d) collides with another HWC id", pid, id)
+			}
+			hwcIDs[pid] = true
+			if roles[p.GetRole()] {
+				return fmt.Errorf("widget %d: duplicate compressor role %v", id, p.GetRole())
+			}
+			roles[p.GetRole()] = true
+			if len(p.GetLabel()) > MaxParamLabelLen {
+				return fmt.Errorf("widget %d: compressor param %d label exceeds %d bytes", id, pid, MaxParamLabelLen)
+			}
+			// 0/0 means "panel default for the role" and is resolved later; any other
+			// pair must describe a real range or the 0..1000 mapping collapses.
+			if (p.GetMin() != 0 || p.GetMax() != 0) && p.GetMin() >= p.GetMax() {
+				return fmt.Errorf("widget %d: compressor param %d has an empty range %d..%d", id, pid, p.GetMin(), p.GetMax())
+			}
+		}
 	}
 	return nil
 }

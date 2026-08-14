@@ -36,10 +36,16 @@ const touchUIPageCanvasH = 1000
 const touchUIMaxDispW = 256
 const touchUIMaxDispH = 160
 
-func touchUITypeIndexKey(t rwp.TouchUIWidget_WidgetTypeE, vertical bool) uint32 {
+// touchUITypeIndexKey derives the TypeIndex key for a widget. It MUST discriminate on every
+// option that changes the type def below, or two widgets of the same type with different
+// options collide in TypeIndex and the second silently inherits the first's drawing.
+func touchUITypeIndexKey(t rwp.TouchUIWidget_WidgetTypeE, opts *rwp.TouchUIWidgetOptions) uint32 {
 	key := touchUITypeBase + uint32(t)
-	if vertical {
+	if opts.GetVertical() {
 		key += 50 // orientation variants get their own type defs (e.g. vertical sliders)
+	}
+	if t == rwp.TouchUIWidget_LABEL && opts.GetEditKind() != rwp.TouchUIWidgetOptions_NONE {
+		key += 100 // an editable label draws as a field with a caret and takes input
 	}
 	return key
 }
@@ -102,7 +108,8 @@ func scaleTypeDef(def topology.TopologyHWcTypeDef, scaleX, scaleY float64) topol
 	return out
 }
 
-func touchUITypeDef(t rwp.TouchUIWidget_WidgetTypeE, vertical bool) topology.TopologyHWcTypeDef {
+func touchUITypeDef(t rwp.TouchUIWidget_WidgetTypeE, opts *rwp.TouchUIWidgetOptions) topology.TopologyHWcTypeDef {
+	vertical := opts.GetVertical()
 	def := topology.TopologyHWcTypeDef{
 		W:      touchUICellTenthMM - touchUICellGapTenthMM,
 		H:      touchUICellTenthMM - touchUICellGapTenthMM,
@@ -168,6 +175,19 @@ func touchUITypeDef(t rwp.TouchUIWidget_WidgetTypeE, vertical bool) topology.Top
 	case rwp.TouchUIWidget_LABEL:
 		def.Desc = "TouchUI label"
 		def.Disp = &topology.TopologyHWcTypeDef_Display{W: 20, H: 3, Subidx: -1, Type: "text"}
+		if opts.GetEditKind() != rwp.TouchUIWidgetOptions_NONE {
+			// A tap opens the keyboard and the commit rides a Text event, for which the
+			// topology "in" vocabulary has no letter. "b" is the honest minimum — it says
+			// the component takes a touch, which every client already understands.
+			def.In = "b"
+			def.Desc = "TouchUI editable label"
+			def.Sub = []topology.TopologyHWcTypeDefSubEl{
+				subRect(-170, -40, 340, 80, 6, touchUIStyleFrame), // the field
+				subRect(150, -26, 4, 52, 0, touchUIStyleHandle),   // the caret
+			}
+		} else if !opts.GetNoTapEvents() {
+			def.In = "b" // labels have always emitted taps; the topology just never said so
+		}
 	case rwp.TouchUIWidget_IMAGE:
 		def.In = "b" // tap events (unless NoTapEvents)
 		def.Desc = "TouchUI image"
@@ -249,10 +269,10 @@ func TouchUIConfigToTopology(cfg *rwp.TouchUIConfig) *topology.Topology {
 		}
 
 		for _, widget := range page.GetWidgets() {
-			vertical := widget.GetOptions().GetVertical()
-			typeKey := touchUITypeIndexKey(widget.GetType(), vertical)
+			wOpts := widget.GetOptions()
+			typeKey := touchUITypeIndexKey(widget.GetType(), wOpts)
 			if _, known := top.TypeIndex[typeKey]; !known {
-				top.TypeIndex[typeKey] = touchUITypeDef(widget.GetType(), vertical)
+				top.TypeIndex[typeKey] = touchUITypeDef(widget.GetType(), wOpts)
 			}
 
 			comp := topology.TopologyHWcomponent{
@@ -282,7 +302,7 @@ func TouchUIConfigToTopology(cfg *rwp.TouchUIConfig) *topology.Topology {
 				// single cell (a horizontal slider defaults to two cells wide, a roller two
 				// tall), so scale to the span always — not only when it is >1 — otherwise a
 				// single-cell widget keeps its oversized default and spills past the screen.
-				base := touchUITypeDef(widget.GetType(), vertical)
+				base := touchUITypeDef(widget.GetType(), wOpts)
 				spanW := int(float64(colSpan)*cellW - gapW)
 				spanH := int(float64(rowSpan)*cellH - gapH)
 				override := scaleTypeDef(base, ratio(spanW, base.W), ratio(spanH, base.H))
@@ -294,7 +314,7 @@ func TouchUIConfigToTopology(cfg *rwp.TouchUIConfig) *topology.Topology {
 				comp.X = int(widget.GetX())
 				comp.Y = int(widget.GetY())
 				if widget.GetW() > 0 || widget.GetH() > 0 {
-					override := touchUITypeDef(widget.GetType(), vertical)
+					override := touchUITypeDef(widget.GetType(), wOpts)
 					override.W = int(widget.GetW())
 					override.H = int(widget.GetH())
 					comp.TypeOverride = &override
@@ -314,7 +334,7 @@ func TouchUIConfigToTopology(cfg *rwp.TouchUIConfig) *topology.Topology {
 
 // mergeTypeKeyOffset shifts TouchUI widget type-index keys into a high range when merging
 // with a native topology. Widget type keys are touchUITypeBase (100) + widget-type ordinal
-// (+50 vertical), i.e. ~100..157 — squarely inside the range panels use for native type
+// (+50 vertical, +100 editable label), i.e. ~100..205 — squarely inside the range panels use for native type
 // keys (the AirFlyTouch uses 130/132/135/136/140/324). Offsetting by a large constant keeps
 // the two sets disjoint in the merged TypeIndex.
 const mergeTypeKeyOffset uint32 = 100000

@@ -274,6 +274,46 @@ func TestTouchUIOutbound(t *testing.T) {
 			[]string{"map=201:2147483849"},
 			[]string{"map=201:2147483849"},
 		},
+
+		// Text events (editable LABEL commits). The value is the rest of the line,
+		// so nothing needs escaping — that is the whole point of the encoding.
+		{
+			[]string{"HWC#100=Text:hello world"},
+			[]string{"HWC#100=Text:hello world"},
+		},
+		{
+			// Empty is legal: the user cleared the field. Must not be dropped.
+			[]string{"HWC#100=Text:"},
+			[]string{"HWC#100=Text:"},
+		},
+		{
+			// The delimiters that break every other line format survive verbatim.
+			[]string{"HWC#100=Text:a,b:c=d"},
+			[]string{"HWC#100=Text:a,b:c=d"},
+		},
+		{
+			[]string{"HWC#100=Text:192.168.1.10"},
+			[]string{"HWC#100=Text:192.168.1.10"},
+		},
+		{
+			// Leading/trailing spaces belong to the value (a password may end in one).
+			[]string{"HWC#100=Text:  padded  "},
+			[]string{"HWC#100=Text:  padded  "},
+		},
+
+		// Regression guards: adding Text: must not have widened the numeric forms.
+		{
+			[]string{"HWC#100=Abs:57"}, // scalar stays scalar, not a 1-element vector
+			[]string{"HWC#100=Abs:57"},
+		},
+		{
+			[]string{"HWC#100=Abs:250,750"}, // XYPAD position
+			[]string{"HWC#100=Abs:250,750"},
+		},
+		{
+			[]string{"HWC#100=Speed:-3,4"}, // XYPAD relative movement
+			[]string{"HWC#100=Speed:-3,4"},
+		},
 	}
 
 	for i, tt := range tests {
