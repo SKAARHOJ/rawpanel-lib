@@ -302,7 +302,200 @@ func TrimExplode(str string, token string) []string {
 	return outputStrings
 }
 
-// Port of similar function in UniSketch:
+// TileTextSettings are the per-tile settings the panel applies around WriteDisplayTileNew.
+// On a panel they come from hwconfig.json (Tiles.<name>.Border / WShrink / HShrink /
+// TextBorderPct / TextScale, each falling back to the Displays.<name> value); on a Raw Panel
+// client they come from the topology display definition - see TileTextSettingsFromDisp.
+//
+// The zero value is the legacy behaviour: no inset, no magnification.
+type TileTextSettings struct {
+	// Shrink is the W+H shrink bitmask: bit0 cuts a pixel off the right edge, bit1 off the
+	// bottom. Ignored when BorderPct > 0 or Scale > 1.
+	Shrink int
+
+	// Border is a fixed inset in pixels on all four sides, used only when BorderPct is 0.
+	// It is deliberately not divided by Scale: with Scale > 1 it applies to the reduced
+	// canvas and so comes out Scale times larger on screen, which is what
+	// borderPixelsForTile() in ibeam-hardware does.
+	Border int
+
+	// BorderPct is the inset as a percentage of the tile's shortest side. When > 0 it
+	// replaces Border and forces Shrink to 0.
+	BorderPct int
+
+	// Scale magnifies the text: the tile is rasterised into a round(W/Scale) x
+	// round(H/Scale) canvas and then upscaled, so glyphs come out Scale times bigger.
+	// Values <= 1 mean 1:1.
+	Scale float64
+}
+
+// TextTileBorderPixels returns the pixel inset to use when rendering an HWCText into a
+// w x h tile. Port of borderPixelsForTile() in ibeam-hardware/src/RawPanelHelpers.cpp.
+//
+// With borderPct > 0 the inset is min(w,h) * borderPct / 100 using integer truncation (not
+// rounding), clamped to 255; otherwise the fixed border is returned unchanged. The C++ and
+// UniSketch renderers have to agree with this exactly, so the truncation is deliberate.
+func TextTileBorderPixels(border int, borderPct int, w int, h int) int {
+	if borderPct <= 0 {
+		return su.ConstrainValue(border, 0, 255)
+	}
+
+	short := su.ConstrainValue(su.Qint(h < w, h, w), 0, 1<<30)
+	return su.ConstrainValue(short*borderPct/100, 0, 255)
+}
+
+// isIntegerTextScale reports whether scale is a whole number within the tolerance the panel
+// uses to pick nearest-neighbour resampling over bilinear.
+func isIntegerTextScale(scale float64) bool {
+	return math.Abs(scale-math.Round(scale)) < 0.01
+}
+
+// RenderHWCTextToTile renders an HWCText into a width x height tile, applying that tile's
+// TextBorderPct and TextScale. It is the Go counterpart of renderHWCTextToTile() in
+// ibeam-hardware/src/RawPanelHelpers.cpp and is what Raw Panel clients should call;
+// WriteDisplayTileNew below is the inner rasteriser and knows nothing about these settings.
+//
+// With Scale <= 1 and BorderPct == 0 this is exactly WriteDisplayTileNew(textStruct, width,
+// height, settings.Shrink, settings.Border), so the panels that set neither - which today is
+// all of them bar the Flywheel - render byte for byte as they did before these settings
+// existed.
+//
+// With Scale > 1 the tile is rasterised into a round(width/Scale) x round(height/Scale)
+// canvas, with the inset recomputed at that smaller size and Shrink forced to 0, and then
+// resampled back up: nearest-neighbour for integer scales so glyph pixels stay square
+// blocks, bilinear otherwise so a fractional scale does not render one stroke 2px and the
+// next 3px.
+func RenderHWCTextToTile(textStruct *rwp.HWCText, width int, height int, settings TileTextSettings) image.Image {
+	if width < 1 || height < 1 {
+		return image.NewRGBA(image.Rect(0, 0, 0, 0))
+	}
+
+	scale := settings.Scale
+	if scale <= 1 { // Legacy path: rasterise straight into the tile.
+		shrink := settings.Shrink
+		if settings.BorderPct > 0 { // A percentage border replaces the shrink entirely.
+			shrink = 0
+		}
+		return renderTextTileImage(textStruct, width, height, shrink, TextTileBorderPixels(settings.Border, settings.BorderPct, width, height))
+	}
+
+	// Magnified: rasterise small, then blow it back up to the tile size. Note the "+ 0.5"
+	// rather than math.Round, to stay greppable against the C++ - and that it rounds up, so
+	// e.g. a 205 wide tile at scale 2 renders 103 wide, not 102.
+	sw := su.ConstrainValue(int(float64(width)/scale+0.5), 1, width)
+	sh := su.ConstrainValue(int(float64(height)/scale+0.5), 1, height)
+
+	small := renderTextTileImage(textStruct, sw, sh, 0, TextTileBorderPixels(settings.Border, settings.BorderPct, sw, sh))
+
+	if isIntegerTextScale(scale) {
+		return scaleTextNearest(small, width, height)
+	}
+	return scaleTextSmooth(small, width, height)
+}
+
+// renderTextTileImage rasterises an HWCText at exactly w x h and hands it back as an image.
+// It goes through RwpImgToImage rather than reading the RGB16 slice directly because this
+// library packs RGB16 blue-high/red-low, and RwpImgToImage is the one place that knows it.
+func renderTextTileImage(textStruct *rwp.HWCText, w int, h int, shrink int, border int) image.Image {
+	disp := WriteDisplayTileNew(textStruct, w, h, shrink, border)
+
+	return RwpImgToImage(&rwp.HWCGfx{
+		W:         uint32(w),
+		H:         uint32(h),
+		ImageData: disp.GetImgSliceRGB(),
+		ImageType: rwp.HWCGfx_RGB16bit,
+	}, w, h)
+}
+
+// scaleTextNearest nearest-neighbour scales src to w x h using the same integer sampling as
+// the panel (sx = dx*sw/w), so every source pixel becomes an even block and text stays crisp
+// and chunky.
+func scaleTextNearest(src image.Image, w int, h int) image.Image {
+	dst := image.NewRGBA(image.Rect(0, 0, w, h))
+	if src == nil {
+		return dst
+	}
+
+	bounds := src.Bounds()
+	sw, sh := bounds.Dx(), bounds.Dy()
+	if sw < 1 || sh < 1 {
+		return dst
+	}
+
+	for y := 0; y < h; y++ {
+		sy := bounds.Min.Y + y*sh/h
+		for x := 0; x < w; x++ {
+			dst.Set(x, y, src.At(bounds.Min.X+x*sw/w, sy))
+		}
+	}
+	return dst
+}
+
+// scaleTextSmooth bilinearly scales src to w x h, which is what the panel uses for
+// fractional text scales: nearest-neighbour at, say, 1.7x renders one vertical stroke 2px
+// and the next 3px, which reads as lumpy. Softer edges are the price.
+func scaleTextSmooth(src image.Image, w int, h int) image.Image {
+	dst := image.NewRGBA(image.Rect(0, 0, w, h))
+	if src == nil {
+		return dst
+	}
+
+	bounds := src.Bounds()
+	sw, sh := bounds.Dx(), bounds.Dy()
+	if sw < 1 || sh < 1 {
+		return dst
+	}
+
+	// Normalise to an origin-0 RGBA so the sample coordinates below line up.
+	rgba, ok := src.(*image.RGBA)
+	if !ok || bounds.Min != (image.Point{}) {
+		rgba = image.NewRGBA(image.Rect(0, 0, sw, sh))
+		draw.Draw(rgba, rgba.Bounds(), src, bounds.Min, draw.Src)
+	}
+
+	for y := 0; y < h; y++ {
+		// Centre-aligned source coordinate, avoiding the half-pixel shift that a
+		// corner-aligned mapping bakes in.
+		sy := (float64(y)+0.5)*float64(sh)/float64(h) - 0.5
+		for x := 0; x < w; x++ {
+			sx := (float64(x)+0.5)*float64(sw)/float64(w) - 0.5
+			r, g, b := bilinearSampleRGB(rgba, sx, sy)
+			offset := dst.PixOffset(x, y)
+			dst.Pix[offset+0] = r
+			dst.Pix[offset+1] = g
+			dst.Pix[offset+2] = b
+			dst.Pix[offset+3] = 0xff
+		}
+	}
+	return dst
+}
+
+// bilinearSampleRGB samples src at a fractional coordinate, clamping at the edges.
+func bilinearSampleRGB(src *image.RGBA, x float64, y float64) (uint8, uint8, uint8) {
+	bounds := src.Bounds()
+	x0 := su.ConstrainValue(int(math.Floor(x)), bounds.Min.X, bounds.Max.X-1)
+	y0 := su.ConstrainValue(int(math.Floor(y)), bounds.Min.Y, bounds.Max.Y-1)
+	x1 := su.ConstrainValue(x0+1, bounds.Min.X, bounds.Max.X-1)
+	y1 := su.ConstrainValue(y0+1, bounds.Min.Y, bounds.Max.Y-1)
+
+	c00 := src.RGBAAt(x0, y0)
+	c10 := src.RGBAAt(x1, y0)
+	c01 := src.RGBAAt(x0, y1)
+	c11 := src.RGBAAt(x1, y1)
+
+	xf := x - math.Floor(x)
+	yf := y - math.Floor(y)
+
+	lerp := func(a, b, t float64) float64 { return a + t*(b-a) }
+	mix := func(v00, v10, v01, v11 uint8) uint8 {
+		return uint8(lerp(lerp(float64(v00), float64(v10), xf), lerp(float64(v01), float64(v11), xf), yf))
+	}
+
+	return mix(c00.R, c10.R, c01.R, c11.R), mix(c00.G, c10.G, c01.G, c11.G), mix(c00.B, c10.B, c01.B, c11.B)
+}
+
+// Port of similar function in UniSketch. This is the inner rasteriser: most callers want
+// RenderHWCTextToTile, which additionally applies the tile's TextBorderPct and TextScale.
 func WriteDisplayTileNew(textStruct *rwp.HWCText, width int, height int, shrink int, border int) monogfx.MonoImg { // Border and shrink shall come from info about the tile we render onto...
 
 	if textStruct.TextStyling == nil {

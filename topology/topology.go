@@ -83,6 +83,14 @@ type TopologyHWcTypeDef_Display struct {
 	Shrink int    `json:"shrink,omitempty"`    // W+H Shrink. W=bit0, H=bit1. W-shrink cuts a pixel off in the right side of tile. H-shrink cuts a pixel off in the bottom of tile.
 	Border int    `json:"txtborder,omitempty"` // Txt Border (shall match that used by ibeam-hardware and UniSketch for rendering)
 
+	// TextBorderPct and TextScale are the remaining two HWCText render settings a tile can
+	// carry. Like Border they are mirrored from the panel's hwconfig.json (keys TextBorderPct
+	// and TextScale) and shall match it, so that a Raw Panel client rendering HWCText itself -
+	// reactor's simulator, say - produces what the panel produces. They have no effect on
+	// HWCGfx. See rawpanellib.RenderHWCTextToTile.
+	TextBorderPct int     `json:"txtborderpct,omitempty"` // Txt Border as a percentage of the display's shortest side. Replaces Border, and disables Shrink, when >0.
+	TextScale     float64 `json:"txtscale,omitempty"`     // Text magnification: when >1 the display is rendered at 1/txtscale and upscaled, so text comes out that many times bigger.
+
 	Curve *TopologyHWcTypeDef_DisplayCurve `json:"curve,omitempty"` // If set, the display is drawn bent along a circular arc (physically wrapped around e.g. a jog wheel) instead of as a flat rectangle.
 }
 
