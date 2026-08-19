@@ -186,8 +186,14 @@ func TestTouchUIConfigToTopology(t *testing.T) {
 				t.Errorf("free-layout video should carry its pixel size override: %+v", comp.TypeOverride)
 			}
 			def := top.TypeIndex[comp.Type]
-			if def.In != "b" || def.Disp == nil {
-				t.Errorf("VIDEO type def should be tappable with a display: %+v", def)
+			// "b,xy": tappable AND position-reporting. The leading "b" matters — clients read
+			// only the first token, so a video region must still present as a button to
+			// anything that has not been taught about xy input.
+			if def.In != "b,xy" || def.Disp == nil {
+				t.Errorf("VIDEO type def should be tappable and xy with a display: %+v", def)
+			}
+			if got := def.GetInputType(); got != "b" {
+				t.Errorf("VIDEO must still read as a button to clients taking only the first input token, got %q", got)
 			}
 		}
 	}

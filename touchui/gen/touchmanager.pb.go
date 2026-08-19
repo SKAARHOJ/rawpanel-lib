@@ -24,14 +24,17 @@ const (
 type WidgetDef_Type int32
 
 const (
-	WidgetDef_BUTTON     WidgetDef_Type = 0
-	WidgetDef_TOGGLE     WidgetDef_Type = 1
-	WidgetDef_SLIDER     WidgetDef_Type = 2
-	WidgetDef_KNOB       WidgetDef_Type = 3 // analog rotary dial (absolute 0..1000)
-	WidgetDef_METER      WidgetDef_Type = 4
-	WidgetDef_LABEL      WidgetDef_Type = 5
-	WidgetDef_IMAGE      WidgetDef_Type = 6
-	WidgetDef_VIDEO      WidgetDef_Type = 7
+	WidgetDef_BUTTON WidgetDef_Type = 0
+	WidgetDef_TOGGLE WidgetDef_Type = 1
+	WidgetDef_SLIDER WidgetDef_Type = 2
+	WidgetDef_KNOB   WidgetDef_Type = 3 // analog rotary dial (absolute 0..1000)
+	WidgetDef_METER  WidgetDef_Type = 4
+	WidgetDef_LABEL  WidgetDef_Type = 5
+	WidgetDef_IMAGE  WidgetDef_Type = 6
+	WidgetDef_VIDEO  WidgetDef_Type = 7 // live video region; emits vector (+ binary on touch/release) like an XYPAD,
+	// but in IMAGE coordinates: Y is 0 at the TOP, so a touch and an overlay
+	// box share one frame and following a tapped point needs no axis flip.
+	// text.line2, when non-empty, overrides feed.source at runtime.
 	WidgetDef_ENCODER    WidgetDef_Type = 8  // -/press/+ pad: pulses on -/+, binary press in the center
 	WidgetDef_ROLLER     WidgetDef_Type = 9  // discrete 1-of-N wheel; emits absolute(selected index 0..N-1)
 	WidgetDef_XYPAD      WidgetDef_Type = 10 // 2D pad; emits vector (+ binary on touch/release). Y is 0 at the BOTTOM.
@@ -327,7 +330,7 @@ func (x ConfigMenuItem_Type) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use ConfigMenuItem_Type.Descriptor instead.
 func (ConfigMenuItem_Type) EnumDescriptor() ([]byte, []int) {
-	return file_touchmanager_proto_rawDescGZIP(), []int{18, 0}
+	return file_touchmanager_proto_rawDescGZIP(), []int{20, 0}
 }
 
 type ConfigMenuCtl_Op int32
@@ -385,7 +388,7 @@ func (x ConfigMenuCtl_Op) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use ConfigMenuCtl_Op.Descriptor instead.
 func (ConfigMenuCtl_Op) EnumDescriptor() ([]byte, []int) {
-	return file_touchmanager_proto_rawDescGZIP(), []int{20, 0}
+	return file_touchmanager_proto_rawDescGZIP(), []int{22, 0}
 }
 
 type ConfigMenuEvent_Kind int32
@@ -446,7 +449,7 @@ func (x ConfigMenuEvent_Kind) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use ConfigMenuEvent_Kind.Descriptor instead.
 func (ConfigMenuEvent_Kind) EnumDescriptor() ([]byte, []int) {
-	return file_touchmanager_proto_rawDescGZIP(), []int{21, 0}
+	return file_touchmanager_proto_rawDescGZIP(), []int{23, 0}
 }
 
 // Go -> UI envelope: every server frame is one of these.
@@ -817,12 +820,18 @@ func (x *SetSleep) GetDimOnly() bool {
 }
 
 type WidgetTree struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Epoch         uint32                 `protobuf:"varint,1,opt,name=epoch,proto3" json:"epoch,omitempty"` // monotonic config generation; state/gfx carry it
-	Title         string                 `protobuf:"bytes,2,opt,name=title,proto3" json:"title,omitempty"`
-	Pages         []*PageDef             `protobuf:"bytes,3,rep,name=pages,proto3" json:"pages,omitempty"`
-	ActivePage    uint32                 `protobuf:"varint,4,opt,name=active_page,json=activePage,proto3" json:"active_page,omitempty"` // page id shown now (server-owned)
-	Options       *GlobalOptions         `protobuf:"bytes,5,opt,name=options,proto3" json:"options,omitempty"`                          // panel-wide render/diagnostic overlays (Go-digested from TouchUIConfig.Options)
+	state      protoimpl.MessageState `protogen:"open.v1"`
+	Epoch      uint32                 `protobuf:"varint,1,opt,name=epoch,proto3" json:"epoch,omitempty"` // monotonic config generation; state/gfx carry it
+	Title      string                 `protobuf:"bytes,2,opt,name=title,proto3" json:"title,omitempty"`
+	Pages      []*PageDef             `protobuf:"bytes,3,rep,name=pages,proto3" json:"pages,omitempty"`
+	ActivePage uint32                 `protobuf:"varint,4,opt,name=active_page,json=activePage,proto3" json:"active_page,omitempty"` // page id shown now (server-owned)
+	Options    *GlobalOptions         `protobuf:"bytes,5,opt,name=options,proto3" json:"options,omitempty"`                          // panel-wide render/diagnostic overlays (Go-digested from TouchUIConfig.Options)
+	// Overlay markers, FLAT across the whole config rather than nested in the VIDEO widget
+	// that owns them (each carries video_hwc_id instead). WidgetDef is embedded by value
+	// 24x per page and 8x per tree, so a repeated field there is multiplied ~192x in
+	// WidgetTree_size: nesting these would cost tens of KB and blow IPC_BUF_CAP, while the
+	// flat list costs its own size once. See MarkerDef.
+	Markers       []*MarkerDef `protobuf:"bytes,6,rep,name=markers,proto3" json:"markers,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -888,6 +897,13 @@ func (x *WidgetTree) GetActivePage() uint32 {
 func (x *WidgetTree) GetOptions() *GlobalOptions {
 	if x != nil {
 		return x.Options
+	}
+	return nil
+}
+
+func (x *WidgetTree) GetMarkers() []*MarkerDef {
+	if x != nil {
+		return x.Markers
 	}
 	return nil
 }
@@ -1463,6 +1479,101 @@ func (x *VideoFeed) GetHiddenPolicy() VideoFeed_HiddenPolicy {
 	return VideoFeed_KEEP_DECODING
 }
 
+// One overlay marker: a box on a VIDEO widget that is an addressable HWC of its own, so a
+// client that can only emit standard per-HWC state can still place a single box on a widget
+// it shares with others (HWCOverlay is whole-set and cannot be shared that way).
+//
+// The renderer resolves a marker's state exactly like a compressor member's: an id that is
+// not a widget is looked up here, and the box it carries is drawn on top of video_hwc_id's
+// region. Marker boxes are drawn IN ADDITION to that widget's OverlayState.
+//
+// Geometry arrives in the marker's own WidgetState.text.line1 as "x,y" or "x,y,w,h" (decimal,
+// 0..1000 within the video region, same axes as a touch on it — Y down). w/h below fill in the
+// short form. Anything unparseable, including the empty string, hides the box.
+type MarkerDef struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	HwcId         uint32                 `protobuf:"varint,1,opt,name=hwc_id,json=hwcId,proto3" json:"hwc_id,omitempty"`                  // the addressable HWC that positions this box
+	VideoHwcId    uint32                 `protobuf:"varint,2,opt,name=video_hwc_id,json=videoHwcId,proto3" json:"video_hwc_id,omitempty"` // the VIDEO widget it draws on
+	W             uint32                 `protobuf:"varint,3,opt,name=w,proto3" json:"w,omitempty"`                                       // default box size, 0..1000 (0 => renderer default)
+	H             uint32                 `protobuf:"varint,4,opt,name=h,proto3" json:"h,omitempty"`
+	Rgb           uint32                 `protobuf:"varint,5,opt,name=rgb,proto3" json:"rgb,omitempty"`           // default colour, 0xRRGGBB; 0 = accent. WidgetState.color_rgb overrides.
+	Centered      bool                   `protobuf:"varint,6,opt,name=centered,proto3" json:"centered,omitempty"` // x,y is the box CENTRE rather than its top-left corner
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *MarkerDef) Reset() {
+	*x = MarkerDef{}
+	mi := &file_touchmanager_proto_msgTypes[9]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *MarkerDef) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*MarkerDef) ProtoMessage() {}
+
+func (x *MarkerDef) ProtoReflect() protoreflect.Message {
+	mi := &file_touchmanager_proto_msgTypes[9]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use MarkerDef.ProtoReflect.Descriptor instead.
+func (*MarkerDef) Descriptor() ([]byte, []int) {
+	return file_touchmanager_proto_rawDescGZIP(), []int{9}
+}
+
+func (x *MarkerDef) GetHwcId() uint32 {
+	if x != nil {
+		return x.HwcId
+	}
+	return 0
+}
+
+func (x *MarkerDef) GetVideoHwcId() uint32 {
+	if x != nil {
+		return x.VideoHwcId
+	}
+	return 0
+}
+
+func (x *MarkerDef) GetW() uint32 {
+	if x != nil {
+		return x.W
+	}
+	return 0
+}
+
+func (x *MarkerDef) GetH() uint32 {
+	if x != nil {
+		return x.H
+	}
+	return 0
+}
+
+func (x *MarkerDef) GetRgb() uint32 {
+	if x != nil {
+		return x.Rgb
+	}
+	return 0
+}
+
+func (x *MarkerDef) GetCentered() bool {
+	if x != nil {
+		return x.Centered
+	}
+	return false
+}
+
 // Sparse per-widget state delta. Absent sub-messages / unset optionals leave
 // the corresponding aspect untouched.
 type WidgetState struct {
@@ -1480,7 +1591,7 @@ type WidgetState struct {
 
 func (x *WidgetState) Reset() {
 	*x = WidgetState{}
-	mi := &file_touchmanager_proto_msgTypes[9]
+	mi := &file_touchmanager_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1492,7 +1603,7 @@ func (x *WidgetState) String() string {
 func (*WidgetState) ProtoMessage() {}
 
 func (x *WidgetState) ProtoReflect() protoreflect.Message {
-	mi := &file_touchmanager_proto_msgTypes[9]
+	mi := &file_touchmanager_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1505,7 +1616,7 @@ func (x *WidgetState) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use WidgetState.ProtoReflect.Descriptor instead.
 func (*WidgetState) Descriptor() ([]byte, []int) {
-	return file_touchmanager_proto_rawDescGZIP(), []int{9}
+	return file_touchmanager_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *WidgetState) GetEpoch() uint32 {
@@ -1568,7 +1679,7 @@ type ModeState struct {
 
 func (x *ModeState) Reset() {
 	*x = ModeState{}
-	mi := &file_touchmanager_proto_msgTypes[10]
+	mi := &file_touchmanager_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1580,7 +1691,7 @@ func (x *ModeState) String() string {
 func (*ModeState) ProtoMessage() {}
 
 func (x *ModeState) ProtoReflect() protoreflect.Message {
-	mi := &file_touchmanager_proto_msgTypes[10]
+	mi := &file_touchmanager_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1593,7 +1704,7 @@ func (x *ModeState) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ModeState.ProtoReflect.Descriptor instead.
 func (*ModeState) Descriptor() ([]byte, []int) {
-	return file_touchmanager_proto_rawDescGZIP(), []int{10}
+	return file_touchmanager_proto_rawDescGZIP(), []int{11}
 }
 
 func (x *ModeState) GetState() uint32 {
@@ -1633,7 +1744,7 @@ type TextState struct {
 
 func (x *TextState) Reset() {
 	*x = TextState{}
-	mi := &file_touchmanager_proto_msgTypes[11]
+	mi := &file_touchmanager_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1645,7 +1756,7 @@ func (x *TextState) String() string {
 func (*TextState) ProtoMessage() {}
 
 func (x *TextState) ProtoReflect() protoreflect.Message {
-	mi := &file_touchmanager_proto_msgTypes[11]
+	mi := &file_touchmanager_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1658,7 +1769,7 @@ func (x *TextState) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TextState.ProtoReflect.Descriptor instead.
 func (*TextState) Descriptor() ([]byte, []int) {
-	return file_touchmanager_proto_rawDescGZIP(), []int{11}
+	return file_touchmanager_proto_rawDescGZIP(), []int{12}
 }
 
 func (x *TextState) GetTitle() string {
@@ -1714,7 +1825,7 @@ type ValueState struct {
 
 func (x *ValueState) Reset() {
 	*x = ValueState{}
-	mi := &file_touchmanager_proto_msgTypes[12]
+	mi := &file_touchmanager_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1726,7 +1837,7 @@ func (x *ValueState) String() string {
 func (*ValueState) ProtoMessage() {}
 
 func (x *ValueState) ProtoReflect() protoreflect.Message {
-	mi := &file_touchmanager_proto_msgTypes[12]
+	mi := &file_touchmanager_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1739,7 +1850,7 @@ func (x *ValueState) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ValueState.ProtoReflect.Descriptor instead.
 func (*ValueState) Descriptor() ([]byte, []int) {
-	return file_touchmanager_proto_rawDescGZIP(), []int{12}
+	return file_touchmanager_proto_rawDescGZIP(), []int{13}
 }
 
 func (x *ValueState) GetInterpretation() uint32 {
@@ -1766,7 +1877,7 @@ type OverlayState struct {
 
 func (x *OverlayState) Reset() {
 	*x = OverlayState{}
-	mi := &file_touchmanager_proto_msgTypes[13]
+	mi := &file_touchmanager_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1778,7 +1889,7 @@ func (x *OverlayState) String() string {
 func (*OverlayState) ProtoMessage() {}
 
 func (x *OverlayState) ProtoReflect() protoreflect.Message {
-	mi := &file_touchmanager_proto_msgTypes[13]
+	mi := &file_touchmanager_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1791,7 +1902,7 @@ func (x *OverlayState) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use OverlayState.ProtoReflect.Descriptor instead.
 func (*OverlayState) Descriptor() ([]byte, []int) {
-	return file_touchmanager_proto_rawDescGZIP(), []int{13}
+	return file_touchmanager_proto_rawDescGZIP(), []int{14}
 }
 
 func (x *OverlayState) GetBoxes() []*OverlayBox {
@@ -1816,7 +1927,7 @@ type OverlayBox struct {
 
 func (x *OverlayBox) Reset() {
 	*x = OverlayBox{}
-	mi := &file_touchmanager_proto_msgTypes[14]
+	mi := &file_touchmanager_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1828,7 +1939,7 @@ func (x *OverlayBox) String() string {
 func (*OverlayBox) ProtoMessage() {}
 
 func (x *OverlayBox) ProtoReflect() protoreflect.Message {
-	mi := &file_touchmanager_proto_msgTypes[14]
+	mi := &file_touchmanager_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1841,7 +1952,7 @@ func (x *OverlayBox) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use OverlayBox.ProtoReflect.Descriptor instead.
 func (*OverlayBox) Descriptor() ([]byte, []int) {
-	return file_touchmanager_proto_rawDescGZIP(), []int{14}
+	return file_touchmanager_proto_rawDescGZIP(), []int{15}
 }
 
 func (x *OverlayBox) GetId() uint32 {
@@ -1908,7 +2019,7 @@ type WidgetGfx struct {
 
 func (x *WidgetGfx) Reset() {
 	*x = WidgetGfx{}
-	mi := &file_touchmanager_proto_msgTypes[15]
+	mi := &file_touchmanager_proto_msgTypes[16]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1920,7 +2031,7 @@ func (x *WidgetGfx) String() string {
 func (*WidgetGfx) ProtoMessage() {}
 
 func (x *WidgetGfx) ProtoReflect() protoreflect.Message {
-	mi := &file_touchmanager_proto_msgTypes[15]
+	mi := &file_touchmanager_proto_msgTypes[16]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1933,7 +2044,7 @@ func (x *WidgetGfx) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use WidgetGfx.ProtoReflect.Descriptor instead.
 func (*WidgetGfx) Descriptor() ([]byte, []int) {
-	return file_touchmanager_proto_rawDescGZIP(), []int{15}
+	return file_touchmanager_proto_rawDescGZIP(), []int{16}
 }
 
 func (x *WidgetGfx) GetEpoch() uint32 {
@@ -1971,6 +2082,87 @@ func (x *WidgetGfx) GetRgb565() []byte {
 	return nil
 }
 
+// Per-page background image (Go resolves TouchUIPage.Background to native-endian
+// RGB565, downscaled to fit the same 128 KiB cap as WidgetGfx; the renderer draws
+// it as the page's bottom layer and stretches it to the screen, so widgets on top
+// are unaffected). Keyed by page id, not hwc id. A zero-size blob clears the page
+// background. Rides its own arm like WidgetGfx so the union stays size-bounded.
+type PageGfx struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Epoch         uint32                 `protobuf:"varint,1,opt,name=epoch,proto3" json:"epoch,omitempty"`
+	PageId        uint32                 `protobuf:"varint,2,opt,name=page_id,json=pageId,proto3" json:"page_id,omitempty"`
+	W             uint32                 `protobuf:"varint,3,opt,name=w,proto3" json:"w,omitempty"`
+	H             uint32                 `protobuf:"varint,4,opt,name=h,proto3" json:"h,omitempty"`
+	Rgb565        []byte                 `protobuf:"bytes,5,opt,name=rgb565,proto3" json:"rgb565,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *PageGfx) Reset() {
+	*x = PageGfx{}
+	mi := &file_touchmanager_proto_msgTypes[17]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PageGfx) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PageGfx) ProtoMessage() {}
+
+func (x *PageGfx) ProtoReflect() protoreflect.Message {
+	mi := &file_touchmanager_proto_msgTypes[17]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PageGfx.ProtoReflect.Descriptor instead.
+func (*PageGfx) Descriptor() ([]byte, []int) {
+	return file_touchmanager_proto_rawDescGZIP(), []int{17}
+}
+
+func (x *PageGfx) GetEpoch() uint32 {
+	if x != nil {
+		return x.Epoch
+	}
+	return 0
+}
+
+func (x *PageGfx) GetPageId() uint32 {
+	if x != nil {
+		return x.PageId
+	}
+	return 0
+}
+
+func (x *PageGfx) GetW() uint32 {
+	if x != nil {
+		return x.W
+	}
+	return 0
+}
+
+func (x *PageGfx) GetH() uint32 {
+	if x != nil {
+		return x.H
+	}
+	return 0
+}
+
+func (x *PageGfx) GetRgb565() []byte {
+	if x != nil {
+		return x.Rgb565
+	}
+	return nil
+}
+
 type ActivePage struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	PageId        uint32                 `protobuf:"varint,1,opt,name=page_id,json=pageId,proto3" json:"page_id,omitempty"`
@@ -1980,7 +2172,7 @@ type ActivePage struct {
 
 func (x *ActivePage) Reset() {
 	*x = ActivePage{}
-	mi := &file_touchmanager_proto_msgTypes[16]
+	mi := &file_touchmanager_proto_msgTypes[18]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1992,7 +2184,7 @@ func (x *ActivePage) String() string {
 func (*ActivePage) ProtoMessage() {}
 
 func (x *ActivePage) ProtoReflect() protoreflect.Message {
-	mi := &file_touchmanager_proto_msgTypes[16]
+	mi := &file_touchmanager_proto_msgTypes[18]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2005,7 +2197,7 @@ func (x *ActivePage) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ActivePage.ProtoReflect.Descriptor instead.
 func (*ActivePage) Descriptor() ([]byte, []int) {
-	return file_touchmanager_proto_rawDescGZIP(), []int{16}
+	return file_touchmanager_proto_rawDescGZIP(), []int{18}
 }
 
 func (x *ActivePage) GetPageId() uint32 {
@@ -2023,7 +2215,7 @@ type Ping struct {
 
 func (x *Ping) Reset() {
 	*x = Ping{}
-	mi := &file_touchmanager_proto_msgTypes[17]
+	mi := &file_touchmanager_proto_msgTypes[19]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2035,7 +2227,7 @@ func (x *Ping) String() string {
 func (*Ping) ProtoMessage() {}
 
 func (x *Ping) ProtoReflect() protoreflect.Message {
-	mi := &file_touchmanager_proto_msgTypes[17]
+	mi := &file_touchmanager_proto_msgTypes[19]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2048,7 +2240,7 @@ func (x *Ping) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Ping.ProtoReflect.Descriptor instead.
 func (*Ping) Descriptor() ([]byte, []int) {
-	return file_touchmanager_proto_rawDescGZIP(), []int{17}
+	return file_touchmanager_proto_rawDescGZIP(), []int{19}
 }
 
 type ConfigMenuItem struct {
@@ -2070,7 +2262,7 @@ type ConfigMenuItem struct {
 
 func (x *ConfigMenuItem) Reset() {
 	*x = ConfigMenuItem{}
-	mi := &file_touchmanager_proto_msgTypes[18]
+	mi := &file_touchmanager_proto_msgTypes[20]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2082,7 +2274,7 @@ func (x *ConfigMenuItem) String() string {
 func (*ConfigMenuItem) ProtoMessage() {}
 
 func (x *ConfigMenuItem) ProtoReflect() protoreflect.Message {
-	mi := &file_touchmanager_proto_msgTypes[18]
+	mi := &file_touchmanager_proto_msgTypes[20]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2095,7 +2287,7 @@ func (x *ConfigMenuItem) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ConfigMenuItem.ProtoReflect.Descriptor instead.
 func (*ConfigMenuItem) Descriptor() ([]byte, []int) {
-	return file_touchmanager_proto_rawDescGZIP(), []int{18}
+	return file_touchmanager_proto_rawDescGZIP(), []int{20}
 }
 
 func (x *ConfigMenuItem) GetId() string {
@@ -2188,7 +2380,7 @@ type ConfigMenuPage struct {
 
 func (x *ConfigMenuPage) Reset() {
 	*x = ConfigMenuPage{}
-	mi := &file_touchmanager_proto_msgTypes[19]
+	mi := &file_touchmanager_proto_msgTypes[21]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2200,7 +2392,7 @@ func (x *ConfigMenuPage) String() string {
 func (*ConfigMenuPage) ProtoMessage() {}
 
 func (x *ConfigMenuPage) ProtoReflect() protoreflect.Message {
-	mi := &file_touchmanager_proto_msgTypes[19]
+	mi := &file_touchmanager_proto_msgTypes[21]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2213,7 +2405,7 @@ func (x *ConfigMenuPage) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ConfigMenuPage.ProtoReflect.Descriptor instead.
 func (*ConfigMenuPage) Descriptor() ([]byte, []int) {
-	return file_touchmanager_proto_rawDescGZIP(), []int{19}
+	return file_touchmanager_proto_rawDescGZIP(), []int{21}
 }
 
 func (x *ConfigMenuPage) GetPageId() string {
@@ -2267,7 +2459,7 @@ type ConfigMenuCtl struct {
 
 func (x *ConfigMenuCtl) Reset() {
 	*x = ConfigMenuCtl{}
-	mi := &file_touchmanager_proto_msgTypes[20]
+	mi := &file_touchmanager_proto_msgTypes[22]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2279,7 +2471,7 @@ func (x *ConfigMenuCtl) String() string {
 func (*ConfigMenuCtl) ProtoMessage() {}
 
 func (x *ConfigMenuCtl) ProtoReflect() protoreflect.Message {
-	mi := &file_touchmanager_proto_msgTypes[20]
+	mi := &file_touchmanager_proto_msgTypes[22]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2292,7 +2484,7 @@ func (x *ConfigMenuCtl) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ConfigMenuCtl.ProtoReflect.Descriptor instead.
 func (*ConfigMenuCtl) Descriptor() ([]byte, []int) {
-	return file_touchmanager_proto_rawDescGZIP(), []int{20}
+	return file_touchmanager_proto_rawDescGZIP(), []int{22}
 }
 
 func (x *ConfigMenuCtl) GetOp() ConfigMenuCtl_Op {
@@ -2358,7 +2550,7 @@ type ConfigMenuEvent struct {
 
 func (x *ConfigMenuEvent) Reset() {
 	*x = ConfigMenuEvent{}
-	mi := &file_touchmanager_proto_msgTypes[21]
+	mi := &file_touchmanager_proto_msgTypes[23]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2370,7 +2562,7 @@ func (x *ConfigMenuEvent) String() string {
 func (*ConfigMenuEvent) ProtoMessage() {}
 
 func (x *ConfigMenuEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_touchmanager_proto_msgTypes[21]
+	mi := &file_touchmanager_proto_msgTypes[23]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2383,7 +2575,7 @@ func (x *ConfigMenuEvent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ConfigMenuEvent.ProtoReflect.Descriptor instead.
 func (*ConfigMenuEvent) Descriptor() ([]byte, []int) {
-	return file_touchmanager_proto_rawDescGZIP(), []int{21}
+	return file_touchmanager_proto_rawDescGZIP(), []int{23}
 }
 
 func (x *ConfigMenuEvent) GetKind() ConfigMenuEvent_Kind {
@@ -2438,7 +2630,7 @@ type UiEvent struct {
 
 func (x *UiEvent) Reset() {
 	*x = UiEvent{}
-	mi := &file_touchmanager_proto_msgTypes[22]
+	mi := &file_touchmanager_proto_msgTypes[24]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2450,7 +2642,7 @@ func (x *UiEvent) String() string {
 func (*UiEvent) ProtoMessage() {}
 
 func (x *UiEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_touchmanager_proto_msgTypes[22]
+	mi := &file_touchmanager_proto_msgTypes[24]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2463,7 +2655,7 @@ func (x *UiEvent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UiEvent.ProtoReflect.Descriptor instead.
 func (*UiEvent) Descriptor() ([]byte, []int) {
-	return file_touchmanager_proto_rawDescGZIP(), []int{22}
+	return file_touchmanager_proto_rawDescGZIP(), []int{24}
 }
 
 func (x *UiEvent) GetKind() isUiEvent_Kind {
@@ -2564,7 +2756,7 @@ type Hello struct {
 
 func (x *Hello) Reset() {
 	*x = Hello{}
-	mi := &file_touchmanager_proto_msgTypes[23]
+	mi := &file_touchmanager_proto_msgTypes[25]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2576,7 +2768,7 @@ func (x *Hello) String() string {
 func (*Hello) ProtoMessage() {}
 
 func (x *Hello) ProtoReflect() protoreflect.Message {
-	mi := &file_touchmanager_proto_msgTypes[23]
+	mi := &file_touchmanager_proto_msgTypes[25]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2589,7 +2781,7 @@ func (x *Hello) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Hello.ProtoReflect.Descriptor instead.
 func (*Hello) Descriptor() ([]byte, []int) {
-	return file_touchmanager_proto_rawDescGZIP(), []int{23}
+	return file_touchmanager_proto_rawDescGZIP(), []int{25}
 }
 
 func (x *Hello) GetScreenW() uint32 {
@@ -2637,7 +2829,7 @@ type WidgetEvent struct {
 
 func (x *WidgetEvent) Reset() {
 	*x = WidgetEvent{}
-	mi := &file_touchmanager_proto_msgTypes[24]
+	mi := &file_touchmanager_proto_msgTypes[26]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2649,7 +2841,7 @@ func (x *WidgetEvent) String() string {
 func (*WidgetEvent) ProtoMessage() {}
 
 func (x *WidgetEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_touchmanager_proto_msgTypes[24]
+	mi := &file_touchmanager_proto_msgTypes[26]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2662,7 +2854,7 @@ func (x *WidgetEvent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use WidgetEvent.ProtoReflect.Descriptor instead.
 func (*WidgetEvent) Descriptor() ([]byte, []int) {
-	return file_touchmanager_proto_rawDescGZIP(), []int{24}
+	return file_touchmanager_proto_rawDescGZIP(), []int{26}
 }
 
 func (x *WidgetEvent) GetHwcId() uint32 {
@@ -2768,7 +2960,7 @@ type BinaryEv struct {
 
 func (x *BinaryEv) Reset() {
 	*x = BinaryEv{}
-	mi := &file_touchmanager_proto_msgTypes[25]
+	mi := &file_touchmanager_proto_msgTypes[27]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2780,7 +2972,7 @@ func (x *BinaryEv) String() string {
 func (*BinaryEv) ProtoMessage() {}
 
 func (x *BinaryEv) ProtoReflect() protoreflect.Message {
-	mi := &file_touchmanager_proto_msgTypes[25]
+	mi := &file_touchmanager_proto_msgTypes[27]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2793,7 +2985,7 @@ func (x *BinaryEv) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BinaryEv.ProtoReflect.Descriptor instead.
 func (*BinaryEv) Descriptor() ([]byte, []int) {
-	return file_touchmanager_proto_rawDescGZIP(), []int{25}
+	return file_touchmanager_proto_rawDescGZIP(), []int{27}
 }
 
 func (x *BinaryEv) GetPressed() bool {
@@ -2819,7 +3011,7 @@ type PulsedEv struct {
 
 func (x *PulsedEv) Reset() {
 	*x = PulsedEv{}
-	mi := &file_touchmanager_proto_msgTypes[26]
+	mi := &file_touchmanager_proto_msgTypes[28]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2831,7 +3023,7 @@ func (x *PulsedEv) String() string {
 func (*PulsedEv) ProtoMessage() {}
 
 func (x *PulsedEv) ProtoReflect() protoreflect.Message {
-	mi := &file_touchmanager_proto_msgTypes[26]
+	mi := &file_touchmanager_proto_msgTypes[28]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2844,7 +3036,7 @@ func (x *PulsedEv) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PulsedEv.ProtoReflect.Descriptor instead.
 func (*PulsedEv) Descriptor() ([]byte, []int) {
-	return file_touchmanager_proto_rawDescGZIP(), []int{26}
+	return file_touchmanager_proto_rawDescGZIP(), []int{28}
 }
 
 func (x *PulsedEv) GetValue() int32 {
@@ -2863,7 +3055,7 @@ type AbsoluteEv struct {
 
 func (x *AbsoluteEv) Reset() {
 	*x = AbsoluteEv{}
-	mi := &file_touchmanager_proto_msgTypes[27]
+	mi := &file_touchmanager_proto_msgTypes[29]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2875,7 +3067,7 @@ func (x *AbsoluteEv) String() string {
 func (*AbsoluteEv) ProtoMessage() {}
 
 func (x *AbsoluteEv) ProtoReflect() protoreflect.Message {
-	mi := &file_touchmanager_proto_msgTypes[27]
+	mi := &file_touchmanager_proto_msgTypes[29]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2888,7 +3080,7 @@ func (x *AbsoluteEv) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AbsoluteEv.ProtoReflect.Descriptor instead.
 func (*AbsoluteEv) Descriptor() ([]byte, []int) {
-	return file_touchmanager_proto_rawDescGZIP(), []int{27}
+	return file_touchmanager_proto_rawDescGZIP(), []int{29}
 }
 
 func (x *AbsoluteEv) GetValue() uint32 {
@@ -2902,9 +3094,12 @@ func (x *AbsoluteEv) GetValue() uint32 {
 // whether to emit an rwp AbsoluteVectorEvent or a SpeedVectorEvent — two arms would just
 // duplicate the shape, and the renderer already knows which mode it is in. Signed because
 // the relative form carries deltas; the absolute form never sends a negative.
+// Axis orientation is the WIDGET's, not this message's: an XYPAD reports Y up (joystick), a
+// VIDEO region reports Y down (image). Go does not reinterpret either — whatever the renderer
+// measured travels through as-is.
 type VectorEv struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Value         []int32                `protobuf:"zigzag32,1,rep,packed,name=value,proto3" json:"value,omitempty"` // [x,y] 0..1000 with Y up, or [dx,dy] in the same per-edge domain
+	Value         []int32                `protobuf:"zigzag32,1,rep,packed,name=value,proto3" json:"value,omitempty"` // [x,y] 0..1000, or [dx,dy] in the same per-edge domain
 	Relative      bool                   `protobuf:"varint,2,opt,name=relative,proto3" json:"relative,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -2912,7 +3107,7 @@ type VectorEv struct {
 
 func (x *VectorEv) Reset() {
 	*x = VectorEv{}
-	mi := &file_touchmanager_proto_msgTypes[28]
+	mi := &file_touchmanager_proto_msgTypes[30]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2924,7 +3119,7 @@ func (x *VectorEv) String() string {
 func (*VectorEv) ProtoMessage() {}
 
 func (x *VectorEv) ProtoReflect() protoreflect.Message {
-	mi := &file_touchmanager_proto_msgTypes[28]
+	mi := &file_touchmanager_proto_msgTypes[30]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2937,7 +3132,7 @@ func (x *VectorEv) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use VectorEv.ProtoReflect.Descriptor instead.
 func (*VectorEv) Descriptor() ([]byte, []int) {
-	return file_touchmanager_proto_rawDescGZIP(), []int{28}
+	return file_touchmanager_proto_rawDescGZIP(), []int{30}
 }
 
 func (x *VectorEv) GetValue() []int32 {
@@ -2964,7 +3159,7 @@ type TextEv struct {
 
 func (x *TextEv) Reset() {
 	*x = TextEv{}
-	mi := &file_touchmanager_proto_msgTypes[29]
+	mi := &file_touchmanager_proto_msgTypes[31]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2976,7 +3171,7 @@ func (x *TextEv) String() string {
 func (*TextEv) ProtoMessage() {}
 
 func (x *TextEv) ProtoReflect() protoreflect.Message {
-	mi := &file_touchmanager_proto_msgTypes[29]
+	mi := &file_touchmanager_proto_msgTypes[31]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2989,7 +3184,7 @@ func (x *TextEv) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TextEv.ProtoReflect.Descriptor instead.
 func (*TextEv) Descriptor() ([]byte, []int) {
-	return file_touchmanager_proto_rawDescGZIP(), []int{29}
+	return file_touchmanager_proto_rawDescGZIP(), []int{31}
 }
 
 func (x *TextEv) GetValue() string {
@@ -3009,7 +3204,7 @@ type PageSelect struct {
 
 func (x *PageSelect) Reset() {
 	*x = PageSelect{}
-	mi := &file_touchmanager_proto_msgTypes[30]
+	mi := &file_touchmanager_proto_msgTypes[32]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3021,7 +3216,7 @@ func (x *PageSelect) String() string {
 func (*PageSelect) ProtoMessage() {}
 
 func (x *PageSelect) ProtoReflect() protoreflect.Message {
-	mi := &file_touchmanager_proto_msgTypes[30]
+	mi := &file_touchmanager_proto_msgTypes[32]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3034,7 +3229,7 @@ func (x *PageSelect) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PageSelect.ProtoReflect.Descriptor instead.
 func (*PageSelect) Descriptor() ([]byte, []int) {
-	return file_touchmanager_proto_rawDescGZIP(), []int{30}
+	return file_touchmanager_proto_rawDescGZIP(), []int{32}
 }
 
 func (x *PageSelect) GetPageId() uint32 {
@@ -3055,7 +3250,7 @@ type RawTouch struct {
 
 func (x *RawTouch) Reset() {
 	*x = RawTouch{}
-	mi := &file_touchmanager_proto_msgTypes[31]
+	mi := &file_touchmanager_proto_msgTypes[33]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3067,7 +3262,7 @@ func (x *RawTouch) String() string {
 func (*RawTouch) ProtoMessage() {}
 
 func (x *RawTouch) ProtoReflect() protoreflect.Message {
-	mi := &file_touchmanager_proto_msgTypes[31]
+	mi := &file_touchmanager_proto_msgTypes[33]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3080,7 +3275,7 @@ func (x *RawTouch) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RawTouch.ProtoReflect.Descriptor instead.
 func (*RawTouch) Descriptor() ([]byte, []int) {
-	return file_touchmanager_proto_rawDescGZIP(), []int{31}
+	return file_touchmanager_proto_rawDescGZIP(), []int{33}
 }
 
 func (x *RawTouch) GetX() uint32 {
@@ -3102,87 +3297,6 @@ func (x *RawTouch) GetPhase() uint32 {
 		return x.Phase
 	}
 	return 0
-}
-
-// Per-page background image (Go resolves TouchUIPage.Background to native-endian
-// RGB565, downscaled to fit the same 128 KiB cap as WidgetGfx; the renderer draws
-// it as the page's bottom layer and stretches it to the screen, so widgets on top
-// are unaffected). Keyed by page id, not hwc id. A zero-size blob clears the page
-// background. Rides its own arm like WidgetGfx so the union stays size-bounded.
-type PageGfx struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Epoch         uint32                 `protobuf:"varint,1,opt,name=epoch,proto3" json:"epoch,omitempty"`
-	PageId        uint32                 `protobuf:"varint,2,opt,name=page_id,json=pageId,proto3" json:"page_id,omitempty"`
-	W             uint32                 `protobuf:"varint,3,opt,name=w,proto3" json:"w,omitempty"`
-	H             uint32                 `protobuf:"varint,4,opt,name=h,proto3" json:"h,omitempty"`
-	Rgb565        []byte                 `protobuf:"bytes,5,opt,name=rgb565,proto3" json:"rgb565,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *PageGfx) Reset() {
-	*x = PageGfx{}
-	mi := &file_touchmanager_proto_msgTypes[32]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *PageGfx) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*PageGfx) ProtoMessage() {}
-
-func (x *PageGfx) ProtoReflect() protoreflect.Message {
-	mi := &file_touchmanager_proto_msgTypes[32]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use PageGfx.ProtoReflect.Descriptor instead.
-func (*PageGfx) Descriptor() ([]byte, []int) {
-	return file_touchmanager_proto_rawDescGZIP(), []int{32}
-}
-
-func (x *PageGfx) GetEpoch() uint32 {
-	if x != nil {
-		return x.Epoch
-	}
-	return 0
-}
-
-func (x *PageGfx) GetPageId() uint32 {
-	if x != nil {
-		return x.PageId
-	}
-	return 0
-}
-
-func (x *PageGfx) GetW() uint32 {
-	if x != nil {
-		return x.W
-	}
-	return 0
-}
-
-func (x *PageGfx) GetH() uint32 {
-	if x != nil {
-		return x.H
-	}
-	return 0
-}
-
-func (x *PageGfx) GetRgb565() []byte {
-	if x != nil {
-		return x.Rgb565
-	}
-	return nil
 }
 
 var File_touchmanager_proto protoreflect.FileDescriptor
@@ -3211,7 +3325,7 @@ const file_touchmanager_proto_rawDesc = "" +
 	"\x05line1\x18\x03 \x01(\tR\x05line1\x12\x14\n" +
 	"\x05line2\x18\x04 \x01(\tR\x05line2\x12\x14\n" +
 	"\x05blank\x18\x05 \x01(\bR\x05blank\x12\x19\n" +
-	"\bdim_only\x18\x06 \x01(\bR\adimOnly\"\xbd\x01\n" +
+	"\bdim_only\x18\x06 \x01(\bR\adimOnly\"\xf0\x01\n" +
 	"\n" +
 	"WidgetTree\x12\x14\n" +
 	"\x05epoch\x18\x01 \x01(\rR\x05epoch\x12\x14\n" +
@@ -3219,7 +3333,8 @@ const file_touchmanager_proto_rawDesc = "" +
 	"\x05pages\x18\x03 \x03(\v2\x15.touchmanager.PageDefR\x05pages\x12\x1f\n" +
 	"\vactive_page\x18\x04 \x01(\rR\n" +
 	"activePage\x125\n" +
-	"\aoptions\x18\x05 \x01(\v2\x1b.touchmanager.GlobalOptionsR\aoptions\"\xa4\x01\n" +
+	"\aoptions\x18\x05 \x01(\v2\x1b.touchmanager.GlobalOptionsR\aoptions\x121\n" +
+	"\amarkers\x18\x06 \x03(\v2\x17.touchmanager.MarkerDefR\amarkers\"\xa4\x01\n" +
 	"\rGlobalOptions\x12&\n" +
 	"\x0fshow_debug_info\x18\x01 \x01(\bR\rshowDebugInfo\x12\x1b\n" +
 	"\tshow_taps\x18\x02 \x01(\rR\bshowTaps\x12$\n" +
@@ -3314,7 +3429,15 @@ const file_touchmanager_proto_rawDesc = "" +
 	"\rKEEP_DECODING\x10\x00\x12\x10\n" +
 	"\fPAUSE_DECODE\x10\x01\x12\x0e\n" +
 	"\n" +
-	"DISCONNECT\x10\x02\"\xaa\x02\n" +
+	"DISCONNECT\x10\x02\"\x8e\x01\n" +
+	"\tMarkerDef\x12\x15\n" +
+	"\x06hwc_id\x18\x01 \x01(\rR\x05hwcId\x12 \n" +
+	"\fvideo_hwc_id\x18\x02 \x01(\rR\n" +
+	"videoHwcId\x12\f\n" +
+	"\x01w\x18\x03 \x01(\rR\x01w\x12\f\n" +
+	"\x01h\x18\x04 \x01(\rR\x01h\x12\x10\n" +
+	"\x03rgb\x18\x05 \x01(\rR\x03rgb\x12\x1a\n" +
+	"\bcentered\x18\x06 \x01(\bR\bcentered\"\xaa\x02\n" +
 	"\vWidgetState\x12\x14\n" +
 	"\x05epoch\x18\x01 \x01(\rR\x05epoch\x12\x15\n" +
 	"\x06hwc_id\x18\x02 \x01(\rR\x05hwcId\x12+\n" +
@@ -3354,6 +3477,12 @@ const file_touchmanager_proto_rawDesc = "" +
 	"\tWidgetGfx\x12\x14\n" +
 	"\x05epoch\x18\x01 \x01(\rR\x05epoch\x12\x15\n" +
 	"\x06hwc_id\x18\x02 \x01(\rR\x05hwcId\x12\f\n" +
+	"\x01w\x18\x03 \x01(\rR\x01w\x12\f\n" +
+	"\x01h\x18\x04 \x01(\rR\x01h\x12\x16\n" +
+	"\x06rgb565\x18\x05 \x01(\fR\x06rgb565\"l\n" +
+	"\aPageGfx\x12\x14\n" +
+	"\x05epoch\x18\x01 \x01(\rR\x05epoch\x12\x17\n" +
+	"\apage_id\x18\x02 \x01(\rR\x06pageId\x12\f\n" +
 	"\x01w\x18\x03 \x01(\rR\x01w\x12\f\n" +
 	"\x01h\x18\x04 \x01(\rR\x01h\x12\x16\n" +
 	"\x06rgb565\x18\x05 \x01(\fR\x06rgb565\"%\n" +
@@ -3472,13 +3601,7 @@ const file_touchmanager_proto_rawDesc = "" +
 	"\bRawTouch\x12\f\n" +
 	"\x01x\x18\x01 \x01(\rR\x01x\x12\f\n" +
 	"\x01y\x18\x02 \x01(\rR\x01y\x12\x14\n" +
-	"\x05phase\x18\x03 \x01(\rR\x05phase\"l\n" +
-	"\aPageGfx\x12\x14\n" +
-	"\x05epoch\x18\x01 \x01(\rR\x05epoch\x12\x17\n" +
-	"\apage_id\x18\x02 \x01(\rR\x06pageId\x12\f\n" +
-	"\x01w\x18\x03 \x01(\rR\x01w\x12\f\n" +
-	"\x01h\x18\x04 \x01(\rR\x01h\x12\x16\n" +
-	"\x06rgb565\x18\x05 \x01(\fR\x06rgb565B+Z)github.com/SKAARHOJ/touch-manager/gen;genb\x06proto3"
+	"\x05phase\x18\x03 \x01(\rR\x05phaseB+Z)github.com/SKAARHOJ/touch-manager/gen;genb\x06proto3"
 
 var (
 	file_touchmanager_proto_rawDescOnce sync.Once
@@ -3493,7 +3616,7 @@ func file_touchmanager_proto_rawDescGZIP() []byte {
 }
 
 var file_touchmanager_proto_enumTypes = make([]protoimpl.EnumInfo, 7)
-var file_touchmanager_proto_msgTypes = make([]protoimpl.MessageInfo, 33)
+var file_touchmanager_proto_msgTypes = make([]protoimpl.MessageInfo, 34)
 var file_touchmanager_proto_goTypes = []any{
 	(WidgetDef_Type)(0),         // 0: touchmanager.WidgetDef.Type
 	(WidgetDef_EditKind)(0),     // 1: touchmanager.WidgetDef.EditKind
@@ -3511,75 +3634,77 @@ var file_touchmanager_proto_goTypes = []any{
 	(*WidgetDef)(nil),           // 13: touchmanager.WidgetDef
 	(*CompressorParam)(nil),     // 14: touchmanager.CompressorParam
 	(*VideoFeed)(nil),           // 15: touchmanager.VideoFeed
-	(*WidgetState)(nil),         // 16: touchmanager.WidgetState
-	(*ModeState)(nil),           // 17: touchmanager.ModeState
-	(*TextState)(nil),           // 18: touchmanager.TextState
-	(*ValueState)(nil),          // 19: touchmanager.ValueState
-	(*OverlayState)(nil),        // 20: touchmanager.OverlayState
-	(*OverlayBox)(nil),          // 21: touchmanager.OverlayBox
-	(*WidgetGfx)(nil),           // 22: touchmanager.WidgetGfx
-	(*ActivePage)(nil),          // 23: touchmanager.ActivePage
-	(*Ping)(nil),                // 24: touchmanager.Ping
-	(*ConfigMenuItem)(nil),      // 25: touchmanager.ConfigMenuItem
-	(*ConfigMenuPage)(nil),      // 26: touchmanager.ConfigMenuPage
-	(*ConfigMenuCtl)(nil),       // 27: touchmanager.ConfigMenuCtl
-	(*ConfigMenuEvent)(nil),     // 28: touchmanager.ConfigMenuEvent
-	(*UiEvent)(nil),             // 29: touchmanager.UiEvent
-	(*Hello)(nil),               // 30: touchmanager.Hello
-	(*WidgetEvent)(nil),         // 31: touchmanager.WidgetEvent
-	(*BinaryEv)(nil),            // 32: touchmanager.BinaryEv
-	(*PulsedEv)(nil),            // 33: touchmanager.PulsedEv
-	(*AbsoluteEv)(nil),          // 34: touchmanager.AbsoluteEv
-	(*VectorEv)(nil),            // 35: touchmanager.VectorEv
-	(*TextEv)(nil),              // 36: touchmanager.TextEv
-	(*PageSelect)(nil),          // 37: touchmanager.PageSelect
-	(*RawTouch)(nil),            // 38: touchmanager.RawTouch
-	(*PageGfx)(nil),             // 39: touchmanager.PageGfx
+	(*MarkerDef)(nil),           // 16: touchmanager.MarkerDef
+	(*WidgetState)(nil),         // 17: touchmanager.WidgetState
+	(*ModeState)(nil),           // 18: touchmanager.ModeState
+	(*TextState)(nil),           // 19: touchmanager.TextState
+	(*ValueState)(nil),          // 20: touchmanager.ValueState
+	(*OverlayState)(nil),        // 21: touchmanager.OverlayState
+	(*OverlayBox)(nil),          // 22: touchmanager.OverlayBox
+	(*WidgetGfx)(nil),           // 23: touchmanager.WidgetGfx
+	(*PageGfx)(nil),             // 24: touchmanager.PageGfx
+	(*ActivePage)(nil),          // 25: touchmanager.ActivePage
+	(*Ping)(nil),                // 26: touchmanager.Ping
+	(*ConfigMenuItem)(nil),      // 27: touchmanager.ConfigMenuItem
+	(*ConfigMenuPage)(nil),      // 28: touchmanager.ConfigMenuPage
+	(*ConfigMenuCtl)(nil),       // 29: touchmanager.ConfigMenuCtl
+	(*ConfigMenuEvent)(nil),     // 30: touchmanager.ConfigMenuEvent
+	(*UiEvent)(nil),             // 31: touchmanager.UiEvent
+	(*Hello)(nil),               // 32: touchmanager.Hello
+	(*WidgetEvent)(nil),         // 33: touchmanager.WidgetEvent
+	(*BinaryEv)(nil),            // 34: touchmanager.BinaryEv
+	(*PulsedEv)(nil),            // 35: touchmanager.PulsedEv
+	(*AbsoluteEv)(nil),          // 36: touchmanager.AbsoluteEv
+	(*VectorEv)(nil),            // 37: touchmanager.VectorEv
+	(*TextEv)(nil),              // 38: touchmanager.TextEv
+	(*PageSelect)(nil),          // 39: touchmanager.PageSelect
+	(*RawTouch)(nil),            // 40: touchmanager.RawTouch
 }
 var file_touchmanager_proto_depIdxs = []int32{
 	10, // 0: touchmanager.ServerMessage.tree:type_name -> touchmanager.WidgetTree
-	16, // 1: touchmanager.ServerMessage.state:type_name -> touchmanager.WidgetState
-	22, // 2: touchmanager.ServerMessage.gfx:type_name -> touchmanager.WidgetGfx
-	23, // 3: touchmanager.ServerMessage.page:type_name -> touchmanager.ActivePage
-	24, // 4: touchmanager.ServerMessage.ping:type_name -> touchmanager.Ping
-	26, // 5: touchmanager.ServerMessage.menu_page:type_name -> touchmanager.ConfigMenuPage
-	27, // 6: touchmanager.ServerMessage.menu_ctl:type_name -> touchmanager.ConfigMenuCtl
+	17, // 1: touchmanager.ServerMessage.state:type_name -> touchmanager.WidgetState
+	23, // 2: touchmanager.ServerMessage.gfx:type_name -> touchmanager.WidgetGfx
+	25, // 3: touchmanager.ServerMessage.page:type_name -> touchmanager.ActivePage
+	26, // 4: touchmanager.ServerMessage.ping:type_name -> touchmanager.Ping
+	28, // 5: touchmanager.ServerMessage.menu_page:type_name -> touchmanager.ConfigMenuPage
+	29, // 6: touchmanager.ServerMessage.menu_ctl:type_name -> touchmanager.ConfigMenuCtl
 	8,  // 7: touchmanager.ServerMessage.orientation:type_name -> touchmanager.SetOrientation
 	9,  // 8: touchmanager.ServerMessage.sleep:type_name -> touchmanager.SetSleep
-	39, // 9: touchmanager.ServerMessage.page_bg:type_name -> touchmanager.PageGfx
+	24, // 9: touchmanager.ServerMessage.page_bg:type_name -> touchmanager.PageGfx
 	12, // 10: touchmanager.WidgetTree.pages:type_name -> touchmanager.PageDef
 	11, // 11: touchmanager.WidgetTree.options:type_name -> touchmanager.GlobalOptions
-	13, // 12: touchmanager.PageDef.widgets:type_name -> touchmanager.WidgetDef
-	0,  // 13: touchmanager.WidgetDef.type:type_name -> touchmanager.WidgetDef.Type
-	15, // 14: touchmanager.WidgetDef.feed:type_name -> touchmanager.VideoFeed
-	14, // 15: touchmanager.WidgetDef.params:type_name -> touchmanager.CompressorParam
-	1,  // 16: touchmanager.WidgetDef.edit_kind:type_name -> touchmanager.WidgetDef.EditKind
-	2,  // 17: touchmanager.CompressorParam.role:type_name -> touchmanager.CompressorParam.Role
-	3,  // 18: touchmanager.VideoFeed.hidden_policy:type_name -> touchmanager.VideoFeed.HiddenPolicy
-	17, // 19: touchmanager.WidgetState.mode:type_name -> touchmanager.ModeState
-	18, // 20: touchmanager.WidgetState.text:type_name -> touchmanager.TextState
-	19, // 21: touchmanager.WidgetState.value:type_name -> touchmanager.ValueState
-	20, // 22: touchmanager.WidgetState.overlay:type_name -> touchmanager.OverlayState
-	21, // 23: touchmanager.OverlayState.boxes:type_name -> touchmanager.OverlayBox
-	4,  // 24: touchmanager.ConfigMenuItem.type:type_name -> touchmanager.ConfigMenuItem.Type
-	25, // 25: touchmanager.ConfigMenuPage.items:type_name -> touchmanager.ConfigMenuItem
-	5,  // 26: touchmanager.ConfigMenuCtl.op:type_name -> touchmanager.ConfigMenuCtl.Op
-	6,  // 27: touchmanager.ConfigMenuEvent.kind:type_name -> touchmanager.ConfigMenuEvent.Kind
-	30, // 28: touchmanager.UiEvent.hello:type_name -> touchmanager.Hello
-	31, // 29: touchmanager.UiEvent.widget:type_name -> touchmanager.WidgetEvent
-	37, // 30: touchmanager.UiEvent.page_select:type_name -> touchmanager.PageSelect
-	38, // 31: touchmanager.UiEvent.touch:type_name -> touchmanager.RawTouch
-	28, // 32: touchmanager.UiEvent.menu:type_name -> touchmanager.ConfigMenuEvent
-	32, // 33: touchmanager.WidgetEvent.binary:type_name -> touchmanager.BinaryEv
-	33, // 34: touchmanager.WidgetEvent.pulsed:type_name -> touchmanager.PulsedEv
-	34, // 35: touchmanager.WidgetEvent.absolute:type_name -> touchmanager.AbsoluteEv
-	35, // 36: touchmanager.WidgetEvent.vector:type_name -> touchmanager.VectorEv
-	36, // 37: touchmanager.WidgetEvent.text:type_name -> touchmanager.TextEv
-	38, // [38:38] is the sub-list for method output_type
-	38, // [38:38] is the sub-list for method input_type
-	38, // [38:38] is the sub-list for extension type_name
-	38, // [38:38] is the sub-list for extension extendee
-	0,  // [0:38] is the sub-list for field type_name
+	16, // 12: touchmanager.WidgetTree.markers:type_name -> touchmanager.MarkerDef
+	13, // 13: touchmanager.PageDef.widgets:type_name -> touchmanager.WidgetDef
+	0,  // 14: touchmanager.WidgetDef.type:type_name -> touchmanager.WidgetDef.Type
+	15, // 15: touchmanager.WidgetDef.feed:type_name -> touchmanager.VideoFeed
+	14, // 16: touchmanager.WidgetDef.params:type_name -> touchmanager.CompressorParam
+	1,  // 17: touchmanager.WidgetDef.edit_kind:type_name -> touchmanager.WidgetDef.EditKind
+	2,  // 18: touchmanager.CompressorParam.role:type_name -> touchmanager.CompressorParam.Role
+	3,  // 19: touchmanager.VideoFeed.hidden_policy:type_name -> touchmanager.VideoFeed.HiddenPolicy
+	18, // 20: touchmanager.WidgetState.mode:type_name -> touchmanager.ModeState
+	19, // 21: touchmanager.WidgetState.text:type_name -> touchmanager.TextState
+	20, // 22: touchmanager.WidgetState.value:type_name -> touchmanager.ValueState
+	21, // 23: touchmanager.WidgetState.overlay:type_name -> touchmanager.OverlayState
+	22, // 24: touchmanager.OverlayState.boxes:type_name -> touchmanager.OverlayBox
+	4,  // 25: touchmanager.ConfigMenuItem.type:type_name -> touchmanager.ConfigMenuItem.Type
+	27, // 26: touchmanager.ConfigMenuPage.items:type_name -> touchmanager.ConfigMenuItem
+	5,  // 27: touchmanager.ConfigMenuCtl.op:type_name -> touchmanager.ConfigMenuCtl.Op
+	6,  // 28: touchmanager.ConfigMenuEvent.kind:type_name -> touchmanager.ConfigMenuEvent.Kind
+	32, // 29: touchmanager.UiEvent.hello:type_name -> touchmanager.Hello
+	33, // 30: touchmanager.UiEvent.widget:type_name -> touchmanager.WidgetEvent
+	39, // 31: touchmanager.UiEvent.page_select:type_name -> touchmanager.PageSelect
+	40, // 32: touchmanager.UiEvent.touch:type_name -> touchmanager.RawTouch
+	30, // 33: touchmanager.UiEvent.menu:type_name -> touchmanager.ConfigMenuEvent
+	34, // 34: touchmanager.WidgetEvent.binary:type_name -> touchmanager.BinaryEv
+	35, // 35: touchmanager.WidgetEvent.pulsed:type_name -> touchmanager.PulsedEv
+	36, // 36: touchmanager.WidgetEvent.absolute:type_name -> touchmanager.AbsoluteEv
+	37, // 37: touchmanager.WidgetEvent.vector:type_name -> touchmanager.VectorEv
+	38, // 38: touchmanager.WidgetEvent.text:type_name -> touchmanager.TextEv
+	39, // [39:39] is the sub-list for method output_type
+	39, // [39:39] is the sub-list for method input_type
+	39, // [39:39] is the sub-list for extension type_name
+	39, // [39:39] is the sub-list for extension extendee
+	0,  // [0:39] is the sub-list for field type_name
 }
 
 func init() { file_touchmanager_proto_init() }
@@ -3599,16 +3724,16 @@ func file_touchmanager_proto_init() {
 		(*ServerMessage_Sleep)(nil),
 		(*ServerMessage_PageBg)(nil),
 	}
-	file_touchmanager_proto_msgTypes[9].OneofWrappers = []any{}
-	file_touchmanager_proto_msgTypes[20].OneofWrappers = []any{}
-	file_touchmanager_proto_msgTypes[22].OneofWrappers = []any{
+	file_touchmanager_proto_msgTypes[10].OneofWrappers = []any{}
+	file_touchmanager_proto_msgTypes[22].OneofWrappers = []any{}
+	file_touchmanager_proto_msgTypes[24].OneofWrappers = []any{
 		(*UiEvent_Hello)(nil),
 		(*UiEvent_Widget)(nil),
 		(*UiEvent_PageSelect)(nil),
 		(*UiEvent_Touch)(nil),
 		(*UiEvent_Menu)(nil),
 	}
-	file_touchmanager_proto_msgTypes[24].OneofWrappers = []any{
+	file_touchmanager_proto_msgTypes[26].OneofWrappers = []any{
 		(*WidgetEvent_Binary)(nil),
 		(*WidgetEvent_Pulsed)(nil),
 		(*WidgetEvent_Absolute)(nil),
@@ -3621,7 +3746,7 @@ func file_touchmanager_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_touchmanager_proto_rawDesc), len(file_touchmanager_proto_rawDesc)),
 			NumEnums:      7,
-			NumMessages:   33,
+			NumMessages:   34,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

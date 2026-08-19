@@ -31,7 +31,16 @@ func defaultEventMask(w *rwp.TouchUIWidget) uint32 {
 			mask |= helpers.TouchUIEventText
 		}
 		return mask
-	case rwp.TouchUIWidget_IMAGE, rwp.TouchUIWidget_VIDEO:
+	case rwp.TouchUIWidget_VIDEO:
+		// A video region is a picture you point at, so it reports WHERE it was touched the
+		// same way an XYPAD does; NoTapEvents keeps its original meaning and suppresses only
+		// the press/release pair, leaving the position stream. A widget that must stay
+		// entirely silent narrows with TouchUIWidget.EventMask.
+		if opts.GetNoTapEvents() {
+			return helpers.TouchUIEventVector
+		}
+		return helpers.TouchUIEventVector | helpers.TouchUIEventBinary
+	case rwp.TouchUIWidget_IMAGE:
 		if opts.GetNoTapEvents() {
 			return 0
 		}

@@ -22,6 +22,10 @@ const (
 	MaxCompressorParams = 6 // COMPRESSOR: one per RoleE
 	MaxParamLabelLen    = 15
 	MaxEditLen          = 63 // LABEL: Options.EditMaxLen ceiling
+
+	MaxMarkersPerWidget = 8  // VIDEO: Options.Markers on one widget
+	MaxMarkers          = 16 // VIDEO: markers across the whole config, matching the tree's static cap
+	MaxMarkerCoord      = 1000
 )
 
 // Validate checks a TouchUIConfig against the panel's static limits and its
@@ -38,6 +42,7 @@ func Validate(cfg *rwp.TouchUIConfig) error {
 	pageIDs := map[uint32]bool{}
 	hwcIDs := map[uint32]bool{}
 	videoCount := 0
+	markerCount := 0
 
 	for _, page := range pages {
 		if page.GetId() == 0 {
@@ -75,6 +80,7 @@ func Validate(cfg *rwp.TouchUIConfig) error {
 			}
 			if widget.GetType() == rwp.TouchUIWidget_VIDEO {
 				videoCount++
+				markerCount += len(widget.GetOptions().GetMarkers())
 				if len(widget.GetOptions().GetSource()) > MaxSourceLen {
 					return fmt.Errorf("widget %d video source exceeds %d bytes", widget.GetHWCID(), MaxSourceLen)
 				}
@@ -87,6 +93,11 @@ func Validate(cfg *rwp.TouchUIConfig) error {
 
 	if videoCount > MaxVideoWidgets {
 		return fmt.Errorf("%d VIDEO widgets exceeds the maximum of %d", videoCount, MaxVideoWidgets)
+	}
+	// Config-wide, not per widget: markers travel as one flat list on the widget tree, so the
+	// static cap the UI decodes into is a total.
+	if markerCount > MaxMarkers {
+		return fmt.Errorf("%d markers exceeds the maximum of %d for a config", markerCount, MaxMarkers)
 	}
 	if want := cfg.GetActivePage(); want != 0 && !pageIDs[want] {
 		return fmt.Errorf("ActivePage %d is not a declared page", want)
@@ -109,6 +120,9 @@ func validateWidgetOptions(widget *rwp.TouchUIWidget, hwcIDs map[uint32]bool) er
 	}
 	if opts.GetEditMaxLen() > MaxEditLen {
 		return fmt.Errorf("widget %d: EditMaxLen %d exceeds the maximum of %d", id, opts.GetEditMaxLen(), MaxEditLen)
+	}
+	if len(opts.GetMarkers()) > 0 && widget.GetType() != rwp.TouchUIWidget_VIDEO {
+		return fmt.Errorf("widget %d: Markers are only valid on a VIDEO widget", id)
 	}
 
 	switch widget.GetType() {
@@ -135,6 +149,34 @@ func validateWidgetOptions(widget *rwp.TouchUIWidget, hwcIDs map[uint32]bool) er
 	case rwp.TouchUIWidget_XYPAD:
 		if opts.GetRelative() && opts.GetCenterReturn() {
 			return fmt.Errorf("widget %d: CenterReturn is meaningless with Relative — a delta pad has no position to return to", id)
+		}
+
+	case rwp.TouchUIWidget_VIDEO:
+		// A video region draws no cursor of its own, so there is nothing to send home; unlike
+		// the XYPAD rule this holds in both modes.
+		if opts.GetCenterReturn() {
+			return fmt.Errorf("widget %d: CenterReturn is meaningless on a VIDEO widget — it has no cursor to return", id)
+		}
+		markers := opts.GetMarkers()
+		if len(markers) > MaxMarkersPerWidget {
+			return fmt.Errorf("widget %d: %d Markers exceeds the maximum of %d", id, len(markers), MaxMarkersPerWidget)
+		}
+		for _, m := range markers {
+			mid := m.GetHWCID()
+			if mid == 0 {
+				return fmt.Errorf("widget %d: marker HWC id 0 is reserved", id)
+			}
+			// Same reason the compressor members register here: a marker is an addressable
+			// HWC sharing the widget id space, and a collision would route one HWC's state to
+			// the wrong box (or to a widget), which fails silently at render time.
+			if hwcIDs[mid] {
+				return fmt.Errorf("marker HWC id %d (widget %d) collides with another HWC id", mid, id)
+			}
+			hwcIDs[mid] = true
+			if m.GetW() > MaxMarkerCoord || m.GetH() > MaxMarkerCoord {
+				return fmt.Errorf("widget %d: marker %d size %dx%d is outside the 0..%d domain",
+					id, mid, m.GetW(), m.GetH(), MaxMarkerCoord)
+			}
 		}
 
 	case rwp.TouchUIWidget_COMPRESSOR:
