@@ -101,9 +101,12 @@ func Capabilities(screenW, screenH uint32, orientation rwp.TouchUIGlobalOptions_
 				StateMask: helpers.TouchUIStateGfx,
 			},
 			{
-				Type:      rwp.TouchUIWidget_VIDEO,
-				EventMask: helpers.TouchUIEventBinary,
-				StateMask: helpers.TouchUIStateText | helpers.TouchUIStateOverlay,
+				Type: rwp.TouchUIWidget_VIDEO,
+				// Vector like an XYPAD (image axes, see WidgetTypeE.VIDEO), plus the tap pair.
+				// This is the union the type can ever emit; EffectiveEventMask intersects a
+				// widget's own mask with it, so a bit missing here can never be granted back.
+				EventMask: helpers.TouchUIEventVector | helpers.TouchUIEventBinary,
+				StateMask: helpers.TouchUIStateText | helpers.TouchUIStateColor | helpers.TouchUIStateOverlay,
 			},
 		},
 	}

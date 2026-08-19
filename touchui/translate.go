@@ -41,6 +41,12 @@ func ConfigToWidgetTree(cfg *rwp.TouchUIConfig, epoch uint32, resolve FeedResolv
 			if widget.GetType() == rwp.TouchUIWidget_VIDEO {
 				videoOrdinal++
 				def.Feed = resolveFeed(widget, videoOrdinal, resolve)
+				// Markers are flattened onto the tree rather than nested in the widget they
+				// belong to, each carrying the id of its parent — see WidgetTree.markers for
+				// why (a repeated field on WidgetDef is multiplied ~192x in the static size).
+				for _, m := range widget.GetOptions().GetMarkers() {
+					tree.Markers = append(tree.Markers, markerToDef(m, widget.GetHWCID()))
+				}
 			}
 			pageDef.Widgets = append(pageDef.Widgets, def)
 		}
@@ -181,6 +187,20 @@ func compressorParams(params []*rwp.TouchUICompressorParam) []*gen.CompressorPar
 		})
 	}
 	return out
+}
+
+// markerToDef translates one overlay marker, binding it to the VIDEO widget it draws on. Only
+// the box defaults travel: the geometry, caption and colour that actually vary arrive later as
+// ordinary per-HWC state under the marker's own id.
+func markerToDef(m *rwp.TouchUIMarker, videoHWC uint32) *gen.MarkerDef {
+	return &gen.MarkerDef{
+		HwcId:      m.GetHWCID(),
+		VideoHwcId: videoHWC,
+		W:          m.GetW(),
+		H:          m.GetH(),
+		Rgb:        ColorToRGB(m.GetColor()),
+		Centered:   m.GetCentered(),
+	}
 }
 
 func resolveFeed(w *rwp.TouchUIWidget, ordinal int, resolve FeedResolver) *gen.VideoFeed {

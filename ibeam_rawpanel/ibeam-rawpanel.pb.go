@@ -1567,9 +1567,24 @@ const (
 	// on-screen keyboard seeded with the text the label is currently displaying, and committing
 	// emits TextEvent. See TouchUIWidgetOptions.EditKind.
 	TouchUIWidget_IMAGE TouchUIWidget_WidgetTypeE = 6 // image tile               -> emits Binary on tap (unless Options.NoTapEvents); honors HWCGfx
-	TouchUIWidget_VIDEO TouchUIWidget_WidgetTypeE = 7 // live video region        -> emits Binary on tap (unless Options.NoTapEvents); honors HWCText/HWCOverlay.
+	TouchUIWidget_VIDEO TouchUIWidget_WidgetTypeE = 7 // live video region        -> emits AbsoluteVector[x,y] (position) or, with Options.Relative,
+	// SpeedVector[dx,dy]; plus Binary on touch/release (unless Options.NoTapEvents). Honors
+	// HWCText/HWCColor/HWCOverlay.
+	// Axes: a video region reports IMAGE coordinates - X is 0 at the LEFT edge and Y is 0 at the
+	// TOP edge, each 0..1000 within the region. This is deliberately NOT the XYPAD convention
+	// (Y=0 at the bottom, joystick-style): a tap on a picture and an HWCOverlay box drawn in
+	// response to it must share one frame of reference, so following a tapped point with a
+	// tracking box needs no axis flip anywhere. Relative mode uses the same signs (+dy is
+	// downward) and the same 0..1000-per-edge domain, i.e. deltas are NOT in pixels.
 	// The source is panel-local (Options.Source spec or the panel's default feeds); the client
 	// only places the region and optionally decorates it (corner label, overlay/tracking boxes).
+	// The source can also be retargeted at RUNTIME, without a new SetTouchUI: a non-empty
+	// HWCText.Textline2 addressed to this widget REPLACES Options.Source for as long as it is
+	// set (clearing it falls back to the configured source). That makes switching which camera a
+	// tile shows a matter of ordinary per-HWC feedback rather than a config rebuild, which would
+	// otherwise restart every widget on the panel.
+	// Options.Markers declares overlay boxes that are addressable HWCs in their own right (see
+	// TouchUIMarker). Marker boxes are drawn IN ADDITION to any HWCOverlay set on this widget.
 	TouchUIWidget_ENCODER TouchUIWidget_WidgetTypeE = 8 // encoder pad (- / press / +) -> emits Pulsed on the -/+ taps and Binary (Edge=ENCODER) on the
 	// center press; honors HWCText/HWCExtended. The touch-friendly counterpart of a physical
 	// encoder: left/right taps pulse -1/+1, the center is the push. (KNOB is the analog dial.)
@@ -1809,7 +1824,7 @@ func (x TouchUICompressorParam_RoleE) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use TouchUICompressorParam_RoleE.Descriptor instead.
 func (TouchUICompressorParam_RoleE) EnumDescriptor() ([]byte, []int) {
-	return file_ibeam_rawpanel_proto_ibeam_rawpanel_proto_rawDescGZIP(), []int{62, 0}
+	return file_ibeam_rawpanel_proto_ibeam_rawpanel_proto_rawDescGZIP(), []int{63, 0}
 }
 
 // Wrapper for all incoming messages (Incoming = to Panel from System)
@@ -3643,6 +3658,9 @@ func (x *HWCGfx) GetImageData() []byte {
 // TouchUI VIDEO widget (see TouchUIWidget). Semantics: each HWCOverlay message is a FULL REPLACEMENT
 // of the addressed HWC's overlay set; send an empty Boxes list to clear. Panels shall support at
 // least 16 boxes per HWC. ASCII form: "HWCo#xx={json}" (JSON encoding of this message).
+// Boxes contributed by TouchUIMarker HWCs are drawn IN ADDITION to this set and are not affected by
+// it: the two are separate mechanisms for the same picture, one whole-set and one box-at-a-time, so
+// a client using either cannot clear the other's boxes out from under it.
 type HWCOverlay struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Boxes         []*HWCOverlay_Box      `protobuf:"bytes,1,rep,name=Boxes,proto3" json:"Boxes,omitempty"`
@@ -6534,6 +6552,7 @@ type TouchUIWidgetOptions struct {
 	HiddenPolicy  TouchUIWidgetOptions_HiddenPolicyE `protobuf:"varint,9,opt,name=HiddenPolicy,proto3,enum=ibeam_rawpanel.TouchUIWidgetOptions_HiddenPolicyE" json:"HiddenPolicy,omitempty"`
 	SourceWidth   uint32                             `protobuf:"varint,10,opt,name=SourceWidth,proto3" json:"SourceWidth,omitempty"` // Capture hints (0 = source default)
 	SourceHeight  uint32                             `protobuf:"varint,11,opt,name=SourceHeight,proto3" json:"SourceHeight,omitempty"`
+	Markers       []*TouchUIMarker                   `protobuf:"bytes,19,rep,name=Markers,proto3" json:"Markers,omitempty"` // VIDEO: overlay boxes that are addressable HWCs of their own. At most 8 per
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -6694,6 +6713,105 @@ func (x *TouchUIWidgetOptions) GetSourceHeight() uint32 {
 	return 0
 }
 
+func (x *TouchUIWidgetOptions) GetMarkers() []*TouchUIMarker {
+	if x != nil {
+		return x.Markers
+	}
+	return nil
+}
+
+// TouchUIMarker is one overlay box on a VIDEO widget that is addressable as an HWC in its own right, so an ordinary
+// per-HWC feedback can position it. It exists because HWCOverlay is a whole-set message: a client that can only emit
+// standard per-HWC state (text/color/mode) has no way to contribute ONE box to a widget it shares with others. A
+// marker turns each box into its own HWC, which such a client can drive with nothing but a text feedback.
+//
+// A marker emits no events. It consumes, under its own HWCID:
+//
+//	HWCText.Textline1  the box geometry, as "x,y" or "x,y,w,h" - decimal integers, comma separated, each 0..1000
+//	                   normalized within the VIDEO widget's content rect (the same domain and, per WidgetTypeE.VIDEO,
+//	                   the same axes as a touch on that widget). The "x,y" form takes W/H below. Anything that does
+//	                   not parse - including the empty string - HIDES the box rather than drawing it somewhere
+//	                   arbitrary, which is what makes it safe to point a general-purpose text feedback at a marker.
+//	HWCText.Title      box caption. Empty leaves the box unlabelled.
+//	HWCColor           box color, overriding Color below.
+//	HWCMode.State=OFF  hides the box, so visibility is a condition like any other feedback.
+type TouchUIMarker struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	HWCID uint32                 `protobuf:"varint,1,opt,name=HWCID,proto3" json:"HWCID,omitempty"` // Addressable HWC for this box. MUST NOT collide with any widget, compressor
+	// member or other marker id.
+	W             uint32 `protobuf:"varint,2,opt,name=W,proto3" json:"W,omitempty"` // Box size 0..1000, used when Textline1 gives only "x,y" (0 = panel default)
+	H             uint32 `protobuf:"varint,3,opt,name=H,proto3" json:"H,omitempty"`
+	Color         *Color `protobuf:"bytes,4,opt,name=Color,proto3" json:"Color,omitempty"`        // Default border/label color. Unset = panel default; HWCColor overrides.
+	Centered      bool   `protobuf:"varint,5,opt,name=Centered,proto3" json:"Centered,omitempty"` // Interpret x,y as the box CENTRE rather than its top-left corner. The natural
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *TouchUIMarker) Reset() {
+	*x = TouchUIMarker{}
+	mi := &file_ibeam_rawpanel_proto_ibeam_rawpanel_proto_msgTypes[62]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *TouchUIMarker) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*TouchUIMarker) ProtoMessage() {}
+
+func (x *TouchUIMarker) ProtoReflect() protoreflect.Message {
+	mi := &file_ibeam_rawpanel_proto_ibeam_rawpanel_proto_msgTypes[62]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use TouchUIMarker.ProtoReflect.Descriptor instead.
+func (*TouchUIMarker) Descriptor() ([]byte, []int) {
+	return file_ibeam_rawpanel_proto_ibeam_rawpanel_proto_rawDescGZIP(), []int{62}
+}
+
+func (x *TouchUIMarker) GetHWCID() uint32 {
+	if x != nil {
+		return x.HWCID
+	}
+	return 0
+}
+
+func (x *TouchUIMarker) GetW() uint32 {
+	if x != nil {
+		return x.W
+	}
+	return 0
+}
+
+func (x *TouchUIMarker) GetH() uint32 {
+	if x != nil {
+		return x.H
+	}
+	return 0
+}
+
+func (x *TouchUIMarker) GetColor() *Color {
+	if x != nil {
+		return x.Color
+	}
+	return nil
+}
+
+func (x *TouchUIMarker) GetCentered() bool {
+	if x != nil {
+		return x.Centered
+	}
+	return false
+}
+
 // TouchUICompressorParam is one member parameter of a COMPRESSOR widget (see TouchUIWidget.WidgetTypeE.COMPRESSOR).
 // Each parameter is a standard fader HWC in its own right: it emits Absolute under its HWCID and is set from the
 // system via HWCExtended(FADER) under the same id, so it stays individually addressable and automatable. Role tells
@@ -6712,7 +6830,7 @@ type TouchUICompressorParam struct {
 
 func (x *TouchUICompressorParam) Reset() {
 	*x = TouchUICompressorParam{}
-	mi := &file_ibeam_rawpanel_proto_ibeam_rawpanel_proto_msgTypes[62]
+	mi := &file_ibeam_rawpanel_proto_ibeam_rawpanel_proto_msgTypes[63]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6724,7 +6842,7 @@ func (x *TouchUICompressorParam) String() string {
 func (*TouchUICompressorParam) ProtoMessage() {}
 
 func (x *TouchUICompressorParam) ProtoReflect() protoreflect.Message {
-	mi := &file_ibeam_rawpanel_proto_ibeam_rawpanel_proto_msgTypes[62]
+	mi := &file_ibeam_rawpanel_proto_ibeam_rawpanel_proto_msgTypes[63]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6737,7 +6855,7 @@ func (x *TouchUICompressorParam) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TouchUICompressorParam.ProtoReflect.Descriptor instead.
 func (*TouchUICompressorParam) Descriptor() ([]byte, []int) {
-	return file_ibeam_rawpanel_proto_ibeam_rawpanel_proto_rawDescGZIP(), []int{62}
+	return file_ibeam_rawpanel_proto_ibeam_rawpanel_proto_rawDescGZIP(), []int{63}
 }
 
 func (x *TouchUICompressorParam) GetHWCID() uint32 {
@@ -6796,7 +6914,7 @@ type TouchUICapabilities struct {
 
 func (x *TouchUICapabilities) Reset() {
 	*x = TouchUICapabilities{}
-	mi := &file_ibeam_rawpanel_proto_ibeam_rawpanel_proto_msgTypes[63]
+	mi := &file_ibeam_rawpanel_proto_ibeam_rawpanel_proto_msgTypes[64]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6808,7 +6926,7 @@ func (x *TouchUICapabilities) String() string {
 func (*TouchUICapabilities) ProtoMessage() {}
 
 func (x *TouchUICapabilities) ProtoReflect() protoreflect.Message {
-	mi := &file_ibeam_rawpanel_proto_ibeam_rawpanel_proto_msgTypes[63]
+	mi := &file_ibeam_rawpanel_proto_ibeam_rawpanel_proto_msgTypes[64]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6821,7 +6939,7 @@ func (x *TouchUICapabilities) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TouchUICapabilities.ProtoReflect.Descriptor instead.
 func (*TouchUICapabilities) Descriptor() ([]byte, []int) {
-	return file_ibeam_rawpanel_proto_ibeam_rawpanel_proto_rawDescGZIP(), []int{63}
+	return file_ibeam_rawpanel_proto_ibeam_rawpanel_proto_rawDescGZIP(), []int{64}
 }
 
 func (x *TouchUICapabilities) GetScreenWidth() uint32 {
@@ -6901,7 +7019,7 @@ type TouchUIWidgetTypeCap struct {
 
 func (x *TouchUIWidgetTypeCap) Reset() {
 	*x = TouchUIWidgetTypeCap{}
-	mi := &file_ibeam_rawpanel_proto_ibeam_rawpanel_proto_msgTypes[64]
+	mi := &file_ibeam_rawpanel_proto_ibeam_rawpanel_proto_msgTypes[65]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6913,7 +7031,7 @@ func (x *TouchUIWidgetTypeCap) String() string {
 func (*TouchUIWidgetTypeCap) ProtoMessage() {}
 
 func (x *TouchUIWidgetTypeCap) ProtoReflect() protoreflect.Message {
-	mi := &file_ibeam_rawpanel_proto_ibeam_rawpanel_proto_msgTypes[64]
+	mi := &file_ibeam_rawpanel_proto_ibeam_rawpanel_proto_msgTypes[65]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6926,7 +7044,7 @@ func (x *TouchUIWidgetTypeCap) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TouchUIWidgetTypeCap.ProtoReflect.Descriptor instead.
 func (*TouchUIWidgetTypeCap) Descriptor() ([]byte, []int) {
-	return file_ibeam_rawpanel_proto_ibeam_rawpanel_proto_rawDescGZIP(), []int{64}
+	return file_ibeam_rawpanel_proto_ibeam_rawpanel_proto_rawDescGZIP(), []int{65}
 }
 
 func (x *TouchUIWidgetTypeCap) GetType() TouchUIWidget_WidgetTypeE {
@@ -6961,7 +7079,7 @@ type HWCJog_TargetPositionM struct {
 
 func (x *HWCJog_TargetPositionM) Reset() {
 	*x = HWCJog_TargetPositionM{}
-	mi := &file_ibeam_rawpanel_proto_ibeam_rawpanel_proto_msgTypes[65]
+	mi := &file_ibeam_rawpanel_proto_ibeam_rawpanel_proto_msgTypes[66]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6973,7 +7091,7 @@ func (x *HWCJog_TargetPositionM) String() string {
 func (*HWCJog_TargetPositionM) ProtoMessage() {}
 
 func (x *HWCJog_TargetPositionM) ProtoReflect() protoreflect.Message {
-	mi := &file_ibeam_rawpanel_proto_ibeam_rawpanel_proto_msgTypes[65]
+	mi := &file_ibeam_rawpanel_proto_ibeam_rawpanel_proto_msgTypes[66]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7009,7 +7127,7 @@ type HWCText_ScaleM struct {
 
 func (x *HWCText_ScaleM) Reset() {
 	*x = HWCText_ScaleM{}
-	mi := &file_ibeam_rawpanel_proto_ibeam_rawpanel_proto_msgTypes[66]
+	mi := &file_ibeam_rawpanel_proto_ibeam_rawpanel_proto_msgTypes[67]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7021,7 +7139,7 @@ func (x *HWCText_ScaleM) String() string {
 func (*HWCText_ScaleM) ProtoMessage() {}
 
 func (x *HWCText_ScaleM) ProtoReflect() protoreflect.Message {
-	mi := &file_ibeam_rawpanel_proto_ibeam_rawpanel_proto_msgTypes[66]
+	mi := &file_ibeam_rawpanel_proto_ibeam_rawpanel_proto_msgTypes[67]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7086,7 +7204,7 @@ type HWCText_TextStyle struct {
 
 func (x *HWCText_TextStyle) Reset() {
 	*x = HWCText_TextStyle{}
-	mi := &file_ibeam_rawpanel_proto_ibeam_rawpanel_proto_msgTypes[67]
+	mi := &file_ibeam_rawpanel_proto_ibeam_rawpanel_proto_msgTypes[68]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7098,7 +7216,7 @@ func (x *HWCText_TextStyle) String() string {
 func (*HWCText_TextStyle) ProtoMessage() {}
 
 func (x *HWCText_TextStyle) ProtoReflect() protoreflect.Message {
-	mi := &file_ibeam_rawpanel_proto_ibeam_rawpanel_proto_msgTypes[67]
+	mi := &file_ibeam_rawpanel_proto_ibeam_rawpanel_proto_msgTypes[68]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7167,7 +7285,7 @@ type HWCText_TextStyle_Font struct {
 
 func (x *HWCText_TextStyle_Font) Reset() {
 	*x = HWCText_TextStyle_Font{}
-	mi := &file_ibeam_rawpanel_proto_ibeam_rawpanel_proto_msgTypes[68]
+	mi := &file_ibeam_rawpanel_proto_ibeam_rawpanel_proto_msgTypes[69]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7179,7 +7297,7 @@ func (x *HWCText_TextStyle_Font) String() string {
 func (*HWCText_TextStyle_Font) ProtoMessage() {}
 
 func (x *HWCText_TextStyle_Font) ProtoReflect() protoreflect.Message {
-	mi := &file_ibeam_rawpanel_proto_ibeam_rawpanel_proto_msgTypes[68]
+	mi := &file_ibeam_rawpanel_proto_ibeam_rawpanel_proto_msgTypes[69]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7231,7 +7349,7 @@ type HWCOverlay_Box struct {
 
 func (x *HWCOverlay_Box) Reset() {
 	*x = HWCOverlay_Box{}
-	mi := &file_ibeam_rawpanel_proto_ibeam_rawpanel_proto_msgTypes[69]
+	mi := &file_ibeam_rawpanel_proto_ibeam_rawpanel_proto_msgTypes[70]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7243,7 +7361,7 @@ func (x *HWCOverlay_Box) String() string {
 func (*HWCOverlay_Box) ProtoMessage() {}
 
 func (x *HWCOverlay_Box) ProtoReflect() protoreflect.Message {
-	mi := &file_ibeam_rawpanel_proto_ibeam_rawpanel_proto_msgTypes[69]
+	mi := &file_ibeam_rawpanel_proto_ibeam_rawpanel_proto_msgTypes[70]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7999,7 +8117,7 @@ const file_ibeam_rawpanel_proto_ibeam_rawpanel_proto_rawDesc = "" +
 	"\x05XYPAD\x10\n" +
 	"\x12\x0e\n" +
 	"\n" +
-	"COMPRESSOR\x10\v\"\xb6\x06\n" +
+	"COMPRESSOR\x10\v\"\xef\x06\n" +
 	"\x14TouchUIWidgetOptions\x12\x10\n" +
 	"\x03Min\x18\x01 \x01(\x11R\x03Min\x12\x10\n" +
 	"\x03Max\x18\x02 \x01(\x11R\x03Max\x12\x12\n" +
@@ -8021,7 +8139,8 @@ const file_ibeam_rawpanel_proto_ibeam_rawpanel_proto_rawDesc = "" +
 	"\fHiddenPolicy\x18\t \x01(\x0e22.ibeam_rawpanel.TouchUIWidgetOptions.HiddenPolicyER\fHiddenPolicy\x12 \n" +
 	"\vSourceWidth\x18\n" +
 	" \x01(\rR\vSourceWidth\x12\"\n" +
-	"\fSourceHeight\x18\v \x01(\rR\fSourceHeight\"A\n" +
+	"\fSourceHeight\x18\v \x01(\rR\fSourceHeight\x127\n" +
+	"\aMarkers\x18\x13 \x03(\v2\x1d.ibeam_rawpanel.TouchUIMarkerR\aMarkers\"A\n" +
 	"\tEditKindE\x12\b\n" +
 	"\x04NONE\x10\x00\x12\b\n" +
 	"\x04TEXT\x10\x01\x12\n" +
@@ -8033,7 +8152,13 @@ const file_ibeam_rawpanel_proto_ibeam_rawpanel_proto_rawDesc = "" +
 	"\rKEEP_DECODING\x10\x00\x12\x10\n" +
 	"\fPAUSE_DECODE\x10\x01\x12\x0e\n" +
 	"\n" +
-	"DISCONNECT\x10\x02\"\xfc\x01\n" +
+	"DISCONNECT\x10\x02\"\x8a\x01\n" +
+	"\rTouchUIMarker\x12\x14\n" +
+	"\x05HWCID\x18\x01 \x01(\rR\x05HWCID\x12\f\n" +
+	"\x01W\x18\x02 \x01(\rR\x01W\x12\f\n" +
+	"\x01H\x18\x03 \x01(\rR\x01H\x12+\n" +
+	"\x05Color\x18\x04 \x01(\v2\x15.ibeam_rawpanel.ColorR\x05Color\x12\x1a\n" +
+	"\bCentered\x18\x05 \x01(\bR\bCentered\"\xfc\x01\n" +
 	"\x16TouchUICompressorParam\x12\x14\n" +
 	"\x05HWCID\x18\x01 \x01(\rR\x05HWCID\x12@\n" +
 	"\x04Role\x18\x02 \x01(\x0e2,.ibeam_rawpanel.TouchUICompressorParam.RoleER\x04Role\x12\x10\n" +
@@ -8079,7 +8204,7 @@ func file_ibeam_rawpanel_proto_ibeam_rawpanel_proto_rawDescGZIP() []byte {
 }
 
 var file_ibeam_rawpanel_proto_ibeam_rawpanel_proto_enumTypes = make([]protoimpl.EnumInfo, 31)
-var file_ibeam_rawpanel_proto_ibeam_rawpanel_proto_msgTypes = make([]protoimpl.MessageInfo, 71)
+var file_ibeam_rawpanel_proto_ibeam_rawpanel_proto_msgTypes = make([]protoimpl.MessageInfo, 72)
 var file_ibeam_rawpanel_proto_ibeam_rawpanel_proto_goTypes = []any{
 	(InboundMessage_FlowMsg)(0),                   // 0: ibeam_rawpanel.InboundMessage.FlowMsg
 	(Register_RegisterE)(0),                       // 1: ibeam_rawpanel.Register.RegisterE
@@ -8174,15 +8299,16 @@ var file_ibeam_rawpanel_proto_ibeam_rawpanel_proto_goTypes = []any{
 	(*TouchUIPage)(nil),                           // 90: ibeam_rawpanel.TouchUIPage
 	(*TouchUIWidget)(nil),                         // 91: ibeam_rawpanel.TouchUIWidget
 	(*TouchUIWidgetOptions)(nil),                  // 92: ibeam_rawpanel.TouchUIWidgetOptions
-	(*TouchUICompressorParam)(nil),                // 93: ibeam_rawpanel.TouchUICompressorParam
-	(*TouchUICapabilities)(nil),                   // 94: ibeam_rawpanel.TouchUICapabilities
-	(*TouchUIWidgetTypeCap)(nil),                  // 95: ibeam_rawpanel.TouchUIWidgetTypeCap
-	(*HWCJog_TargetPositionM)(nil),                // 96: ibeam_rawpanel.HWCJog.TargetPositionM
-	(*HWCText_ScaleM)(nil),                        // 97: ibeam_rawpanel.HWCText.ScaleM
-	(*HWCText_TextStyle)(nil),                     // 98: ibeam_rawpanel.HWCText.TextStyle
-	(*HWCText_TextStyle_Font)(nil),                // 99: ibeam_rawpanel.HWCText.TextStyle.Font
-	(*HWCOverlay_Box)(nil),                        // 100: ibeam_rawpanel.HWCOverlay.Box
-	nil,                                           // 101: ibeam_rawpanel.OutboundMessage.HWCavailabilityEntry
+	(*TouchUIMarker)(nil),                         // 93: ibeam_rawpanel.TouchUIMarker
+	(*TouchUICompressorParam)(nil),                // 94: ibeam_rawpanel.TouchUICompressorParam
+	(*TouchUICapabilities)(nil),                   // 95: ibeam_rawpanel.TouchUICapabilities
+	(*TouchUIWidgetTypeCap)(nil),                  // 96: ibeam_rawpanel.TouchUIWidgetTypeCap
+	(*HWCJog_TargetPositionM)(nil),                // 97: ibeam_rawpanel.HWCJog.TargetPositionM
+	(*HWCText_ScaleM)(nil),                        // 98: ibeam_rawpanel.HWCText.ScaleM
+	(*HWCText_TextStyle)(nil),                     // 99: ibeam_rawpanel.HWCText.TextStyle
+	(*HWCText_TextStyle_Font)(nil),                // 100: ibeam_rawpanel.HWCText.TextStyle.Font
+	(*HWCOverlay_Box)(nil),                        // 101: ibeam_rawpanel.HWCOverlay.Box
+	nil,                                           // 102: ibeam_rawpanel.OutboundMessage.HWCavailabilityEntry
 }
 var file_ibeam_rawpanel_proto_ibeam_rawpanel_proto_depIdxs = []int32{
 	0,   // 0: ibeam_rawpanel.InboundMessage.FlowMessage:type_name -> ibeam_rawpanel.InboundMessage.FlowMsg
@@ -8227,7 +8353,7 @@ var file_ibeam_rawpanel_proto_ibeam_rawpanel_proto_depIdxs = []int32{
 	5,   // 39: ibeam_rawpanel.HWCMode.State:type_name -> ibeam_rawpanel.HWCMode.StateE
 	6,   // 40: ibeam_rawpanel.HWCExtended.Interpretation:type_name -> ibeam_rawpanel.HWCExtended.InterpretationE
 	7,   // 41: ibeam_rawpanel.HWCJog.Mode:type_name -> ibeam_rawpanel.HWCJog.ModeE
-	96,  // 42: ibeam_rawpanel.HWCJog.TargetPosition:type_name -> ibeam_rawpanel.HWCJog.TargetPositionM
+	97,  // 42: ibeam_rawpanel.HWCJog.TargetPosition:type_name -> ibeam_rawpanel.HWCJog.TargetPositionM
 	52,  // 43: ibeam_rawpanel.HWCColor.ColorRGB:type_name -> ibeam_rawpanel.ColorRGB
 	53,  // 44: ibeam_rawpanel.HWCColor.ColorIndex:type_name -> ibeam_rawpanel.ColorIndex
 	52,  // 45: ibeam_rawpanel.Color.ColorRGB:type_name -> ibeam_rawpanel.ColorRGB
@@ -8237,19 +8363,19 @@ var file_ibeam_rawpanel_proto_ibeam_rawpanel_proto_depIdxs = []int32{
 	10,  // 49: ibeam_rawpanel.HWCText.StateIcon:type_name -> ibeam_rawpanel.HWCText.StateIconE
 	11,  // 50: ibeam_rawpanel.HWCText.ModifierIcon:type_name -> ibeam_rawpanel.HWCText.ModifierIconE
 	12,  // 51: ibeam_rawpanel.HWCText.PairMode:type_name -> ibeam_rawpanel.HWCText.PairModeE
-	97,  // 52: ibeam_rawpanel.HWCText.Scale:type_name -> ibeam_rawpanel.HWCText.ScaleM
-	98,  // 53: ibeam_rawpanel.HWCText.TextStyling:type_name -> ibeam_rawpanel.HWCText.TextStyle
+	98,  // 52: ibeam_rawpanel.HWCText.Scale:type_name -> ibeam_rawpanel.HWCText.ScaleM
+	99,  // 53: ibeam_rawpanel.HWCText.TextStyling:type_name -> ibeam_rawpanel.HWCText.TextStyle
 	51,  // 54: ibeam_rawpanel.HWCText.PixelColor:type_name -> ibeam_rawpanel.Color
 	51,  // 55: ibeam_rawpanel.HWCText.BackgroundColor:type_name -> ibeam_rawpanel.Color
 	15,  // 56: ibeam_rawpanel.HWCGfx.ImageType:type_name -> ibeam_rawpanel.HWCGfx.ImageTypeE
-	100, // 57: ibeam_rawpanel.HWCOverlay.Boxes:type_name -> ibeam_rawpanel.HWCOverlay.Box
+	101, // 57: ibeam_rawpanel.HWCOverlay.Boxes:type_name -> ibeam_rawpanel.HWCOverlay.Box
 	16,  // 58: ibeam_rawpanel.ProcGfxConverter.ImageType:type_name -> ibeam_rawpanel.ProcGfxConverter.ImageTypeE
 	17,  // 59: ibeam_rawpanel.ProcGfxConverter.Scaling:type_name -> ibeam_rawpanel.ProcGfxConverter.ScalingE
 	18,  // 60: ibeam_rawpanel.ProcAudioMeter.MeterType:type_name -> ibeam_rawpanel.ProcAudioMeter.MeterTypeE
 	19,  // 61: ibeam_rawpanel.ProcUniText.Align:type_name -> ibeam_rawpanel.ProcUniText.AlignTypeE
 	20,  // 62: ibeam_rawpanel.ProcIcon.IconType:type_name -> ibeam_rawpanel.ProcIcon.ImageTypeE
 	21,  // 63: ibeam_rawpanel.OutboundMessage.FlowMessage:type_name -> ibeam_rawpanel.OutboundMessage.FlowMsg
-	101, // 64: ibeam_rawpanel.OutboundMessage.HWCavailability:type_name -> ibeam_rawpanel.OutboundMessage.HWCavailabilityEntry
+	102, // 64: ibeam_rawpanel.OutboundMessage.HWCavailability:type_name -> ibeam_rawpanel.OutboundMessage.HWCavailabilityEntry
 	81,  // 65: ibeam_rawpanel.OutboundMessage.PanelInfo:type_name -> ibeam_rawpanel.PanelInfo
 	83,  // 66: ibeam_rawpanel.OutboundMessage.PanelTopology:type_name -> ibeam_rawpanel.PanelTopology
 	84,  // 67: ibeam_rawpanel.OutboundMessage.BurninProfile:type_name -> ibeam_rawpanel.BurninProfile
@@ -8269,7 +8395,7 @@ var file_ibeam_rawpanel_proto_ibeam_rawpanel_proto_depIdxs = []int32{
 	85,  // 81: ibeam_rawpanel.OutboundMessage.CalibrationProfile:type_name -> ibeam_rawpanel.CalibrationProfile
 	85,  // 82: ibeam_rawpanel.OutboundMessage.DefaultCalibrationProfile:type_name -> ibeam_rawpanel.CalibrationProfile
 	86,  // 83: ibeam_rawpanel.OutboundMessage.NetworkConfig:type_name -> ibeam_rawpanel.NetworkConfig
-	94,  // 84: ibeam_rawpanel.OutboundMessage.TouchUICapabilities:type_name -> ibeam_rawpanel.TouchUICapabilities
+	95,  // 84: ibeam_rawpanel.OutboundMessage.TouchUICapabilities:type_name -> ibeam_rawpanel.TouchUICapabilities
 	87,  // 85: ibeam_rawpanel.OutboundMessage.TouchUIConfig:type_name -> ibeam_rawpanel.TouchUIConfig
 	22,  // 86: ibeam_rawpanel.Environment.RunMode:type_name -> ibeam_rawpanel.Environment.RunModeE
 	72,  // 87: ibeam_rawpanel.HWCEvent.Binary:type_name -> ibeam_rawpanel.BinaryEvent
@@ -8291,23 +8417,25 @@ var file_ibeam_rawpanel_proto_ibeam_rawpanel_proto_depIdxs = []int32{
 	27,  // 103: ibeam_rawpanel.TouchUIWidget.Type:type_name -> ibeam_rawpanel.TouchUIWidget.WidgetTypeE
 	92,  // 104: ibeam_rawpanel.TouchUIWidget.Options:type_name -> ibeam_rawpanel.TouchUIWidgetOptions
 	51,  // 105: ibeam_rawpanel.TouchUIWidgetOptions.Color:type_name -> ibeam_rawpanel.Color
-	93,  // 106: ibeam_rawpanel.TouchUIWidgetOptions.Params:type_name -> ibeam_rawpanel.TouchUICompressorParam
+	94,  // 106: ibeam_rawpanel.TouchUIWidgetOptions.Params:type_name -> ibeam_rawpanel.TouchUICompressorParam
 	28,  // 107: ibeam_rawpanel.TouchUIWidgetOptions.EditKind:type_name -> ibeam_rawpanel.TouchUIWidgetOptions.EditKindE
 	29,  // 108: ibeam_rawpanel.TouchUIWidgetOptions.HiddenPolicy:type_name -> ibeam_rawpanel.TouchUIWidgetOptions.HiddenPolicyE
-	30,  // 109: ibeam_rawpanel.TouchUICompressorParam.Role:type_name -> ibeam_rawpanel.TouchUICompressorParam.RoleE
-	95,  // 110: ibeam_rawpanel.TouchUICapabilities.WidgetTypes:type_name -> ibeam_rawpanel.TouchUIWidgetTypeCap
-	26,  // 111: ibeam_rawpanel.TouchUICapabilities.CurrentOrientation:type_name -> ibeam_rawpanel.TouchUIGlobalOptions.DisplayOrientationE
-	27,  // 112: ibeam_rawpanel.TouchUIWidgetTypeCap.Type:type_name -> ibeam_rawpanel.TouchUIWidget.WidgetTypeE
-	13,  // 113: ibeam_rawpanel.HWCText.ScaleM.ScaleType:type_name -> ibeam_rawpanel.HWCText.ScaleM.ScaleTypeE
-	99,  // 114: ibeam_rawpanel.HWCText.TextStyle.TitleFont:type_name -> ibeam_rawpanel.HWCText.TextStyle.Font
-	99,  // 115: ibeam_rawpanel.HWCText.TextStyle.TextFont:type_name -> ibeam_rawpanel.HWCText.TextStyle.Font
-	14,  // 116: ibeam_rawpanel.HWCText.TextStyle.Font.FontFace:type_name -> ibeam_rawpanel.HWCText.TextStyle.Font.FontFaceE
-	51,  // 117: ibeam_rawpanel.HWCOverlay.Box.Color:type_name -> ibeam_rawpanel.Color
-	118, // [118:118] is the sub-list for method output_type
-	118, // [118:118] is the sub-list for method input_type
-	118, // [118:118] is the sub-list for extension type_name
-	118, // [118:118] is the sub-list for extension extendee
-	0,   // [0:118] is the sub-list for field type_name
+	93,  // 109: ibeam_rawpanel.TouchUIWidgetOptions.Markers:type_name -> ibeam_rawpanel.TouchUIMarker
+	51,  // 110: ibeam_rawpanel.TouchUIMarker.Color:type_name -> ibeam_rawpanel.Color
+	30,  // 111: ibeam_rawpanel.TouchUICompressorParam.Role:type_name -> ibeam_rawpanel.TouchUICompressorParam.RoleE
+	96,  // 112: ibeam_rawpanel.TouchUICapabilities.WidgetTypes:type_name -> ibeam_rawpanel.TouchUIWidgetTypeCap
+	26,  // 113: ibeam_rawpanel.TouchUICapabilities.CurrentOrientation:type_name -> ibeam_rawpanel.TouchUIGlobalOptions.DisplayOrientationE
+	27,  // 114: ibeam_rawpanel.TouchUIWidgetTypeCap.Type:type_name -> ibeam_rawpanel.TouchUIWidget.WidgetTypeE
+	13,  // 115: ibeam_rawpanel.HWCText.ScaleM.ScaleType:type_name -> ibeam_rawpanel.HWCText.ScaleM.ScaleTypeE
+	100, // 116: ibeam_rawpanel.HWCText.TextStyle.TitleFont:type_name -> ibeam_rawpanel.HWCText.TextStyle.Font
+	100, // 117: ibeam_rawpanel.HWCText.TextStyle.TextFont:type_name -> ibeam_rawpanel.HWCText.TextStyle.Font
+	14,  // 118: ibeam_rawpanel.HWCText.TextStyle.Font.FontFace:type_name -> ibeam_rawpanel.HWCText.TextStyle.Font.FontFaceE
+	51,  // 119: ibeam_rawpanel.HWCOverlay.Box.Color:type_name -> ibeam_rawpanel.Color
+	120, // [120:120] is the sub-list for method output_type
+	120, // [120:120] is the sub-list for method input_type
+	120, // [120:120] is the sub-list for extension type_name
+	120, // [120:120] is the sub-list for extension extendee
+	0,   // [0:120] is the sub-list for field type_name
 }
 
 func init() { file_ibeam_rawpanel_proto_ibeam_rawpanel_proto_init() }
@@ -8322,7 +8450,7 @@ func file_ibeam_rawpanel_proto_ibeam_rawpanel_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_ibeam_rawpanel_proto_ibeam_rawpanel_proto_rawDesc), len(file_ibeam_rawpanel_proto_ibeam_rawpanel_proto_rawDesc)),
 			NumEnums:      31,
-			NumMessages:   71,
+			NumMessages:   72,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

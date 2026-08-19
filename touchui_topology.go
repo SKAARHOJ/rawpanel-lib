@@ -36,6 +36,69 @@ const touchUIPageCanvasH = 1000
 const touchUIMaxDispW = 256
 const touchUIMaxDispH = 160
 
+// touchUIMarkerTypeKey is the TypeIndex key for a VIDEO widget's overlay markers. Markers are
+// not a WidgetTypeE, so this sits clear of the widget-ordinal range touchUITypeIndexKey spans
+// (base+0..11, +50 vertical, +100 editable label).
+const touchUIMarkerTypeKey = touchUITypeBase + 200
+
+// touchUIMarkerTypeDef is the type def for one overlay marker HWC. A marker draws nothing on
+// the panel itself — it positions a box on its parent VIDEO widget — so it is inert except for
+// the display, which is NOT decoration: clients gate text feedback on the presence of a display
+// (Reactor: dispatch/DFeedback.go), and a marker's whole purpose is to be driven by a text
+// feedback carrying "x,y[,w,h]". Without a Disp no geometry would ever reach it.
+func touchUIMarkerTypeDef() topology.TopologyHWcTypeDef {
+	return topology.TopologyHWcTypeDef{
+		W:      touchUICellTenthMM/2 - touchUICellGapTenthMM,
+		H:      touchUICellTenthMM/4 - touchUICellGapTenthMM,
+		Subidx: -1,
+		Desc:   "TouchUI video marker",
+		Disp:   &topology.TopologyHWcTypeDef_Display{W: 64, H: 16, Subidx: -1, Type: "text"},
+		Sub: []topology.TopologyHWcTypeDefSubEl{
+			subRect(-70, -20, 140, 40, 4, touchUIStyleFrame),
+		},
+	}
+}
+
+// markerComponents derives one topology component per overlay marker on a VIDEO widget, and
+// registers the shared marker type def on first use. Markers MUST be real components — unlike a
+// compressor's member parameters, which stay invisible to the topology and are therefore
+// addressable only by compressor-aware clients. A marker exists precisely so a general-purpose
+// client can bind an ordinary feedback to it, and it can only do that for an HWC the panel
+// advertises.
+//
+// They are drawn as a stack inside the parent's rect: a marker has no place of its own on the
+// screen (it paints a box on the video), so anchoring it to its parent is what makes it
+// recognisable in a client's panel view. Purely presentational — nothing reads these back.
+func markerComponents(top *topology.Topology, widget *rwp.TouchUIWidget, parent topology.TopologyHWcomponent, parentW, parentH int) []topology.TopologyHWcomponent {
+	markers := widget.GetOptions().GetMarkers()
+	if len(markers) == 0 {
+		return nil
+	}
+	if _, known := top.TypeIndex[touchUIMarkerTypeKey]; !known {
+		top.TypeIndex[touchUIMarkerTypeKey] = touchUIMarkerTypeDef()
+	}
+
+	base := touchUIMarkerTypeDef()
+	// Fit the stack to the parent: as wide as it allows, and tall enough that every marker
+	// fits however many there are.
+	rowH := parentH / (len(markers) + 1)
+	override := scaleTypeDef(base, ratio(parentW*3/4, base.W), ratio(rowH, base.H))
+
+	out := make([]topology.TopologyHWcomponent, 0, len(markers))
+	for i, m := range markers {
+		comp := topology.TopologyHWcomponent{
+			Id:           m.GetHWCID(),
+			Txt:          fmt.Sprintf("Marker %d", m.GetHWCID()),
+			Type:         touchUIMarkerTypeKey,
+			X:            parent.X + parentW/8,
+			Y:            parent.Y + rowH*(i+1),
+			TypeOverride: &override,
+		}
+		out = append(out, comp)
+	}
+	return out
+}
+
 // touchUITypeIndexKey derives the TypeIndex key for a widget. It MUST discriminate on every
 // option that changes the type def below, or two widgets of the same type with different
 // options collide in TypeIndex and the second silently inherits the first's drawing.
@@ -193,7 +256,10 @@ func touchUITypeDef(t rwp.TouchUIWidget_WidgetTypeE, opts *rwp.TouchUIWidgetOpti
 		def.Desc = "TouchUI image"
 		def.Disp = &topology.TopologyHWcTypeDef_Display{W: 128, H: 96, Subidx: -1, Type: "touch"}
 	case rwp.TouchUIWidget_VIDEO:
-		def.In = "b" // tap events (unless NoTapEvents)
+		// Two input types: the tap pair (unless NoTapEvents) and the 2D position of the touch.
+		// Clients read only the first token (topology.getInputType cuts at the comma), so a
+		// video region still presents as a button to anything that has not been taught "xy".
+		def.In = "b,xy"
 		def.Desc = "TouchUI video region"
 		def.Disp = &topology.TopologyHWcTypeDef_Display{W: 320, H: 180, Subidx: -1, Type: "touch"}
 	case rwp.TouchUIWidget_ROLLER:
@@ -284,6 +350,9 @@ func TouchUIConfigToTopology(cfg *rwp.TouchUIConfig) *topology.Topology {
 				comp.Txt = fmt.Sprintf("Widget %d", widget.GetHWCID())
 			}
 
+			// The parent's extent on the abstract canvas, so markers can be laid out inside it.
+			var parentW, parentH int
+
 			if gridMode {
 				row, col := widget.GetRow(), widget.GetCol() // 1-based
 				if row < 1 || col < 1 || row > page.GetGridRows() || col > page.GetGridCols() {
@@ -308,20 +377,25 @@ func TouchUIConfigToTopology(cfg *rwp.TouchUIConfig) *topology.Topology {
 				override := scaleTypeDef(base, ratio(spanW, base.W), ratio(spanH, base.H))
 				comp.TypeOverride = &override
 				grid.HWcMap[row-1][col-1].Ids = append(grid.HWcMap[row-1][col-1].Ids, widget.GetHWCID())
+				parentW, parentH = spanW, spanH
 			} else {
 				// Free layout: pixel coordinates on the capability-reported screen, mapped 1:1
 				// onto the abstract 1/10mm topology canvas.
 				comp.X = int(widget.GetX())
 				comp.Y = int(widget.GetY())
+				base := touchUITypeDef(widget.GetType(), wOpts)
+				parentW, parentH = base.W, base.H
 				if widget.GetW() > 0 || widget.GetH() > 0 {
-					override := touchUITypeDef(widget.GetType(), wOpts)
+					override := base
 					override.W = int(widget.GetW())
 					override.H = int(widget.GetH())
 					comp.TypeOverride = &override
+					parentW, parentH = override.W, override.H
 				}
 			}
 
 			top.HWc = append(top.HWc, comp)
+			top.HWc = append(top.HWc, markerComponents(top, widget, comp, parentW, parentH)...)
 		}
 
 		if gridMode {

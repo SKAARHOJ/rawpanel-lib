@@ -77,6 +77,35 @@ func TestEffectiveEventMask(t *testing.T) {
 			&rwp.TouchUIWidget{HWCID: 103, Type: rwp.TouchUIWidget_COMPRESSOR},
 			0,
 		},
+		{
+			// A video region is pointed at, so it reports WHERE — same as an XYPAD.
+			"video reports a vector plus tap",
+			&rwp.TouchUIWidget{HWCID: 104, Type: rwp.TouchUIWidget_VIDEO},
+			helpers.TouchUIEventVector | helpers.TouchUIEventBinary,
+		},
+		{
+			// NoTapEvents keeps its original meaning — it suppresses the press/release pair
+			// — and must not take the position stream with it, or a widget that wants
+			// position without taps would have no way to ask for it.
+			"no-tap video still reports position",
+			&rwp.TouchUIWidget{HWCID: 105, Type: rwp.TouchUIWidget_VIDEO,
+				Options: &rwp.TouchUIWidgetOptions{NoTapEvents: true}},
+			helpers.TouchUIEventVector,
+		},
+		{
+			"video narrowed to taps only",
+			&rwp.TouchUIWidget{HWCID: 106, Type: rwp.TouchUIWidget_VIDEO,
+				EventMask: helpers.TouchUIEventBinary},
+			helpers.TouchUIEventBinary,
+		},
+		{
+			// An IMAGE is not a video: it stays a plain tap target and NoTapEvents still
+			// silences it completely.
+			"no-tap image is silent",
+			&rwp.TouchUIWidget{HWCID: 107, Type: rwp.TouchUIWidget_IMAGE,
+				Options: &rwp.TouchUIWidgetOptions{NoTapEvents: true}},
+			0,
+		},
 	}
 
 	for _, tt := range cases {
