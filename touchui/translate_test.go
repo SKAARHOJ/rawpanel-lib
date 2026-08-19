@@ -90,6 +90,34 @@ func TestEncoderAndFourWayMapping(t *testing.T) {
 	}
 }
 
+func TestKnobTickCount(t *testing.T) {
+	knob := func(o *rwp.TouchUIWidgetOptions) *rwp.TouchUIWidget {
+		return &rwp.TouchUIWidget{HWCID: 401, Type: rwp.TouchUIWidget_KNOB, Options: o}
+	}
+	cases := []struct {
+		name   string
+		widget *rwp.TouchUIWidget
+		want   uint32
+	}{
+		{"explicit wins over the range", knob(&rwp.TouchUIWidgetOptions{KnobTicks: 7, Min: 0, Max: 100, Step: 1}), 7},
+		{"explicit is clamped", knob(&rwp.TouchUIWidgetOptions{KnobTicks: 500}), MaxKnobTicks},
+		{"one tick per value", knob(&rwp.TouchUIWidgetOptions{Min: 0, Max: 10, Step: 1}), 11},
+		{"step over the implicit 0..1000", knob(&rwp.TouchUIWidgetOptions{Step: 100}), 11},
+		{"a dense range is capped", knob(&rwp.TouchUIWidgetOptions{Min: 0, Max: 1000, Step: 1}), MaxKnobTicks},
+		{"a step wider than the range still draws two", knob(&rwp.TouchUIWidgetOptions{Min: 0, Max: 5, Step: 50}), MinKnobTicks},
+		{"negative ranges count normally", knob(&rwp.TouchUIWidgetOptions{Min: -6, Max: 6, Step: 3}), 5},
+		{"no step is left to the renderer", knob(&rwp.TouchUIWidgetOptions{Min: 0, Max: 100}), 0},
+		{"an inverted range is left to the renderer", knob(&rwp.TouchUIWidgetOptions{Min: 10, Max: 5, Step: 1}), 0},
+		{"no options at all", knob(nil), 0},
+		{"non-knobs never carry a ring", &rwp.TouchUIWidget{Type: rwp.TouchUIWidget_SLIDER, Options: &rwp.TouchUIWidgetOptions{Step: 10}}, 0},
+	}
+	for _, c := range cases {
+		if got := KnobTickCount(c.widget); got != c.want {
+			t.Errorf("%s: got %d, want %d", c.name, got, c.want)
+		}
+	}
+}
+
 func TestActivePageFallback(t *testing.T) {
 	cfg := testConfig()
 	cfg.ActivePage = 99 // not a page

@@ -216,6 +216,12 @@ func touchUITypeDef(t rwp.TouchUIWidget_WidgetTypeE, opts *rwp.TouchUIWidgetOpti
 		def.In = "ar" // analog rotary (absolute 0..1000 dial)
 		def.Ext = "pos" // position feedback: driven like a motorized fader when the value changes externally
 		def.Desc = "TouchUI knob (rotary fader)"
+		// The dial prints a caption in the middle of the ring, so it is a text component as
+		// far as a client is concerned - Capabilities() has always advertised KNOB with
+		// TouchUIStateText. Without a Disp here Reactor gates the whole text path off
+		// (dispatch/DFeedback.go: "if typeDef.Disp != nil") and a behavior's Title/Textline1/
+		// Textline2 never leave the host. Sized in characters, like the LABEL display.
+		def.Disp = &topology.TopologyHWcTypeDef_Display{W: 12, H: 3, Subidx: -1, Type: "text"}
 		def.Sub = []topology.TopologyHWcTypeDefSubEl{
 			subCircle(0, 0, 150, touchUIStyleTrack),
 			subRect(-8, -140, 16, 70, 4, touchUIStyleHandle),
