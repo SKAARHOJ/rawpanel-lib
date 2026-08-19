@@ -115,6 +115,8 @@ func widgetToDef(w *rwp.TouchUIWidget) *gen.WidgetDef {
 		KnobVariant: gen.WidgetDef_KnobVariant(opts.GetKnobVariant()),
 		KnobTicks:   KnobTickCount(w),
 
+		SliderVariant: gen.WidgetDef_SliderVariant(opts.GetSliderVariant()),
+
 		Choices:      joinChoices(opts.GetChoices()),
 		Relative:     opts.GetRelative(),
 		CenterReturn: opts.GetCenterReturn(),

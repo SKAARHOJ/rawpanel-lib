@@ -196,6 +196,10 @@ func touchUITypeDef(t rwp.TouchUIWidget_WidgetTypeE, opts *rwp.TouchUIWidgetOpti
 	case rwp.TouchUIWidget_SLIDER:
 		def.Desc = "TouchUI slider"
 		def.Ext = "pos" // position feedback: driven like a motorized fader when the value changes externally
+		// Prints a caption - on the bar for BAR, under the track for LINE - so it is a text
+		// component to a client, which Capabilities() has always advertised. See the KNOB case
+		// below for why the Disp is what actually lets a behavior's text reach the panel.
+		def.Disp = &topology.TopologyHWcTypeDef_Display{W: 12, H: 3, Subidx: -1, Type: "text"}
 		if vertical {
 			def.In = "av"
 			def.H = 2*touchUICellTenthMM - touchUICellGapTenthMM
