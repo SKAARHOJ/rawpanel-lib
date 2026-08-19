@@ -156,6 +156,57 @@ func (WidgetDef_EditKind) EnumDescriptor() ([]byte, []int) {
 	return file_touchmanager_proto_rawDescGZIP(), []int{6, 1}
 }
 
+// KNOB visual style. The drag interaction (absolute value 0..1000) is identical
+// across all; only the rendering differs.
+type WidgetDef_KnobVariant int32
+
+const (
+	WidgetDef_KNOB_ARC   WidgetDef_KnobVariant = 0 // default: 270° arc + thumb + centered value
+	WidgetDef_KNOB_TICKS WidgetDef_KnobVariant = 1 // 270° arc framed by a decorative tick ring
+	WidgetDef_KNOB_GAUGE WidgetDef_KnobVariant = 2 // 180° half-dial with a needle
+)
+
+// Enum value maps for WidgetDef_KnobVariant.
+var (
+	WidgetDef_KnobVariant_name = map[int32]string{
+		0: "KNOB_ARC",
+		1: "KNOB_TICKS",
+		2: "KNOB_GAUGE",
+	}
+	WidgetDef_KnobVariant_value = map[string]int32{
+		"KNOB_ARC":   0,
+		"KNOB_TICKS": 1,
+		"KNOB_GAUGE": 2,
+	}
+)
+
+func (x WidgetDef_KnobVariant) Enum() *WidgetDef_KnobVariant {
+	p := new(WidgetDef_KnobVariant)
+	*p = x
+	return p
+}
+
+func (x WidgetDef_KnobVariant) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (WidgetDef_KnobVariant) Descriptor() protoreflect.EnumDescriptor {
+	return file_touchmanager_proto_enumTypes[2].Descriptor()
+}
+
+func (WidgetDef_KnobVariant) Type() protoreflect.EnumType {
+	return &file_touchmanager_proto_enumTypes[2]
+}
+
+func (x WidgetDef_KnobVariant) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use WidgetDef_KnobVariant.Descriptor instead.
+func (WidgetDef_KnobVariant) EnumDescriptor() ([]byte, []int) {
+	return file_touchmanager_proto_rawDescGZIP(), []int{6, 2}
+}
+
 type CompressorParam_Role int32
 
 const (
@@ -198,11 +249,11 @@ func (x CompressorParam_Role) String() string {
 }
 
 func (CompressorParam_Role) Descriptor() protoreflect.EnumDescriptor {
-	return file_touchmanager_proto_enumTypes[2].Descriptor()
+	return file_touchmanager_proto_enumTypes[3].Descriptor()
 }
 
 func (CompressorParam_Role) Type() protoreflect.EnumType {
-	return &file_touchmanager_proto_enumTypes[2]
+	return &file_touchmanager_proto_enumTypes[3]
 }
 
 func (x CompressorParam_Role) Number() protoreflect.EnumNumber {
@@ -247,11 +298,11 @@ func (x VideoFeed_HiddenPolicy) String() string {
 }
 
 func (VideoFeed_HiddenPolicy) Descriptor() protoreflect.EnumDescriptor {
-	return file_touchmanager_proto_enumTypes[3].Descriptor()
+	return file_touchmanager_proto_enumTypes[4].Descriptor()
 }
 
 func (VideoFeed_HiddenPolicy) Type() protoreflect.EnumType {
-	return &file_touchmanager_proto_enumTypes[3]
+	return &file_touchmanager_proto_enumTypes[4]
 }
 
 func (x VideoFeed_HiddenPolicy) Number() protoreflect.EnumNumber {
@@ -317,11 +368,11 @@ func (x ConfigMenuItem_Type) String() string {
 }
 
 func (ConfigMenuItem_Type) Descriptor() protoreflect.EnumDescriptor {
-	return file_touchmanager_proto_enumTypes[4].Descriptor()
+	return file_touchmanager_proto_enumTypes[5].Descriptor()
 }
 
 func (ConfigMenuItem_Type) Type() protoreflect.EnumType {
-	return &file_touchmanager_proto_enumTypes[4]
+	return &file_touchmanager_proto_enumTypes[5]
 }
 
 func (x ConfigMenuItem_Type) Number() protoreflect.EnumNumber {
@@ -375,11 +426,11 @@ func (x ConfigMenuCtl_Op) String() string {
 }
 
 func (ConfigMenuCtl_Op) Descriptor() protoreflect.EnumDescriptor {
-	return file_touchmanager_proto_enumTypes[5].Descriptor()
+	return file_touchmanager_proto_enumTypes[6].Descriptor()
 }
 
 func (ConfigMenuCtl_Op) Type() protoreflect.EnumType {
-	return &file_touchmanager_proto_enumTypes[5]
+	return &file_touchmanager_proto_enumTypes[6]
 }
 
 func (x ConfigMenuCtl_Op) Number() protoreflect.EnumNumber {
@@ -436,11 +487,11 @@ func (x ConfigMenuEvent_Kind) String() string {
 }
 
 func (ConfigMenuEvent_Kind) Descriptor() protoreflect.EnumDescriptor {
-	return file_touchmanager_proto_enumTypes[6].Descriptor()
+	return file_touchmanager_proto_enumTypes[7].Descriptor()
 }
 
 func (ConfigMenuEvent_Kind) Type() protoreflect.EnumType {
-	return &file_touchmanager_proto_enumTypes[6]
+	return &file_touchmanager_proto_enumTypes[7]
 }
 
 func (x ConfigMenuEvent_Kind) Number() protoreflect.EnumNumber {
@@ -1096,7 +1147,9 @@ type WidgetDef struct {
 	// What this widget actually emits, precomputed by Go (touchui.EffectiveEventMask) using
 	// the rawpanel-lib mask bits: bit0 binary, bit1 pulsed, bit2 absolute, bit3 speed,
 	// bit4 vector, bit5 text. The renderer consults bit0 to decide whether to emit taps.
-	EventMask     uint32 `protobuf:"varint,27,opt,name=event_mask,json=eventMask,proto3" json:"event_mask,omitempty"`
+	EventMask     uint32                `protobuf:"varint,27,opt,name=event_mask,json=eventMask,proto3" json:"event_mask,omitempty"`
+	KnobVariant   WidgetDef_KnobVariant `protobuf:"varint,28,opt,name=knob_variant,json=knobVariant,proto3,enum=touchmanager.WidgetDef_KnobVariant" json:"knob_variant,omitempty"` // KNOB only; 0 = KNOB_ARC (default)
+	KnobTicks     uint32                `protobuf:"varint,29,opt,name=knob_ticks,json=knobTicks,proto3" json:"knob_ticks,omitempty"`                                               // KNOB TICKS/GAUGE: tick marks on the ring, already resolved by Go
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1316,6 +1369,20 @@ func (x *WidgetDef) GetEditMaxLen() uint32 {
 func (x *WidgetDef) GetEventMask() uint32 {
 	if x != nil {
 		return x.EventMask
+	}
+	return 0
+}
+
+func (x *WidgetDef) GetKnobVariant() WidgetDef_KnobVariant {
+	if x != nil {
+		return x.KnobVariant
+	}
+	return WidgetDef_KNOB_ARC
+}
+
+func (x *WidgetDef) GetKnobTicks() uint32 {
+	if x != nil {
+		return x.KnobTicks
 	}
 	return 0
 }
@@ -3345,7 +3412,7 @@ const file_touchmanager_proto_rawDesc = "" +
 	"\x05title\x18\x02 \x01(\tR\x05title\x12\x1b\n" +
 	"\tgrid_rows\x18\x03 \x01(\rR\bgridRows\x12\x1b\n" +
 	"\tgrid_cols\x18\x04 \x01(\rR\bgridCols\x121\n" +
-	"\awidgets\x18\x05 \x03(\v2\x17.touchmanager.WidgetDefR\awidgets\"\xf0\a\n" +
+	"\awidgets\x18\x05 \x03(\v2\x17.touchmanager.WidgetDefR\awidgets\"\x94\t\n" +
 	"\tWidgetDef\x12\x15\n" +
 	"\x06hwc_id\x18\x01 \x01(\rR\x05hwcId\x120\n" +
 	"\x04type\x18\x02 \x01(\x0e2\x1c.touchmanager.WidgetDef.TypeR\x04type\x12\x14\n" +
@@ -3377,7 +3444,10 @@ const file_touchmanager_proto_rawDesc = "" +
 	"\fedit_max_len\x18\x1a \x01(\rR\n" +
 	"editMaxLen\x12\x1d\n" +
 	"\n" +
-	"event_mask\x18\x1b \x01(\rR\teventMask\"\x94\x01\n" +
+	"event_mask\x18\x1b \x01(\rR\teventMask\x12F\n" +
+	"\fknob_variant\x18\x1c \x01(\x0e2#.touchmanager.WidgetDef.KnobVariantR\vknobVariant\x12\x1d\n" +
+	"\n" +
+	"knob_ticks\x18\x1d \x01(\rR\tknobTicks\"\x94\x01\n" +
 	"\x04Type\x12\n" +
 	"\n" +
 	"\x06BUTTON\x10\x00\x12\n" +
@@ -3402,7 +3472,13 @@ const file_touchmanager_proto_rawDesc = "" +
 	"\tEDIT_TEXT\x10\x01\x12\x0f\n" +
 	"\vEDIT_NUMBER\x10\x02\x12\v\n" +
 	"\aEDIT_IP\x10\x03\x12\x11\n" +
-	"\rEDIT_PASSWORD\x10\x04\"\xeb\x01\n" +
+	"\rEDIT_PASSWORD\x10\x04\";\n" +
+	"\vKnobVariant\x12\f\n" +
+	"\bKNOB_ARC\x10\x00\x12\x0e\n" +
+	"\n" +
+	"KNOB_TICKS\x10\x01\x12\x0e\n" +
+	"\n" +
+	"KNOB_GAUGE\x10\x02\"\xeb\x01\n" +
 	"\x0fCompressorParam\x12\x15\n" +
 	"\x06hwc_id\x18\x01 \x01(\rR\x05hwcId\x126\n" +
 	"\x04role\x18\x02 \x01(\x0e2\".touchmanager.CompressorParam.RoleR\x04role\x12\x10\n" +
@@ -3615,96 +3691,98 @@ func file_touchmanager_proto_rawDescGZIP() []byte {
 	return file_touchmanager_proto_rawDescData
 }
 
-var file_touchmanager_proto_enumTypes = make([]protoimpl.EnumInfo, 7)
+var file_touchmanager_proto_enumTypes = make([]protoimpl.EnumInfo, 8)
 var file_touchmanager_proto_msgTypes = make([]protoimpl.MessageInfo, 34)
 var file_touchmanager_proto_goTypes = []any{
 	(WidgetDef_Type)(0),         // 0: touchmanager.WidgetDef.Type
 	(WidgetDef_EditKind)(0),     // 1: touchmanager.WidgetDef.EditKind
-	(CompressorParam_Role)(0),   // 2: touchmanager.CompressorParam.Role
-	(VideoFeed_HiddenPolicy)(0), // 3: touchmanager.VideoFeed.HiddenPolicy
-	(ConfigMenuItem_Type)(0),    // 4: touchmanager.ConfigMenuItem.Type
-	(ConfigMenuCtl_Op)(0),       // 5: touchmanager.ConfigMenuCtl.Op
-	(ConfigMenuEvent_Kind)(0),   // 6: touchmanager.ConfigMenuEvent.Kind
-	(*ServerMessage)(nil),       // 7: touchmanager.ServerMessage
-	(*SetOrientation)(nil),      // 8: touchmanager.SetOrientation
-	(*SetSleep)(nil),            // 9: touchmanager.SetSleep
-	(*WidgetTree)(nil),          // 10: touchmanager.WidgetTree
-	(*GlobalOptions)(nil),       // 11: touchmanager.GlobalOptions
-	(*PageDef)(nil),             // 12: touchmanager.PageDef
-	(*WidgetDef)(nil),           // 13: touchmanager.WidgetDef
-	(*CompressorParam)(nil),     // 14: touchmanager.CompressorParam
-	(*VideoFeed)(nil),           // 15: touchmanager.VideoFeed
-	(*MarkerDef)(nil),           // 16: touchmanager.MarkerDef
-	(*WidgetState)(nil),         // 17: touchmanager.WidgetState
-	(*ModeState)(nil),           // 18: touchmanager.ModeState
-	(*TextState)(nil),           // 19: touchmanager.TextState
-	(*ValueState)(nil),          // 20: touchmanager.ValueState
-	(*OverlayState)(nil),        // 21: touchmanager.OverlayState
-	(*OverlayBox)(nil),          // 22: touchmanager.OverlayBox
-	(*WidgetGfx)(nil),           // 23: touchmanager.WidgetGfx
-	(*PageGfx)(nil),             // 24: touchmanager.PageGfx
-	(*ActivePage)(nil),          // 25: touchmanager.ActivePage
-	(*Ping)(nil),                // 26: touchmanager.Ping
-	(*ConfigMenuItem)(nil),      // 27: touchmanager.ConfigMenuItem
-	(*ConfigMenuPage)(nil),      // 28: touchmanager.ConfigMenuPage
-	(*ConfigMenuCtl)(nil),       // 29: touchmanager.ConfigMenuCtl
-	(*ConfigMenuEvent)(nil),     // 30: touchmanager.ConfigMenuEvent
-	(*UiEvent)(nil),             // 31: touchmanager.UiEvent
-	(*Hello)(nil),               // 32: touchmanager.Hello
-	(*WidgetEvent)(nil),         // 33: touchmanager.WidgetEvent
-	(*BinaryEv)(nil),            // 34: touchmanager.BinaryEv
-	(*PulsedEv)(nil),            // 35: touchmanager.PulsedEv
-	(*AbsoluteEv)(nil),          // 36: touchmanager.AbsoluteEv
-	(*VectorEv)(nil),            // 37: touchmanager.VectorEv
-	(*TextEv)(nil),              // 38: touchmanager.TextEv
-	(*PageSelect)(nil),          // 39: touchmanager.PageSelect
-	(*RawTouch)(nil),            // 40: touchmanager.RawTouch
+	(WidgetDef_KnobVariant)(0),  // 2: touchmanager.WidgetDef.KnobVariant
+	(CompressorParam_Role)(0),   // 3: touchmanager.CompressorParam.Role
+	(VideoFeed_HiddenPolicy)(0), // 4: touchmanager.VideoFeed.HiddenPolicy
+	(ConfigMenuItem_Type)(0),    // 5: touchmanager.ConfigMenuItem.Type
+	(ConfigMenuCtl_Op)(0),       // 6: touchmanager.ConfigMenuCtl.Op
+	(ConfigMenuEvent_Kind)(0),   // 7: touchmanager.ConfigMenuEvent.Kind
+	(*ServerMessage)(nil),       // 8: touchmanager.ServerMessage
+	(*SetOrientation)(nil),      // 9: touchmanager.SetOrientation
+	(*SetSleep)(nil),            // 10: touchmanager.SetSleep
+	(*WidgetTree)(nil),          // 11: touchmanager.WidgetTree
+	(*GlobalOptions)(nil),       // 12: touchmanager.GlobalOptions
+	(*PageDef)(nil),             // 13: touchmanager.PageDef
+	(*WidgetDef)(nil),           // 14: touchmanager.WidgetDef
+	(*CompressorParam)(nil),     // 15: touchmanager.CompressorParam
+	(*VideoFeed)(nil),           // 16: touchmanager.VideoFeed
+	(*MarkerDef)(nil),           // 17: touchmanager.MarkerDef
+	(*WidgetState)(nil),         // 18: touchmanager.WidgetState
+	(*ModeState)(nil),           // 19: touchmanager.ModeState
+	(*TextState)(nil),           // 20: touchmanager.TextState
+	(*ValueState)(nil),          // 21: touchmanager.ValueState
+	(*OverlayState)(nil),        // 22: touchmanager.OverlayState
+	(*OverlayBox)(nil),          // 23: touchmanager.OverlayBox
+	(*WidgetGfx)(nil),           // 24: touchmanager.WidgetGfx
+	(*PageGfx)(nil),             // 25: touchmanager.PageGfx
+	(*ActivePage)(nil),          // 26: touchmanager.ActivePage
+	(*Ping)(nil),                // 27: touchmanager.Ping
+	(*ConfigMenuItem)(nil),      // 28: touchmanager.ConfigMenuItem
+	(*ConfigMenuPage)(nil),      // 29: touchmanager.ConfigMenuPage
+	(*ConfigMenuCtl)(nil),       // 30: touchmanager.ConfigMenuCtl
+	(*ConfigMenuEvent)(nil),     // 31: touchmanager.ConfigMenuEvent
+	(*UiEvent)(nil),             // 32: touchmanager.UiEvent
+	(*Hello)(nil),               // 33: touchmanager.Hello
+	(*WidgetEvent)(nil),         // 34: touchmanager.WidgetEvent
+	(*BinaryEv)(nil),            // 35: touchmanager.BinaryEv
+	(*PulsedEv)(nil),            // 36: touchmanager.PulsedEv
+	(*AbsoluteEv)(nil),          // 37: touchmanager.AbsoluteEv
+	(*VectorEv)(nil),            // 38: touchmanager.VectorEv
+	(*TextEv)(nil),              // 39: touchmanager.TextEv
+	(*PageSelect)(nil),          // 40: touchmanager.PageSelect
+	(*RawTouch)(nil),            // 41: touchmanager.RawTouch
 }
 var file_touchmanager_proto_depIdxs = []int32{
-	10, // 0: touchmanager.ServerMessage.tree:type_name -> touchmanager.WidgetTree
-	17, // 1: touchmanager.ServerMessage.state:type_name -> touchmanager.WidgetState
-	23, // 2: touchmanager.ServerMessage.gfx:type_name -> touchmanager.WidgetGfx
-	25, // 3: touchmanager.ServerMessage.page:type_name -> touchmanager.ActivePage
-	26, // 4: touchmanager.ServerMessage.ping:type_name -> touchmanager.Ping
-	28, // 5: touchmanager.ServerMessage.menu_page:type_name -> touchmanager.ConfigMenuPage
-	29, // 6: touchmanager.ServerMessage.menu_ctl:type_name -> touchmanager.ConfigMenuCtl
-	8,  // 7: touchmanager.ServerMessage.orientation:type_name -> touchmanager.SetOrientation
-	9,  // 8: touchmanager.ServerMessage.sleep:type_name -> touchmanager.SetSleep
-	24, // 9: touchmanager.ServerMessage.page_bg:type_name -> touchmanager.PageGfx
-	12, // 10: touchmanager.WidgetTree.pages:type_name -> touchmanager.PageDef
-	11, // 11: touchmanager.WidgetTree.options:type_name -> touchmanager.GlobalOptions
-	16, // 12: touchmanager.WidgetTree.markers:type_name -> touchmanager.MarkerDef
-	13, // 13: touchmanager.PageDef.widgets:type_name -> touchmanager.WidgetDef
+	11, // 0: touchmanager.ServerMessage.tree:type_name -> touchmanager.WidgetTree
+	18, // 1: touchmanager.ServerMessage.state:type_name -> touchmanager.WidgetState
+	24, // 2: touchmanager.ServerMessage.gfx:type_name -> touchmanager.WidgetGfx
+	26, // 3: touchmanager.ServerMessage.page:type_name -> touchmanager.ActivePage
+	27, // 4: touchmanager.ServerMessage.ping:type_name -> touchmanager.Ping
+	29, // 5: touchmanager.ServerMessage.menu_page:type_name -> touchmanager.ConfigMenuPage
+	30, // 6: touchmanager.ServerMessage.menu_ctl:type_name -> touchmanager.ConfigMenuCtl
+	9,  // 7: touchmanager.ServerMessage.orientation:type_name -> touchmanager.SetOrientation
+	10, // 8: touchmanager.ServerMessage.sleep:type_name -> touchmanager.SetSleep
+	25, // 9: touchmanager.ServerMessage.page_bg:type_name -> touchmanager.PageGfx
+	13, // 10: touchmanager.WidgetTree.pages:type_name -> touchmanager.PageDef
+	12, // 11: touchmanager.WidgetTree.options:type_name -> touchmanager.GlobalOptions
+	17, // 12: touchmanager.WidgetTree.markers:type_name -> touchmanager.MarkerDef
+	14, // 13: touchmanager.PageDef.widgets:type_name -> touchmanager.WidgetDef
 	0,  // 14: touchmanager.WidgetDef.type:type_name -> touchmanager.WidgetDef.Type
-	15, // 15: touchmanager.WidgetDef.feed:type_name -> touchmanager.VideoFeed
-	14, // 16: touchmanager.WidgetDef.params:type_name -> touchmanager.CompressorParam
+	16, // 15: touchmanager.WidgetDef.feed:type_name -> touchmanager.VideoFeed
+	15, // 16: touchmanager.WidgetDef.params:type_name -> touchmanager.CompressorParam
 	1,  // 17: touchmanager.WidgetDef.edit_kind:type_name -> touchmanager.WidgetDef.EditKind
-	2,  // 18: touchmanager.CompressorParam.role:type_name -> touchmanager.CompressorParam.Role
-	3,  // 19: touchmanager.VideoFeed.hidden_policy:type_name -> touchmanager.VideoFeed.HiddenPolicy
-	18, // 20: touchmanager.WidgetState.mode:type_name -> touchmanager.ModeState
-	19, // 21: touchmanager.WidgetState.text:type_name -> touchmanager.TextState
-	20, // 22: touchmanager.WidgetState.value:type_name -> touchmanager.ValueState
-	21, // 23: touchmanager.WidgetState.overlay:type_name -> touchmanager.OverlayState
-	22, // 24: touchmanager.OverlayState.boxes:type_name -> touchmanager.OverlayBox
-	4,  // 25: touchmanager.ConfigMenuItem.type:type_name -> touchmanager.ConfigMenuItem.Type
-	27, // 26: touchmanager.ConfigMenuPage.items:type_name -> touchmanager.ConfigMenuItem
-	5,  // 27: touchmanager.ConfigMenuCtl.op:type_name -> touchmanager.ConfigMenuCtl.Op
-	6,  // 28: touchmanager.ConfigMenuEvent.kind:type_name -> touchmanager.ConfigMenuEvent.Kind
-	32, // 29: touchmanager.UiEvent.hello:type_name -> touchmanager.Hello
-	33, // 30: touchmanager.UiEvent.widget:type_name -> touchmanager.WidgetEvent
-	39, // 31: touchmanager.UiEvent.page_select:type_name -> touchmanager.PageSelect
-	40, // 32: touchmanager.UiEvent.touch:type_name -> touchmanager.RawTouch
-	30, // 33: touchmanager.UiEvent.menu:type_name -> touchmanager.ConfigMenuEvent
-	34, // 34: touchmanager.WidgetEvent.binary:type_name -> touchmanager.BinaryEv
-	35, // 35: touchmanager.WidgetEvent.pulsed:type_name -> touchmanager.PulsedEv
-	36, // 36: touchmanager.WidgetEvent.absolute:type_name -> touchmanager.AbsoluteEv
-	37, // 37: touchmanager.WidgetEvent.vector:type_name -> touchmanager.VectorEv
-	38, // 38: touchmanager.WidgetEvent.text:type_name -> touchmanager.TextEv
-	39, // [39:39] is the sub-list for method output_type
-	39, // [39:39] is the sub-list for method input_type
-	39, // [39:39] is the sub-list for extension type_name
-	39, // [39:39] is the sub-list for extension extendee
-	0,  // [0:39] is the sub-list for field type_name
+	2,  // 18: touchmanager.WidgetDef.knob_variant:type_name -> touchmanager.WidgetDef.KnobVariant
+	3,  // 19: touchmanager.CompressorParam.role:type_name -> touchmanager.CompressorParam.Role
+	4,  // 20: touchmanager.VideoFeed.hidden_policy:type_name -> touchmanager.VideoFeed.HiddenPolicy
+	19, // 21: touchmanager.WidgetState.mode:type_name -> touchmanager.ModeState
+	20, // 22: touchmanager.WidgetState.text:type_name -> touchmanager.TextState
+	21, // 23: touchmanager.WidgetState.value:type_name -> touchmanager.ValueState
+	22, // 24: touchmanager.WidgetState.overlay:type_name -> touchmanager.OverlayState
+	23, // 25: touchmanager.OverlayState.boxes:type_name -> touchmanager.OverlayBox
+	5,  // 26: touchmanager.ConfigMenuItem.type:type_name -> touchmanager.ConfigMenuItem.Type
+	28, // 27: touchmanager.ConfigMenuPage.items:type_name -> touchmanager.ConfigMenuItem
+	6,  // 28: touchmanager.ConfigMenuCtl.op:type_name -> touchmanager.ConfigMenuCtl.Op
+	7,  // 29: touchmanager.ConfigMenuEvent.kind:type_name -> touchmanager.ConfigMenuEvent.Kind
+	33, // 30: touchmanager.UiEvent.hello:type_name -> touchmanager.Hello
+	34, // 31: touchmanager.UiEvent.widget:type_name -> touchmanager.WidgetEvent
+	40, // 32: touchmanager.UiEvent.page_select:type_name -> touchmanager.PageSelect
+	41, // 33: touchmanager.UiEvent.touch:type_name -> touchmanager.RawTouch
+	31, // 34: touchmanager.UiEvent.menu:type_name -> touchmanager.ConfigMenuEvent
+	35, // 35: touchmanager.WidgetEvent.binary:type_name -> touchmanager.BinaryEv
+	36, // 36: touchmanager.WidgetEvent.pulsed:type_name -> touchmanager.PulsedEv
+	37, // 37: touchmanager.WidgetEvent.absolute:type_name -> touchmanager.AbsoluteEv
+	38, // 38: touchmanager.WidgetEvent.vector:type_name -> touchmanager.VectorEv
+	39, // 39: touchmanager.WidgetEvent.text:type_name -> touchmanager.TextEv
+	40, // [40:40] is the sub-list for method output_type
+	40, // [40:40] is the sub-list for method input_type
+	40, // [40:40] is the sub-list for extension type_name
+	40, // [40:40] is the sub-list for extension extendee
+	0,  // [0:40] is the sub-list for field type_name
 }
 
 func init() { file_touchmanager_proto_init() }
@@ -3745,7 +3823,7 @@ func file_touchmanager_proto_init() {
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_touchmanager_proto_rawDesc), len(file_touchmanager_proto_rawDesc)),
-			NumEnums:      7,
+			NumEnums:      8,
 			NumMessages:   34,
 			NumExtensions: 0,
 			NumServices:   0,

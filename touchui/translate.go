@@ -93,25 +93,27 @@ func defaultPage(cfg *rwp.TouchUIConfig) uint32 {
 func widgetToDef(w *rwp.TouchUIWidget) *gen.WidgetDef {
 	opts := w.GetOptions()
 	return &gen.WidgetDef{
-		HwcId:     w.GetHWCID(),
-		Type:      gen.WidgetDef_Type(w.GetType()),
-		Label:     w.GetLabel(),
-		Row:       w.GetRow(),
-		Col:       w.GetCol(),
-		RowSpan:   w.GetRowSpan(),
-		ColSpan:   w.GetColSpan(),
-		X:         w.GetX(),
-		Y:         w.GetY(),
-		W:         w.GetW(),
-		H:         w.GetH(),
-		Min:       opts.GetMin(),
-		Max:       opts.GetMax(),
-		Step:      opts.GetStep(),
-		Vertical:  opts.GetVertical(),
-		AccentRgb: ColorToRGB(opts.GetColor()),
-		NoTap:     opts.GetNoTapEvents(),
-		Momentary: opts.GetMomentary(),
-		FourWay:   opts.GetFourWay(),
+		HwcId:       w.GetHWCID(),
+		Type:        gen.WidgetDef_Type(w.GetType()),
+		Label:       w.GetLabel(),
+		Row:         w.GetRow(),
+		Col:         w.GetCol(),
+		RowSpan:     w.GetRowSpan(),
+		ColSpan:     w.GetColSpan(),
+		X:           w.GetX(),
+		Y:           w.GetY(),
+		W:           w.GetW(),
+		H:           w.GetH(),
+		Min:         opts.GetMin(),
+		Max:         opts.GetMax(),
+		Step:        opts.GetStep(),
+		Vertical:    opts.GetVertical(),
+		AccentRgb:   ColorToRGB(opts.GetColor()),
+		NoTap:       opts.GetNoTapEvents(),
+		Momentary:   opts.GetMomentary(),
+		FourWay:     opts.GetFourWay(),
+		KnobVariant: gen.WidgetDef_KnobVariant(opts.GetKnobVariant()),
+		KnobTicks:   KnobTickCount(w),
 
 		Choices:      joinChoices(opts.GetChoices()),
 		Relative:     opts.GetRelative(),
@@ -121,6 +123,50 @@ func widgetToDef(w *rwp.TouchUIWidget) *gen.WidgetDef {
 		EditMaxLen:   opts.GetEditMaxLen(),
 		EventMask:    EffectiveEventMask(w),
 	}
+}
+
+// Bounds on the KNOB tick ring: below 2 there is nothing to space out, and past 61 the marks
+// merge into a solid ring on a panel-sized dial.
+const (
+	MinKnobTicks = 2
+	MaxKnobTicks = 61
+)
+
+// KnobTickCount is how many tick marks the TICKS/GAUGE knob variants draw. An explicit
+// Options.KnobTicks wins; otherwise the ring is derived from the widget's own range so that a
+// stepped knob shows one tick per selectable value. Resolved here rather than in the renderer,
+// which has no defaulting logic. 0 means undecidable — no step, or a degenerate range — and
+// leaves the renderer on its per-variant default.
+func KnobTickCount(w *rwp.TouchUIWidget) uint32 {
+	if w.GetType() != rwp.TouchUIWidget_KNOB {
+		return 0
+	}
+	opts := w.GetOptions()
+	if n := opts.GetKnobTicks(); n > 0 {
+		return clampKnobTicks(int64(n))
+	}
+	step := int64(opts.GetStep())
+	if step == 0 {
+		return 0
+	}
+	lo, hi := int64(opts.GetMin()), int64(opts.GetMax())
+	if lo == 0 && hi == 0 {
+		hi = 1000 // the implicit default range, same as the renderer's
+	}
+	if hi <= lo {
+		return 0
+	}
+	return clampKnobTicks((hi-lo)/step + 1)
+}
+
+func clampKnobTicks(n int64) uint32 {
+	if n < MinKnobTicks {
+		return MinKnobTicks
+	}
+	if n > MaxKnobTicks {
+		return MaxKnobTicks
+	}
+	return uint32(n)
 }
 
 // joinChoices renders a ROLLER's options as the single '\n'-joined string the renderer wants
