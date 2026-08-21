@@ -247,6 +247,7 @@ func touchUITypeDef(t rwp.TouchUIWidget_WidgetTypeE, opts *rwp.TouchUIWidgetOpti
 		}
 	case rwp.TouchUIWidget_LABEL:
 		def.Desc = "TouchUI label"
+		def.Out = "rgb"
 		def.Disp = &topology.TopologyHWcTypeDef_Display{W: 20, H: 3, Subidx: -1, Type: "text"}
 		if opts.GetEditKind() != rwp.TouchUIWidgetOptions_NONE {
 			// A tap opens the keyboard and the commit rides a Text event, for which the
