@@ -29,6 +29,7 @@ type RawPanelState struct {
 	rawPanelSupport     *rwp.RawPanelSupport     // Support flags from panel info
 	touchUICapabilities *rwp.TouchUICapabilities // TouchUI capabilities (response to RequestTouchUICapabilities)
 	touchUIConfig       *rwp.TouchUIConfig       // Currently active TouchUI config (response to RequestTouchUIConfig)
+	touchUIActivePage   uint32                   // TouchUI page/tab the panel is displaying now. 0 = not reported yet
 }
 
 func (rps *RawPanelState) GetName() string {
@@ -68,6 +69,15 @@ func (rps *RawPanelState) GetTouchUIConfig() *rwp.TouchUIConfig {
 	rps.RLock()
 	defer rps.RUnlock()
 	return rps.touchUIConfig
+}
+
+// Returns the TouchUI page the panel is currently displaying (see BindTouchUIActivePage).
+// Zero means the panel has not reported a page yet, which is also the case for a panel with
+// no TouchUI config active.
+func (rps *RawPanelState) GetTouchUIActivePage() uint32 {
+	rps.RLock()
+	defer rps.RUnlock()
+	return rps.touchUIActivePage
 }
 
 // Returns whether the panel reports support for TouchUI widget configuration

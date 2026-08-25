@@ -253,6 +253,10 @@ func TestTouchUIOutbound(t *testing.T) {
 			[]string{"_touchUIConfig=" + configJSON},
 		},
 		{
+			[]string{"_touchUIActivePage=3"},
+			[]string{"_touchUIActivePage=3"},
+		},
+		{
 			[]string{"_support=ASCII,Binary,TouchUI"},
 			[]string{"_support=ASCII,Binary,TouchUI"},
 		},
@@ -364,6 +368,14 @@ func TestTouchUIOutboundFromBinary(t *testing.T) {
 				},
 			},
 			[]string{"_touchUIConfig=" + touchUIStringFromConfig(config)},
+		},
+		{
+			[]*rwp.OutboundMessage{
+				{
+					TouchUIActivePage: &rwp.TouchUIActivePage{PageId: 3},
+				},
+			},
+			[]string{"_touchUIActivePage=3"},
 		},
 		{
 			[]*rwp.OutboundMessage{

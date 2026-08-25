@@ -43,15 +43,22 @@ const touchUIMarkerTypeKey = touchUITypeBase + 200
 
 // touchUIMarkerTypeDef is the type def for one overlay marker HWC. A marker draws nothing on
 // the panel itself — it positions a box on its parent VIDEO widget — so it is inert except for
-// the display, which is NOT decoration: clients gate text feedback on the presence of a display
-// (Reactor: dispatch/DFeedback.go), and a marker's whole purpose is to be driven by a text
-// feedback carrying "x,y[,w,h]". Without a Disp no geometry would ever reach it.
+// two capabilities that are NOT decoration, because clients gate feedback on them:
+//   - Disp: clients only send text feedback to a component with a display (Reactor:
+//     dispatch/DFeedback.go), and a marker's whole purpose is to be driven by a text feedback
+//     carrying "x,y[,w,h]". Without it no geometry would ever reach the marker.
+//   - Out "rgb": clients only send HWCColor and HWCMode to a component with a colour output
+//     (same gate). The marker consumes both — HWCColor overrides its box colour and
+//     HWCMode OFF hides it — so without an Out the box could never be coloured, shown or
+//     hidden by an ordinary feedback: Reactor initializes every HWC's mode to OFF and only
+//     an Intensity setting upgrades it, which is what makes the box show at all.
 func touchUIMarkerTypeDef() topology.TopologyHWcTypeDef {
 	return topology.TopologyHWcTypeDef{
 		W:      touchUICellTenthMM/2 - touchUICellGapTenthMM,
 		H:      touchUICellTenthMM/4 - touchUICellGapTenthMM,
 		Subidx: -1,
 		Desc:   "TouchUI video marker",
+		Out:    "rgb",
 		Disp:   &topology.TopologyHWcTypeDef_Display{W: 64, H: 16, Subidx: -1, Type: "text"},
 		Sub: []topology.TopologyHWcTypeDefSubEl{
 			subRect(-70, -20, 140, 40, 4, touchUIStyleFrame),

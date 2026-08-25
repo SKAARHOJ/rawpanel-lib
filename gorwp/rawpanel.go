@@ -53,7 +53,8 @@ type RawPanel struct {
 	intensityBindings  map[uint32]IntensityFunc
 	triggerBindings    map[uint32]TriggerFunc
 	visibilityBindings map[uint32]VisibilityFunc
-	touchUIConfigFunc  TouchUIConfigFunc // Called when the panel reports its active TouchUI config
+	touchUIConfigFunc  TouchUIConfigFunc     // Called when the panel reports its active TouchUI config
+	touchUIPageFunc    TouchUIActivePageFunc // Called when the panel reports the page it displays
 
 	// State
 	State RawPanelState
@@ -327,6 +328,16 @@ func (rp *RawPanel) procesMessagesFromPanel(messagesFromPanel []*rwp.OutboundMes
 			rp.State.Unlock()
 			if rp.touchUIConfigFunc != nil {
 				rp.touchUIConfigFunc(msg.TouchUIConfig)
+			}
+		}
+
+		// TouchUI active page (spontaneous on every page change, and on RequestTouchUIConfig):
+		if msg.TouchUIActivePage != nil {
+			rp.State.Lock()
+			rp.State.touchUIActivePage = msg.TouchUIActivePage.PageId
+			rp.State.Unlock()
+			if rp.touchUIPageFunc != nil {
+				rp.touchUIPageFunc(msg.TouchUIActivePage.PageId)
 			}
 		}
 
@@ -664,4 +675,16 @@ type TouchUIConfigFunc func(config *rwp.TouchUIConfig)
 // config — in response to RequestTouchUIConfig, or as a spontaneous multi-client sync push.
 func (rp *RawPanel) BindTouchUIConfig(f TouchUIConfigFunc) {
 	rp.touchUIConfigFunc = f
+}
+
+// Type TouchUIActivePageFunc is the callback signature for the page the panel is displaying.
+type TouchUIActivePageFunc func(pageId uint32)
+
+// BindTouchUIActivePage sets a callback invoked whenever the panel reports which TouchUI page
+// it is displaying: on every change, whoever caused it (a tap on the panel's own tab bar, this
+// or another client's SetTouchUIActivePage, or a config that opens on a different page), and in
+// answer to RequestTouchUIConfig. Tracking the page from HWCavailability instead would miss a
+// page that carries no widgets.
+func (rp *RawPanel) BindTouchUIActivePage(f TouchUIActivePageFunc) {
+	rp.touchUIPageFunc = f
 }
