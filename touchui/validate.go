@@ -121,6 +121,9 @@ func validateWidgetOptions(widget *rwp.TouchUIWidget, hwcIDs map[uint32]bool) er
 	if opts.GetEditMaxLen() > MaxEditLen {
 		return fmt.Errorf("widget %d: EditMaxLen %d exceeds the maximum of %d", id, opts.GetEditMaxLen(), MaxEditLen)
 	}
+	if opts.GetLabelAlign() != rwp.TouchUIWidgetOptions_TOP && widget.GetType() != rwp.TouchUIWidget_LABEL {
+		return fmt.Errorf("widget %d: LabelAlign is only valid on a LABEL", id)
+	}
 	if len(opts.GetMarkers()) > 0 && widget.GetType() != rwp.TouchUIWidget_VIDEO {
 		return fmt.Errorf("widget %d: Markers are only valid on a VIDEO widget", id)
 	}
