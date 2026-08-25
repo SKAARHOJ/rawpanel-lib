@@ -76,7 +76,7 @@ func Capabilities(screenW, screenH uint32, orientation rwp.TouchUIGlobalOptions_
 				StateMask: helpers.TouchUIStateText | helpers.TouchUIStateColor,
 			},
 			{
-				Type:      rwp.TouchUIWidget_ROLLER, // discrete 1-of-N wheel
+				Type:      rwp.TouchUIWidget_DROPDOWN, // discrete 1-of-N picker
 				EventMask: helpers.TouchUIEventAbsolute,
 				StateMask: helpers.TouchUIStateExtended | helpers.TouchUIStateText | helpers.TouchUIStateColor,
 			},

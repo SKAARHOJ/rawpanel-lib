@@ -1,6 +1,7 @@
 package touchui
 
 import (
+	"strings"
 	"testing"
 
 	rwp "github.com/SKAARHOJ/rawpanel-lib/ibeam_rawpanel"
@@ -213,12 +214,22 @@ func TestValidateRejects(t *testing.T) {
 			}
 		},
 
-		"roller without choices": func(c *rwp.TouchUIConfig) {
-			c.Pages[0].Widgets[0].Type = rwp.TouchUIWidget_ROLLER
+		"dropdown without choices": func(c *rwp.TouchUIConfig) {
+			c.Pages[0].Widgets[0].Type = rwp.TouchUIWidget_DROPDOWN
 		},
 		"choice with a newline": func(c *rwp.TouchUIConfig) {
-			c.Pages[0].Widgets[0].Type = rwp.TouchUIWidget_ROLLER
+			c.Pages[0].Widgets[0].Type = rwp.TouchUIWidget_DROPDOWN
 			c.Pages[0].Widgets[0].Options.Choices = []string{"a\nb"}
+		},
+		"choices that join past the panel's byte cap": func(c *rwp.TouchUIConfig) {
+			c.Pages[0].Widgets[0].Type = rwp.TouchUIWidget_DROPDOWN
+			// 16 x 23 bytes + 15 separators = 383, over MaxChoicesJoined but within both
+			// MaxChoices and MaxChoiceLen — so only the joined check can catch it.
+			ch := make([]string, 16)
+			for i := range ch {
+				ch[i] = strings.Repeat("x", MaxChoiceLen)
+			}
+			c.Pages[0].Widgets[0].Options.Choices = ch
 		},
 		"relative xypad that also center-returns": func(c *rwp.TouchUIConfig) {
 			c.Pages[0].Widgets[0].Type = rwp.TouchUIWidget_XYPAD
@@ -290,5 +301,36 @@ func TestGfxRGB16ChannelOrder(t *testing.T) {
 	blue := out & 0x1F
 	if blue != 17 || red != 0 {
 		t.Errorf("dark blue came back as r=%d b=%d, want r=0 b=17 (channels swapped)", red, blue)
+	}
+}
+
+// joinChoices degrades instead of erroring, because ConfigToWidgetTree also runs on
+// panel-local configs that never pass through Validate. What it must never do is hand the
+// renderer a list whose surviving indices mean something other than what the client sent.
+func TestJoinChoicesDropsWholeOptions(t *testing.T) {
+	long := strings.Repeat("x", MaxChoiceLen)
+	choices := make([]string, MaxChoices)
+	for i := range choices {
+		choices[i] = long
+	}
+
+	got := joinChoices(choices)
+
+	if len(got) > MaxChoicesJoined {
+		t.Fatalf("joined to %d bytes, over the %d cap", len(got), MaxChoicesJoined)
+	}
+	if strings.HasSuffix(got, "\n") {
+		t.Error("trailing separator: nanopb would read a phantom empty final option")
+	}
+	// Every surviving option must be whole, and a prefix of the input — a half-written
+	// label, or a dropped option from the middle, would shift the index domain.
+	parts := strings.Split(got, "\n")
+	for i, p := range parts {
+		if p != long {
+			t.Fatalf("option %d is %q, not the whole label it was cut from", i, p)
+		}
+	}
+	if want := (MaxChoicesJoined + 1) / (MaxChoiceLen + 1); len(parts) != want {
+		t.Errorf("kept %d options, want %d", len(parts), want)
 	}
 }

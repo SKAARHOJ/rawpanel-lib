@@ -14,7 +14,7 @@ func defaultEventMask(w *rwp.TouchUIWidget) uint32 {
 	switch w.GetType() {
 	case rwp.TouchUIWidget_BUTTON, rwp.TouchUIWidget_TOGGLE:
 		return helpers.TouchUIEventBinary
-	case rwp.TouchUIWidget_SLIDER, rwp.TouchUIWidget_KNOB, rwp.TouchUIWidget_ROLLER:
+	case rwp.TouchUIWidget_SLIDER, rwp.TouchUIWidget_KNOB, rwp.TouchUIWidget_DROPDOWN:
 		return helpers.TouchUIEventAbsolute
 	case rwp.TouchUIWidget_ENCODER:
 		return helpers.TouchUIEventPulsed | helpers.TouchUIEventBinary

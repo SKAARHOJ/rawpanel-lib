@@ -280,16 +280,20 @@ func touchUITypeDef(t rwp.TouchUIWidget_WidgetTypeE, opts *rwp.TouchUIWidgetOpti
 		def.In = "b,xy"
 		def.Desc = "TouchUI video region"
 		def.Disp = &topology.TopologyHWcTypeDef_Display{W: 320, H: 180, Subidx: -1, Type: "touch"}
-	case rwp.TouchUIWidget_ROLLER:
+	case rwp.TouchUIWidget_DROPDOWN:
 		def.In = "av" // absolute: selected index (0..N-1)
 		def.Ext = "steps"
-		def.Desc = "TouchUI roller"
-		def.H = 2*touchUICellTenthMM - touchUICellGapTenthMM // a wheel shows several choices at once
+		// Without "rgb" a client's HWCColor never reaches this component at all — Reactor
+		// gates the whole colour path on it — which is why colour was dead here even
+		// though the capability has always been advertised.
+		def.Out = "rgb"
+		def.Desc = "TouchUI dropdown"
+		// One cell: only the closed field is on the grid. The option list is drawn over the
+		// neighbouring widgets while open, so it costs no layout height of its own.
 		def.Disp = &topology.TopologyHWcTypeDef_Display{W: 64, H: 32, Subidx: -1, Type: "text"}
 		def.Sub = []topology.TopologyHWcTypeDefSubEl{
-			subRect(-120, -150, 240, 40, 6, touchUIStyleTrack),
-			subRect(-120, -30, 240, 60, 6, touchUIStyleHandle),
-			subRect(-120, 110, 240, 40, 6, touchUIStyleTrack),
+			subRect(-150, -50, 300, 100, 6, touchUIStyleTrack),  // the closed field
+			subRect(105, -15, 30, 30, 3, touchUIStyleHandle),    // the chevron
 		}
 	case rwp.TouchUIWidget_XYPAD:
 		def.In = "xy" // 2D absolute (or relative) vector input
@@ -386,7 +390,7 @@ func TouchUIConfigToTopology(cfg *rwp.TouchUIConfig) *topology.Topology {
 					colSpan = 1
 				}
 				// Fit the widget to its grid cell(s). A type's intrinsic size can exceed a
-				// single cell (a horizontal slider defaults to two cells wide, a roller two
+				// single cell (a horizontal slider defaults to two cells wide, an XY pad two
 				// tall), so scale to the span always — not only when it is >1 — otherwise a
 				// single-cell widget keeps its oversized default and spills past the screen.
 				base := touchUITypeDef(widget.GetType(), wOpts)
