@@ -92,6 +92,8 @@ func Capabilities(screenW, screenH uint32, orientation rwp.TouchUIGlobalOptions_
 				// The container itself emits nothing. Its member parameters are ordinary fader
 				// HWCs under their own ids (Absolute out, HWCExtended(FADER) in) — a per-type
 				// cap table has no way to express that, so TouchUICompressorParam documents it.
+				// The Extended bit below is the container's own: HWCExtended on the compressor
+				// id is read as live gain reduction, 0..1000 spanning 24 dB.
 				EventMask: 0,
 				StateMask: helpers.TouchUIStateExtended | helpers.TouchUIStateText,
 			},

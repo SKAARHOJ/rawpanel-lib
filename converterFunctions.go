@@ -200,7 +200,7 @@ func RawPanelASCIIstringsToInboundMessages(rp20_ascii []string) []*rwp.InboundMe
 					value, _ := strconv.Atoi(regex_cmd.FindStringSubmatch(inputString)[3])
 					msg = &rwp.InboundMessage{
 						States: []*rwp.HWCState{
-							&rwp.HWCState{
+							{
 								HWCIDs: HWCidArray,
 								HWCMode: &rwp.HWCMode{
 									State:        rwp.HWCMode_StateE(value & 0xF),
@@ -214,7 +214,7 @@ func RawPanelASCIIstringsToInboundMessages(rp20_ascii []string) []*rwp.InboundMe
 					value, _ := strconv.Atoi(regex_cmd.FindStringSubmatch(inputString)[3])
 					msg = &rwp.InboundMessage{
 						States: []*rwp.HWCState{
-							&rwp.HWCState{
+							{
 								HWCIDs: HWCidArray,
 								HWCExtended: &rwp.HWCExtended{
 									Interpretation: rwp.HWCExtended_InterpretationE((value >> 12) & 0xF),
@@ -243,7 +243,7 @@ func RawPanelASCIIstringsToInboundMessages(rp20_ascii []string) []*rwp.InboundMe
 
 					msg = &rwp.InboundMessage{
 						States: []*rwp.HWCState{
-							&rwp.HWCState{
+							{
 								HWCIDs: HWCidArray,
 								HWCJog: jogStruct,
 							},
@@ -254,7 +254,7 @@ func RawPanelASCIIstringsToInboundMessages(rp20_ascii []string) []*rwp.InboundMe
 					if value&0b1000000 > 0 {
 						msg = &rwp.InboundMessage{
 							States: []*rwp.HWCState{
-								&rwp.HWCState{
+								{
 									HWCIDs: HWCidArray,
 									HWCColor: &rwp.HWCColor{
 										ColorRGB: &rwp.ColorRGB{
@@ -269,7 +269,7 @@ func RawPanelASCIIstringsToInboundMessages(rp20_ascii []string) []*rwp.InboundMe
 					} else {
 						msg = &rwp.InboundMessage{
 							States: []*rwp.HWCState{
-								&rwp.HWCState{
+								{
 									HWCIDs: HWCidArray,
 									HWCColor: &rwp.HWCColor{
 										ColorIndex: &rwp.ColorIndex{
@@ -363,7 +363,7 @@ func RawPanelASCIIstringsToInboundMessages(rp20_ascii []string) []*rwp.InboundMe
 
 					msg = &rwp.InboundMessage{
 						States: []*rwp.HWCState{
-							&rwp.HWCState{
+							{
 								HWCIDs:  HWCidArray,
 								HWCText: textStruct,
 							},
@@ -372,7 +372,7 @@ func RawPanelASCIIstringsToInboundMessages(rp20_ascii []string) []*rwp.InboundMe
 				case "HWCo#":
 					msg = &rwp.InboundMessage{
 						States: []*rwp.HWCState{
-							&rwp.HWCState{
+							{
 								HWCIDs:     HWCidArray,
 								HWCOverlay: overlayFromString(regex_cmd.FindStringSubmatch(inputString)[3]),
 							},
@@ -382,7 +382,7 @@ func RawPanelASCIIstringsToInboundMessages(rp20_ascii []string) []*rwp.InboundMe
 					value, _ := strconv.Atoi(regex_cmd.FindStringSubmatch(inputString)[3])
 					msg = &rwp.InboundMessage{
 						States: []*rwp.HWCState{
-							&rwp.HWCState{
+							{
 								HWCIDs: HWCidArray,
 								PublishRawADCValues: &rwp.PublishRawADCValues{
 									Enabled: value == 1,
@@ -437,7 +437,7 @@ func RawPanelASCIIstringsToInboundMessages(rp20_ascii []string) []*rwp.InboundMe
 							if gPartIndex == temp_HWCGfx_max { // If we have reached the final one, wrap it up:
 								msg = &rwp.InboundMessage{
 									States: []*rwp.HWCState{
-										&rwp.HWCState{
+										{
 											HWCIDs: su.IntExplode(temp_HWCGfx_HWClist, ","),
 											HWCGfx: temp_HWCGfx,
 										},
@@ -1104,7 +1104,7 @@ func InboundMessagesToRawPanelASCIIstrings(inboundMsgs []*rwp.InboundMessage) []
 }
 
 var regex_map = regexp.MustCompile("^map=([0-9]+):([0-9]+)$")
-var regex_genericSingle_inbound = regexp.MustCompile("^(_model|_serial|_version|_platform|_bluePillReady|_name|_panelType|_support|_isSleeping|_sleepTimer|_panelTopology_svgbase|_panelTopology_HWC|_burninProfile|_networkConfig|_calibrationProfile|_defaultCalibrationProfile|_serverModeLockToIP|_serverModeMaxClients|_heartBeatTimer|DimmedGain|_connections|_bootsCount|_totalUptimeMin|_sessionUptimeMin|_screenSaverOnMin|_touchUICapabilities|_touchUIConfig|ErrorMsg|Msg|EnvironmentalHealth|SysStat)=(.+)$")
+var regex_genericSingle_inbound = regexp.MustCompile("^(_model|_serial|_version|_platform|_bluePillReady|_name|_panelType|_support|_isSleeping|_sleepTimer|_panelTopology_svgbase|_panelTopology_HWC|_burninProfile|_networkConfig|_calibrationProfile|_defaultCalibrationProfile|_serverModeLockToIP|_serverModeMaxClients|_heartBeatTimer|DimmedGain|_connections|_bootsCount|_totalUptimeMin|_sessionUptimeMin|_screenSaverOnMin|_touchUICapabilities|_touchUIConfig|_touchUIActivePage|ErrorMsg|Msg|EnvironmentalHealth|SysStat)=(.+)$")
 var regex_cmd_inbound = regexp.MustCompile("^HWC#([0-9]+)(|.([0-9]+))=(Down|Up|Press|Abs|Speed|Enc)(|:([-0-9,]+))$")
 
 // Text events carry free text, so their value is the whole rest of the line and needs no escaping.
@@ -1164,7 +1164,7 @@ func RawPanelASCIIstringsToOutboundMessages(rp20_ascii []string) []*rwp.Outbound
 				// the user cleared the field, so this must not be conflated with "no match".
 				msg = &rwp.OutboundMessage{
 					Events: []*rwp.HWCEvent{
-						&rwp.HWCEvent{
+						{
 							HWCID: uint32(su.Intval(m[1])),
 							Text: &rwp.TextEvent{
 								Value: m[2],
@@ -1181,7 +1181,7 @@ func RawPanelASCIIstringsToOutboundMessages(rp20_ascii []string) []*rwp.Outbound
 					edge := su.Intval(regex_cmd_inbound.FindStringSubmatch(inputString)[3])
 					msg = &rwp.OutboundMessage{
 						Events: []*rwp.HWCEvent{
-							&rwp.HWCEvent{
+							{
 								HWCID: uint32(HWCid),
 								Binary: &rwp.BinaryEvent{
 									Pressed: eventType == "Down",
@@ -1194,14 +1194,14 @@ func RawPanelASCIIstringsToOutboundMessages(rp20_ascii []string) []*rwp.Outbound
 					edge := su.Intval(regex_cmd_inbound.FindStringSubmatch(inputString)[3])
 					msg = &rwp.OutboundMessage{
 						Events: []*rwp.HWCEvent{
-							&rwp.HWCEvent{
+							{
 								HWCID: uint32(HWCid),
 								Binary: &rwp.BinaryEvent{
 									Pressed: true,
 									Edge:    rwp.BinaryEvent_EdgeID(edge),
 								},
 							},
-							&rwp.HWCEvent{
+							{
 								HWCID: uint32(HWCid),
 								Binary: &rwp.BinaryEvent{
 									Pressed: false,
@@ -1214,7 +1214,7 @@ func RawPanelASCIIstringsToOutboundMessages(rp20_ascii []string) []*rwp.Outbound
 					value := su.Intval(regex_cmd_inbound.FindStringSubmatch(inputString)[6])
 					msg = &rwp.OutboundMessage{
 						Events: []*rwp.HWCEvent{
-							&rwp.HWCEvent{
+							{
 								HWCID: uint32(HWCid),
 								Pulsed: &rwp.PulsedEvent{
 									Value: int32(value),
@@ -1252,7 +1252,7 @@ func RawPanelASCIIstringsToOutboundMessages(rp20_ascii []string) []*rwp.Outbound
 					value := su.Intval(regex_cmd.FindStringSubmatch(inputString)[6])
 					msg = &rwp.OutboundMessage{
 						Events: []*rwp.HWCEvent{
-							&rwp.HWCEvent{
+							{
 								HWCID: uint32(HWCid),
 								RawAnalog: &rwp.RawAnalogEvent{
 									Value: uint32(value),
@@ -1440,6 +1440,12 @@ func RawPanelASCIIstringsToOutboundMessages(rp20_ascii []string) []*rwp.Outbound
 				case "_touchUIConfig":
 					msg = &rwp.OutboundMessage{
 						TouchUIConfig: touchUIConfigFromString(strValue),
+					}
+				case "_touchUIActivePage":
+					msg = &rwp.OutboundMessage{
+						TouchUIActivePage: &rwp.TouchUIActivePage{
+							PageId: uint32(su.Intval(strValue)),
+						},
 					}
 				case "_serverModeLockToIP":
 					msg = &rwp.OutboundMessage{
@@ -1797,6 +1803,9 @@ func OutboundMessagesToRawPanelASCIIstrings(outboundMsgs []*rwp.OutboundMessage)
 		}
 		if outboundMsg.TouchUIConfig != nil {
 			returnStrings = append(returnStrings, "_touchUIConfig="+stripLineBreaks(touchUIStringFromConfig(outboundMsg.TouchUIConfig)))
+		}
+		if outboundMsg.TouchUIActivePage != nil {
+			returnStrings = append(returnStrings, fmt.Sprintf("_touchUIActivePage=%d", outboundMsg.TouchUIActivePage.PageId))
 		}
 		if outboundMsg.SleepTimeout != nil {
 			returnStrings = append(returnStrings, fmt.Sprintf("_sleepTimer=%d", outboundMsg.SleepTimeout.Value))

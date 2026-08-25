@@ -129,8 +129,9 @@ func orEmptyOptions(o *rwp.TouchUIWidgetOptions) *rwp.TouchUIWidgetOptions {
 	return o
 }
 
-// AssignHWCIDs must treat marker and compressor-member ids as claimed. Handing a widget an id
-// a marker already owns produces a config that cannot push at all.
+// AssignHWCIDs must treat marker and compressor-member ids as claimed — handing a widget an
+// id a marker already owns produces a config that cannot push at all — and must fill in
+// markers and members left at 0, the layout editors' "assign on push" convention.
 func TestAssignHWCIDsRespectsMarkersAndMembers(t *testing.T) {
 	cfg := &rwp.TouchUIConfig{
 		Pages: []*rwp.TouchUIPage{{
@@ -142,7 +143,10 @@ func TestAssignHWCIDsRespectsMarkersAndMembers(t *testing.T) {
 					Markers: []*rwp.TouchUIMarker{{HWCID: HWCIDBase}, {}},
 				}},
 				{HWCID: 301, Type: rwp.TouchUIWidget_COMPRESSOR, Options: &rwp.TouchUIWidgetOptions{
-					Params: []*rwp.TouchUICompressorParam{{HWCID: HWCIDBase + 1, Role: rwp.TouchUICompressorParam_THRESHOLD}},
+					Params: []*rwp.TouchUICompressorParam{
+						{HWCID: HWCIDBase + 1, Role: rwp.TouchUICompressorParam_THRESHOLD},
+						{Role: rwp.TouchUICompressorParam_RATIO},
+					},
 				}},
 			},
 		}},
@@ -160,6 +164,13 @@ func TestAssignHWCIDsRespectsMarkersAndMembers(t *testing.T) {
 	}
 	if blank == button || blank == HWCIDBase || blank == HWCIDBase+1 {
 		t.Errorf("assigned marker id %d collides", blank)
+	}
+	member := cfg.Pages[0].Widgets[2].GetOptions().GetParams()[1].GetHWCID()
+	if member == 0 {
+		t.Errorf("a compressor member left at 0 should have been assigned an id")
+	}
+	if member == button || member == blank || member == HWCIDBase || member == HWCIDBase+1 {
+		t.Errorf("assigned member id %d collides", member)
 	}
 	if err := Validate(cfg); err != nil {
 		t.Errorf("config should validate after assignment: %v", err)

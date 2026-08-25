@@ -41,6 +41,13 @@ func TestMarkersBecomeAddressableComponents(t *testing.T) {
 		if def.Disp == nil {
 			t.Errorf("marker %d type def has no display, so no text feedback can reach it: %+v", comp.Id, def)
 		}
+		// The colour output is equally load-bearing: clients gate HWCColor AND HWCMode on
+		// it, and the marker consumes both (colour override; mode OFF hides). Reactor
+		// initializes every HWC's mode to OFF and only an Intensity feedback upgrades it,
+		// so without an Out the box could never be shown at all.
+		if def.Out == "" {
+			t.Errorf("marker %d type def has no colour output, so no colour/visibility feedback can reach it: %+v", comp.Id, def)
+		}
 		// A marker emits nothing — it is driven, not touched.
 		if def.In != "" {
 			t.Errorf("marker %d should take no input, got In=%q", comp.Id, def.In)
