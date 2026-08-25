@@ -123,6 +123,7 @@ func widgetToDef(w *rwp.TouchUIWidget) *gen.WidgetDef {
 		Params:       compressorParams(opts.GetParams()),
 		EditKind:     gen.WidgetDef_EditKind(opts.GetEditKind()),
 		EditMaxLen:   opts.GetEditMaxLen(),
+		LabelAlign:   gen.WidgetDef_LabelAlign(opts.GetLabelAlign()),
 		EventMask:    EffectiveEventMask(w),
 	}
 }
