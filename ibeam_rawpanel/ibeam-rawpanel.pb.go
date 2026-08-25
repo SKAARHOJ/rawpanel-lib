@@ -1588,11 +1588,15 @@ const (
 	TouchUIWidget_ENCODER TouchUIWidget_WidgetTypeE = 8 // encoder pad (- / press / +) -> emits Pulsed on the -/+ taps and Binary (Edge=ENCODER) on the
 	// center press; honors HWCText/HWCExtended. The touch-friendly counterpart of a physical
 	// encoder: left/right taps pulse -1/+1, the center is the push. (KNOB is the analog dial.)
-	TouchUIWidget_ROLLER TouchUIWidget_WidgetTypeE = 9 // discrete 1-of-N selector -> emits Absolute(selected index, 0..N-1); honors
-	// HWCExtended(STEPS)=selected index / HWCText. Options.Choices holds the ordered labels.
+	TouchUIWidget_DROPDOWN TouchUIWidget_WidgetTypeE = 9 // discrete 1-of-N picker   -> emits Absolute(selected index, 0..N-1); honors
+	// HWCExtended(STEPS)=selected index / HWCText / HWCColor. Options.Choices holds the ordered
+	// labels. The option list is drawn OVER the neighbouring widgets while open, so the closed
+	// control occupies a single grid cell.
 	// HWCText updates the widget's CAPTION only - the choice list is fixed for the life of the
 	// config (changing it means a new SetTouchUI), so the index domain a client emits against
 	// can never shift underneath it.
+	// Re-picking the option already selected DOES emit: on a control surface that is a
+	// deliberate "fire this again" gesture, not a no-op.
 	TouchUIWidget_XYPAD TouchUIWidget_WidgetTypeE = 10 // 2D touch surface         -> emits AbsoluteVector[x,y] (position, each 0..1000) or, with Options.Relative,
 	// SpeedVector[dx,dy]; plus Binary on touch/release. Honors HWCOverlay (cursor/target markers) / HWCGfx (background).
 	// Axes: X is 0 at the LEFT edge, Y is 0 at the BOTTOM edge - Y is inverted relative to screen
@@ -1614,7 +1618,7 @@ var (
 		6:  "IMAGE",
 		7:  "VIDEO",
 		8:  "ENCODER",
-		9:  "ROLLER",
+		9:  "DROPDOWN",
 		10: "XYPAD",
 		11: "COMPRESSOR",
 	}
@@ -1628,7 +1632,7 @@ var (
 		"IMAGE":      6,
 		"VIDEO":      7,
 		"ENCODER":    8,
-		"ROLLER":     9,
+		"DROPDOWN":   9,
 		"XYPAD":      10,
 		"COMPRESSOR": 11,
 	}
@@ -6749,8 +6753,8 @@ type TouchUIWidgetOptions struct {
 	SliderVariant TouchUIWidgetOptions_SliderVariantE `protobuf:"varint,22,opt,name=SliderVariant,proto3,enum=ibeam_rawpanel.TouchUIWidgetOptions_SliderVariantE" json:"SliderVariant,omitempty"` // SLIDER only; 0 = BAR (default)
 	KnobVariant   TouchUIWidgetOptions_KnobVariantE   `protobuf:"varint,20,opt,name=KnobVariant,proto3,enum=ibeam_rawpanel.TouchUIWidgetOptions_KnobVariantE" json:"KnobVariant,omitempty"`       // KNOB only; 0 = ARC (default)
 	KnobTicks     uint32                              `protobuf:"varint,21,opt,name=KnobTicks,proto3" json:"KnobTicks,omitempty"`                                                                 // KNOB TICKS/GAUGE: number of tick marks on the ring, 2..61.
-	// ROLLER options:
-	Choices []string `protobuf:"bytes,13,rep,name=Choices,proto3" json:"Choices,omitempty"` // ROLLER: ordered option labels; selected index is emitted as AbsoluteEvent.Value (0-based).
+	// DROPDOWN options:
+	Choices []string `protobuf:"bytes,13,rep,name=Choices,proto3" json:"Choices,omitempty"` // DROPDOWN: ordered option labels; selected index is emitted as AbsoluteEvent.Value (0-based).
 	// XYPAD options:
 	Relative     bool `protobuf:"varint,14,opt,name=Relative,proto3" json:"Relative,omitempty"`         // XYPAD: emit SpeedVector[dx,dy] deltas instead of AbsoluteVector[x,y] position
 	CenterReturn bool `protobuf:"varint,15,opt,name=CenterReturn,proto3" json:"CenterReturn,omitempty"` // XYPAD: joystick behavior - snap back to center (500,500) on release.
@@ -8331,7 +8335,7 @@ const file_ibeam_rawpanel_proto_ibeam_rawpanel_proto_rawDesc = "" +
 	"\x05Title\x18\x02 \x01(\tR\x05Title\x12\x1a\n" +
 	"\bGridRows\x18\x03 \x01(\rR\bGridRows\x12\x1a\n" +
 	"\bGridCols\x18\x04 \x01(\rR\bGridCols\x127\n" +
-	"\aWidgets\x18\x05 \x03(\v2\x1d.ibeam_rawpanel.TouchUIWidgetR\aWidgets\"\x86\x04\n" +
+	"\aWidgets\x18\x05 \x03(\v2\x1d.ibeam_rawpanel.TouchUIWidgetR\aWidgets\"\x88\x04\n" +
 	"\rTouchUIWidget\x12\x14\n" +
 	"\x05HWCID\x18\x01 \x01(\rR\x05HWCID\x12=\n" +
 	"\x04Type\x18\x02 \x01(\x0e2).ibeam_rawpanel.TouchUIWidget.WidgetTypeER\x04Type\x12\x14\n" +
@@ -8346,7 +8350,7 @@ const file_ibeam_rawpanel_proto_ibeam_rawpanel_proto_rawDesc = "" +
 	" \x01(\rR\x01W\x12\f\n" +
 	"\x01H\x18\v \x01(\rR\x01H\x12>\n" +
 	"\aOptions\x18\f \x01(\v2$.ibeam_rawpanel.TouchUIWidgetOptionsR\aOptions\x12\x1c\n" +
-	"\tEventMask\x18\r \x01(\rR\tEventMask\"\x9b\x01\n" +
+	"\tEventMask\x18\r \x01(\rR\tEventMask\"\x9d\x01\n" +
 	"\vWidgetTypeE\x12\n" +
 	"\n" +
 	"\x06BUTTON\x10\x00\x12\n" +
@@ -8359,9 +8363,8 @@ const file_ibeam_rawpanel_proto_ibeam_rawpanel_proto_rawDesc = "" +
 	"\x05LABEL\x10\x05\x12\t\n" +
 	"\x05IMAGE\x10\x06\x12\t\n" +
 	"\x05VIDEO\x10\a\x12\v\n" +
-	"\aENCODER\x10\b\x12\n" +
-	"\n" +
-	"\x06ROLLER\x10\t\x12\t\n" +
+	"\aENCODER\x10\b\x12\f\n" +
+	"\bDROPDOWN\x10\t\x12\t\n" +
 	"\x05XYPAD\x10\n" +
 	"\x12\x0e\n" +
 	"\n" +

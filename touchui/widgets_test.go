@@ -67,8 +67,8 @@ func TestEffectiveEventMask(t *testing.T) {
 			helpers.TouchUIEventVector | helpers.TouchUIEventBinary,
 		},
 		{
-			"roller reports an index",
-			&rwp.TouchUIWidget{HWCID: 102, Type: rwp.TouchUIWidget_ROLLER},
+			"dropdown reports an index",
+			&rwp.TouchUIWidget{HWCID: 102, Type: rwp.TouchUIWidget_DROPDOWN},
 			helpers.TouchUIEventAbsolute,
 		},
 		{
@@ -205,7 +205,7 @@ func TestWidgetOptionsReachTheRenderer(t *testing.T) {
 		Pages: []*rwp.TouchUIPage{{
 			Id: 1,
 			Widgets: []*rwp.TouchUIWidget{
-				{HWCID: 100, Type: rwp.TouchUIWidget_ROLLER,
+				{HWCID: 100, Type: rwp.TouchUIWidget_DROPDOWN,
 					Options: &rwp.TouchUIWidgetOptions{Choices: []string{"a", "b"}}},
 				{HWCID: 101, Type: rwp.TouchUIWidget_XYPAD,
 					Options: &rwp.TouchUIWidgetOptions{Relative: true}},

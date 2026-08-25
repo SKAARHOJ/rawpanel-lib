@@ -172,10 +172,15 @@ func clampKnobTicks(n int64) uint32 {
 	return uint32(n)
 }
 
-// joinChoices renders a ROLLER's options as the single '\n'-joined string the renderer wants
-// (it feeds lv_roller_set_options directly). Truncation happens here rather than being an
-// error, because ConfigToWidgetTree also runs on panel-local configs that never pass through
-// Validate — a too-long list should degrade, not produce a broken widget.
+// joinChoices renders a DROPDOWN's options as the single '\n'-joined string the renderer
+// wants (it feeds lv_dropdown_set_options directly). Truncation happens here rather than
+// being an error, because ConfigToWidgetTree also runs on panel-local configs that never
+// pass through Validate — a too-long list should degrade, not produce a broken widget.
+//
+// It degrades by dropping WHOLE trailing options. Letting the joined string overrun and be
+// cut by nanopb's fixed buffer would leave a half-written final label, or — if the cut fell
+// on a separator — change the option count, and the surviving indices no longer mean what
+// the client thinks they mean. Dropping from the end keeps the list a strict prefix.
 func joinChoices(choices []string) string {
 	if len(choices) == 0 {
 		return ""
@@ -183,15 +188,24 @@ func joinChoices(choices []string) string {
 	if len(choices) > MaxChoices {
 		choices = choices[:MaxChoices]
 	}
-	out := make([]string, len(choices))
-	for i, c := range choices {
+	out := make([]string, 0, len(choices))
+	used := 0
+	for _, c := range choices {
 		// A newline inside a label would split one option into two and shift every index
 		// after it, desyncing the domain the client emits against.
 		c = strings.NewReplacer("\r", " ", "\n", " ").Replace(c)
 		if len(c) > MaxChoiceLen {
 			c = c[:MaxChoiceLen]
 		}
-		out[i] = c
+		need := len(c)
+		if len(out) > 0 {
+			need++ // the separator
+		}
+		if used+need > MaxChoicesJoined {
+			break
+		}
+		out = append(out, c)
+		used += need
 	}
 	return strings.Join(out, "\n")
 }

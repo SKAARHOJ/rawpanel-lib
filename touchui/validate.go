@@ -17,8 +17,14 @@ const (
 	MaxSourceLen      = 127
 	MaxVideoWidgets   = 4 // pi DRM video planes
 
-	MaxChoices          = 32 // ROLLER: entries in Options.Choices
+	MaxChoices          = 32 // DROPDOWN: entries in Options.Choices
 	MaxChoiceLen        = 23
+	// The '\n'-joined wire form has its own cap, independent of the count and the per-label
+	// one: it is touchmanager.options' WidgetDef.choices max_size minus the NUL. 32 entries
+	// of 23 bytes plus 31 separators is 767 bytes, which nanopb would truncate MID-LABEL —
+	// and a cut landing on a separator silently changes the option count, shifting every
+	// index after it.
+	MaxChoicesJoined = 255
 	MaxCompressorParams = 6 // COMPRESSOR: one per RoleE
 	MaxParamLabelLen    = 15
 	MaxEditLen          = 63 // LABEL: Options.EditMaxLen ceiling
@@ -129,24 +135,33 @@ func validateWidgetOptions(widget *rwp.TouchUIWidget, hwcIDs map[uint32]bool) er
 	}
 
 	switch widget.GetType() {
-	case rwp.TouchUIWidget_ROLLER:
+	case rwp.TouchUIWidget_DROPDOWN:
 		choices := opts.GetChoices()
 		if len(choices) == 0 {
-			return fmt.Errorf("widget %d: ROLLER has no Choices", id)
+			return fmt.Errorf("widget %d: DROPDOWN has no Choices", id)
 		}
 		if len(choices) > MaxChoices {
 			return fmt.Errorf("widget %d: %d Choices exceeds the maximum of %d", id, len(choices), MaxChoices)
 		}
+		joined := 0
 		for i, c := range choices {
 			if len(c) > MaxChoiceLen {
 				return fmt.Errorf("widget %d: choice %d exceeds %d bytes", id, i, MaxChoiceLen)
 			}
-			// Choices reach the renderer newline-joined (the format lv_roller wants), so an
+			// Choices reach the renderer newline-joined (the format lv_dropdown wants), so an
 			// embedded newline would silently split one option into two and shift every
 			// index after it — exactly the desync the fixed-list rule exists to prevent.
 			if strings.ContainsAny(c, "\r\n") {
 				return fmt.Errorf("widget %d: choice %d contains a line break", id, i)
 			}
+			if i > 0 {
+				joined++ // the separator
+			}
+			joined += len(c)
+		}
+		if joined > MaxChoicesJoined {
+			return fmt.Errorf("widget %d: %d Choices join to %d bytes, exceeding the panel's %d",
+				id, len(choices), joined, MaxChoicesJoined)
 		}
 
 	case rwp.TouchUIWidget_XYPAD:
