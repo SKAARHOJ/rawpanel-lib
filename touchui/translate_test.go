@@ -183,30 +183,137 @@ func TestStateToFrames(t *testing.T) {
 }
 
 func TestGfxScaling(t *testing.T) {
-	// 640x100 RGB16 must downscale to 320x50.
+	// The budget is bytes, not a shape: 640x100 is 64000 pixels, inside the 65536
+	// the 131072-byte cap buys, so it must now survive at full size. The old fixed
+	// 320x200 box halved it for no reason.
 	w, h := 640, 100
 	data := make([]byte, w*h*2)
 	g, err := GfxToWidgetGfx(1, &rwp.HWCGfx{ImageType: rwp.HWCGfx_RGB16bit, W: uint32(w), H: uint32(h), ImageData: data}, 1)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if g.GetW() != 320 || g.GetH() != 50 {
-		t.Errorf("scaling wrong: %dx%d", g.GetW(), g.GetH())
+	if g.GetW() != 640 || g.GetH() != 100 {
+		t.Errorf("in-budget gfx was rescaled: %dx%d, want 640x100", g.GetW(), g.GetH())
 	}
-	if len(g.GetRgb565()) != 320*50*2 {
+	if len(g.GetRgb565()) != 640*100*2 {
 		t.Errorf("payload size wrong: %d", len(g.GetRgb565()))
+	}
+}
+
+// TestGfxBudgetFit pins the rule that replaced the 320x200 box: scale to the byte
+// cap, keeping aspect. The 1280x400 row is the panel-sized background that drove
+// the change — under the old box it arrived as 320x100, a sixteenth of the pixels
+// for half the cap.
+func TestGfxBudgetFit(t *testing.T) {
+	for _, tc := range []struct{ w, h int }{
+		{1280, 400}, {1920, 1080}, {800, 480}, {4000, 60}, {64, 32}, {1, 1},
+	} {
+		outW, outH := fitBudget(tc.w, tc.h, maxGfxPixels)
+
+		if outW*outH > maxGfxPixels {
+			t.Errorf("%dx%d -> %dx%d: %d pixels exceeds the %d-pixel cap",
+				tc.w, tc.h, outW, outH, outW*outH, maxGfxPixels)
+		}
+		if outW > tc.w || outH > tc.h {
+			t.Errorf("%dx%d -> %dx%d: upscaled", tc.w, tc.h, outW, outH)
+		}
+		if tc.w*tc.h <= maxGfxPixels && (outW != tc.w || outH != tc.h) {
+			t.Errorf("%dx%d fits the budget but was rescaled to %dx%d", tc.w, tc.h, outW, outH)
+		}
+		// Aspect within a pixel of the source, and the budget actually spent: a
+		// downscaled result should land close to the cap, not at half of it.
+		if tc.w*tc.h > maxGfxPixels {
+			want, got := float64(tc.w)/float64(tc.h), float64(outW)/float64(outH)
+			if want/got > 1.02 || got/want > 1.02 {
+				t.Errorf("%dx%d -> %dx%d: aspect drifted %.3f -> %.3f", tc.w, tc.h, outW, outH, want, got)
+			}
+			if outW*outH < maxGfxPixels*9/10 {
+				t.Errorf("%dx%d -> %dx%d: only %d of %d pixels used",
+					tc.w, tc.h, outW, outH, outW*outH, maxGfxPixels)
+			}
+		}
+	}
+}
+
+// TestBoxDownscaleAverages: the reduction must average its source rect, not pick
+// one pixel out of it. Nearest-neighbour on this input returns a source pixel
+// (0x000000 or 0xFFFFFF); averaging returns the mid grey between them.
+func TestBoxDownscaleAverages(t *testing.T) {
+	pix := []uint32{0x000000, 0xFFFFFF, 0x000000, 0xFFFFFF} // 2x2 checker of columns
+	got := boxDownscale(pix, 2, 2, 1, 1)
+	if len(got) != 1 {
+		t.Fatalf("want 1 pixel, got %d", len(got))
+	}
+	if got[0] != 0x7F7F7F {
+		t.Errorf("box filter returned %06X, want 7F7F7F (a point sample would give 000000 or FFFFFF)", got[0])
+	}
+}
+
+// TestPackRGB565Rounds: quantisation rounds to the nearest level. Truncation —
+// what the old (r>>3) did — sends every value below 8 to zero, so a dark channel
+// lost detail and the whole image skewed dark.
+func TestPackRGB565Rounds(t *testing.T) {
+	// 7/255 is 0.85 of a 5-bit level: rounds to 1, truncates to 0.
+	if got := packRGB565(0x070000) >> 11 & 0x1F; got != 1 {
+		t.Errorf("red 7 packed to level %d, want 1 (truncation would give 0)", got)
+	}
+	if got := packRGB565(0xFFFFFF); got != 0xFFFF {
+		t.Errorf("white packed to %04X, want FFFF", got)
+	}
+	if got := packRGB565(0x000000); got != 0x0000 {
+		t.Errorf("black packed to %04X, want 0000", got)
+	}
+}
+
+// TestPackRGB565Roundtrip: every level the renderer can display must survive
+// expand-then-requantise unchanged. Without this, rounding could shift a pixel
+// that arrived already quantised — which is exactly what an RGB16bit HWCGfx is.
+func TestPackRGB565Roundtrip(t *testing.T) {
+	for bits := uint(5); bits <= 6; bits++ {
+		for q := uint32(0); q <= 1<<bits-1; q++ {
+			if got := quantiseChannel(int32(expandChannel(q, bits)), bits); got != q {
+				t.Errorf("%d-bit level %d expanded to %d and came back as %d",
+					bits, q, expandChannel(q, bits), got)
+			}
+		}
+	}
+}
+
+// TestPageGfxDithers: a background gets error diffusion, a widget icon does not.
+// A flat fill that lands between two 5-bit levels stipples in the background and
+// stays solid in the widget.
+func TestPageGfxDithers(t *testing.T) {
+	const w, h = 16, 16
+	pix := make([]uint32, w*h)
+	for i := range pix {
+		pix[i] = 0x0C0C0C // between 5-bit levels 1 and 2
+	}
+
+	distinct := func(b []byte) int {
+		seen := map[uint16]bool{}
+		for i := 0; i < len(b); i += 2 {
+			seen[uint16(b[i])|uint16(b[i+1])<<8] = true
+		}
+		return len(seen)
+	}
+
+	if n := distinct(packBuffer(pix, w, h, false)); n != 1 {
+		t.Errorf("undithered flat fill produced %d distinct values, want 1", n)
+	}
+	if n := distinct(packBuffer(pix, w, h, true)); n < 2 {
+		t.Errorf("dithered flat fill produced %d distinct values, want at least 2", n)
 	}
 }
 
 func TestValidateRejects(t *testing.T) {
 	cases := map[string]func(*rwp.TouchUIConfig){
-		"no pages":          func(c *rwp.TouchUIConfig) { c.Pages = nil },
-		"dup page":          func(c *rwp.TouchUIConfig) { c.Pages[1].Id = 1 },
-		"dup hwc":           func(c *rwp.TouchUIConfig) { c.Pages[1].Widgets[0].HWCID = 201 },
-		"zero hwc":          func(c *rwp.TouchUIConfig) { c.Pages[0].Widgets[0].HWCID = 0 },
-		"outside grid":      func(c *rwp.TouchUIConfig) { c.Pages[0].Widgets[0].Col = 9 },
-		"bad active page":   func(c *rwp.TouchUIConfig) { c.ActivePage = 42 },
-		"long label":        func(c *rwp.TouchUIConfig) { c.Pages[0].Widgets[0].Label = string(make([]byte, 60)) },
+		"no pages":        func(c *rwp.TouchUIConfig) { c.Pages = nil },
+		"dup page":        func(c *rwp.TouchUIConfig) { c.Pages[1].Id = 1 },
+		"dup hwc":         func(c *rwp.TouchUIConfig) { c.Pages[1].Widgets[0].HWCID = 201 },
+		"zero hwc":        func(c *rwp.TouchUIConfig) { c.Pages[0].Widgets[0].HWCID = 0 },
+		"outside grid":    func(c *rwp.TouchUIConfig) { c.Pages[0].Widgets[0].Col = 9 },
+		"bad active page": func(c *rwp.TouchUIConfig) { c.ActivePage = 42 },
+		"long label":      func(c *rwp.TouchUIConfig) { c.Pages[0].Widgets[0].Label = string(make([]byte, 60)) },
 		"too many widgets": func(c *rwp.TouchUIConfig) {
 			for i := 0; i < 30; i++ {
 				c.Pages[1].Widgets = append(c.Pages[1].Widgets,

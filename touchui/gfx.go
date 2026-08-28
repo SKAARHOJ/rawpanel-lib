@@ -3,25 +3,33 @@ package touchui
 import (
 	"fmt"
 	"image"
+	"math"
 
 	rwp "github.com/SKAARHOJ/rawpanel-lib/ibeam_rawpanel"
 
 	gen "github.com/SKAARHOJ/rawpanel-lib/touchui/gen"
 )
 
-// Bounds for the RGB565 blobs sent to the UI. 320x200x2 = 128000 bytes, within
-// the nanopb cap (WidgetGfx.rgb565 max_size:131072). Larger client images are
-// downscaled preserving aspect.
+// Budget for the RGB565 blobs sent to the UI. The binding constraint is the
+// nanopb field cap (WidgetGfx.rgb565 / PageGfx.rgb565 max_size:131072), which is
+// a byte budget rather than a shape: at two bytes per pixel it buys 65536 pixels
+// in whatever aspect ratio the source happens to have. Fitting a fixed 320x200
+// box instead spent that budget badly on anything far from 8:5 — a 1280x400
+// background landed at 320x100, which is a sixteenth of the pixels for half the
+// cap. Sources already within budget pass through untouched.
 const (
-	maxGfxW = 320
-	maxGfxH = 200
+	maxGfxBytes  = 131072
+	maxGfxPixels = maxGfxBytes / 2
 )
 
 // GfxToWidgetGfx decodes an inbound HWCGfx (MONO / Gray4bit / RGB16bit wire
 // formats, see ibeam_lib_monogfx for the layout reference) into a
-// little-endian RGB565 WidgetGfx frame, downscaling to the transport bounds.
+// little-endian RGB565 WidgetGfx frame, downscaling to the transport budget.
 func GfxToWidgetGfx(hwc uint32, g *rwp.HWCGfx, epoch uint32) (*gen.WidgetGfx, error) {
-	outW, outH, rgb565, err := gfxToRGB565(g)
+	// Widget images are usually flat-colour icons, where error diffusion would
+	// stipple a fill that quantises cleanly on its own. Backgrounds dither, these
+	// do not.
+	outW, outH, rgb565, err := gfxToRGB565(g, false)
 	if err != nil {
 		return nil, err
 	}
@@ -29,11 +37,11 @@ func GfxToWidgetGfx(hwc uint32, g *rwp.HWCGfx, epoch uint32) (*gen.WidgetGfx, er
 }
 
 // PageGfxFromGfx converts an already-resolved per-page background HWCGfx into a
-// PageGfx frame (little-endian RGB565, downscaled to the transport bounds). The
+// PageGfx frame (little-endian RGB565, downscaled to the transport budget). The
 // renderer stretches it to the screen as the page's bottom layer, so the widgets
 // drawn on top are unaffected. Keyed by page id, not hwc id.
 func PageGfxFromGfx(pageID uint32, g *rwp.HWCGfx, epoch uint32) (*gen.PageGfx, error) {
-	outW, outH, rgb565, err := gfxToRGB565(g)
+	outW, outH, rgb565, err := gfxToRGB565(g, true)
 	if err != nil {
 		return nil, err
 	}
@@ -41,7 +49,7 @@ func PageGfxFromGfx(pageID uint32, g *rwp.HWCGfx, epoch uint32) (*gen.PageGfx, e
 }
 
 // PageGfxFromImage packs a decoded background image into a PageGfx frame
-// (little-endian RGB565, downscaled to the transport bounds). For callers that
+// (little-endian RGB565, downscaled to the transport budget). For callers that
 // resolve TouchUIPage.Background from an image file — e.g. an icon reactor holds
 // — rather than an HWCGfx. The renderer stretches it to the screen behind the
 // widgets, so they are unaffected. Keyed by page id, not hwc id.
@@ -51,26 +59,28 @@ func PageGfxFromImage(pageID uint32, img image.Image, epoch uint32) *gen.PageGfx
 	if w <= 0 || h <= 0 {
 		return &gen.PageGfx{Epoch: epoch, PageId: pageID} // zero-size blob clears the page background
 	}
-	outW, outH := fitWithin(w, h, maxGfxW, maxGfxH)
-	rgb565 := make([]byte, outW*outH*2)
-	for y := 0; y < outH; y++ {
-		srcY := b.Min.Y + y*h/outH
-		for x := 0; x < outW; x++ {
-			srcX := b.Min.X + x*w/outW
-			r, g, bl, _ := img.At(srcX, srcY).RGBA() // 16-bit per channel, straight alpha
-			v := packRGB565(uint32(r>>8)<<16 | uint32(g>>8)<<8 | uint32(bl>>8))
-			i := (y*outW + x) * 2
-			rgb565[i] = byte(v)
-			rgb565[i+1] = byte(v >> 8)
+
+	pix := make([]uint32, w*h)
+	for y := 0; y < h; y++ {
+		for x := 0; x < w; x++ {
+			r, g, bl, _ := img.At(b.Min.X+x, b.Min.Y+y).RGBA() // 16-bit per channel, straight alpha
+			pix[y*w+x] = (r>>8)<<16 | (g>>8)<<8 | bl>>8
 		}
 	}
-	return &gen.PageGfx{Epoch: epoch, PageId: pageID, W: uint32(outW), H: uint32(outH), Rgb565: rgb565}
+
+	outW, outH := fitBudget(w, h, maxGfxPixels)
+	small := boxDownscale(pix, w, h, outW, outH)
+	return &gen.PageGfx{
+		Epoch: epoch, PageId: pageID,
+		W: uint32(outW), H: uint32(outH),
+		Rgb565: packBuffer(small, outW, outH, true),
+	}
 }
 
 // gfxToRGB565 decodes an HWCGfx to 0xRRGGBB pixels and downscales it (aspect
-// preserved) into a little-endian RGB565 buffer within the transport bounds.
+// preserved) into a little-endian RGB565 buffer within the transport budget.
 // Shared by the per-widget and per-page image frames.
-func gfxToRGB565(g *rwp.HWCGfx) (outW, outH int, rgb565 []byte, err error) {
+func gfxToRGB565(g *rwp.HWCGfx, dither bool) (outW, outH int, rgb565 []byte, err error) {
 	w, h := int(g.GetW()), int(g.GetH())
 	if w <= 0 || h <= 0 {
 		return 0, 0, nil, fmt.Errorf("touchui: gfx without dimensions")
@@ -81,46 +91,157 @@ func gfxToRGB565(g *rwp.HWCGfx) (outW, outH int, rgb565 []byte, err error) {
 		return 0, 0, nil, err
 	}
 
-	outW, outH = fitWithin(w, h, maxGfxW, maxGfxH)
-	rgb565 = make([]byte, outW*outH*2)
-	for y := 0; y < outH; y++ {
-		srcY := y * h / outH
-		for x := 0; x < outW; x++ {
-			srcX := x * w / outW
-			v := packRGB565(pix[srcY*w+srcX])
-			i := (y*outW + x) * 2
-			rgb565[i] = byte(v)        // little-endian: LVGL-native on all targets
-			rgb565[i+1] = byte(v >> 8)
-		}
-	}
-	return outW, outH, rgb565, nil
+	outW, outH = fitBudget(w, h, maxGfxPixels)
+	small := boxDownscale(pix, w, h, outW, outH)
+	return outW, outH, packBuffer(small, outW, outH, dither), nil
 }
 
-func fitWithin(w, h, maxW, maxH int) (int, int) {
-	if w <= maxW && h <= maxH {
+// fitBudget scales w x h down, aspect preserved, until it fits maxPixels. It
+// never upscales: an image already within budget is returned as it came.
+func fitBudget(w, h, maxPixels int) (int, int) {
+	if w*h <= maxPixels {
 		return w, h
 	}
-	outW, outH := w, h
-	if outW > maxW {
-		outH = outH * maxW / outW
-		outW = maxW
+	scale := math.Sqrt(float64(maxPixels) / float64(w) / float64(h))
+	outW, outH := int(float64(w)*scale), int(float64(h)*scale)
+	outW, outH = max(outW, 1), max(outH, 1)
+
+	// Truncation above (and the clamps, on absurd aspect ratios) can leave the
+	// result a pixel or two over budget; trim the longer side to land inside it.
+	if outW*outH > maxPixels {
+		if outW >= outH {
+			outW = maxPixels / outH
+		} else {
+			outH = maxPixels / outW
+		}
 	}
-	if outH > maxH {
-		outW = outW * maxH / outH
-		outH = maxH
-	}
-	if outW < 1 {
-		outW = 1
-	}
-	if outH < 1 {
-		outH = 1
-	}
-	return outW, outH
+	return max(outW, 1), max(outH, 1)
 }
 
+// boxDownscale area-averages pix (w x h, 0xRRGGBB) down to outW x outH.
+//
+// The previous nearest-neighbour sampling read a single source pixel per
+// destination pixel and discarded the rest — reducing 1280 to 320 threw away 15
+// of every 16 — so any fine detail aliased instead of resolving, which is what
+// turned a subtle diagonal texture into coarse moire. Averaging happens in sRGB
+// space, matching the rest of the toolchain; going via linear light would
+// visibly lift the dark end of a gradient, which is where these backgrounds live.
+func boxDownscale(pix []uint32, w, h, outW, outH int) []uint32 {
+	if outW == w && outH == h {
+		return pix
+	}
+	out := make([]uint32, outW*outH)
+	for y := 0; y < outH; y++ {
+		sy0, sy1 := y*h/outH, (y+1)*h/outH
+		if sy1 <= sy0 {
+			sy1 = sy0 + 1
+		}
+		for x := 0; x < outW; x++ {
+			sx0, sx1 := x*w/outW, (x+1)*w/outW
+			if sx1 <= sx0 {
+				sx1 = sx0 + 1
+			}
+			var rs, gs, bs, n uint32
+			for sy := sy0; sy < sy1; sy++ {
+				row := sy * w
+				for sx := sx0; sx < sx1; sx++ {
+					p := pix[row+sx]
+					rs += p >> 16 & 0xFF
+					gs += p >> 8 & 0xFF
+					bs += p & 0xFF
+					n++
+				}
+			}
+			out[y*outW+x] = (rs/n)<<16 | (gs/n)<<8 | bs/n
+		}
+	}
+	return out
+}
+
+// packBuffer quantises 0xRRGGBB pixels into little-endian RGB565. With dither
+// set the 8->5/6/5 error is diffused Floyd-Steinberg, trading a little noise for
+// the banding that otherwise contours every smooth gradient — 5 bits of blue is
+// 32 levels, and a dark background crosses them all. Dithering is free here
+// because the payload is fixed-size raw pixels; it would not be under a
+// compressing transport, where the added noise costs real bytes.
+func packBuffer(pix []uint32, w, h int, dither bool) []byte {
+	out := make([]byte, w*h*2)
+	if !dither {
+		for i, p := range pix {
+			v := packRGB565(p)
+			out[i*2], out[i*2+1] = byte(v), byte(v>>8)
+		}
+		return out
+	}
+
+	// Signed working copy: diffused error routinely pushes a channel outside 0..255.
+	buf := make([]int32, w*h*3)
+	for i, p := range pix {
+		buf[i*3] = int32(p >> 16 & 0xFF)
+		buf[i*3+1] = int32(p >> 8 & 0xFF)
+		buf[i*3+2] = int32(p & 0xFF)
+	}
+
+	bits := [3]uint{5, 6, 5}
+	for y := 0; y < h; y++ {
+		for x := 0; x < w; x++ {
+			i := (y*w + x) * 3
+			var q [3]uint32
+			for c := 0; c < 3; c++ {
+				q[c] = quantiseChannel(buf[i+c], bits[c])
+				err := buf[i+c] - int32(expandChannel(q[c], bits[c]))
+				diffuse(buf, w, h, x+1, y, c, err*7/16)
+				diffuse(buf, w, h, x-1, y+1, c, err*3/16)
+				diffuse(buf, w, h, x, y+1, c, err*5/16)
+				diffuse(buf, w, h, x+1, y+1, c, err/16)
+			}
+			v := uint16(q[0]<<11 | q[1]<<5 | q[2])
+			o := (y*w + x) * 2
+			out[o], out[o+1] = byte(v), byte(v>>8)
+		}
+	}
+	return out
+}
+
+func diffuse(buf []int32, w, h, x, y, c int, err int32) {
+	if x < 0 || x >= w || y < 0 || y >= h {
+		return
+	}
+	buf[(y*w+x)*3+c] += err
+}
+
+// quantiseChannel rounds an 8-bit channel to its nearest n-bit level. The input
+// is signed because dithering feeds it values carrying diffused error.
+func quantiseChannel(v int32, bits uint) uint32 {
+	if v < 0 {
+		v = 0
+	} else if v > 255 {
+		v = 255
+	}
+	levels := int32(1<<bits - 1)
+	return uint32((v*levels + 127) / 255)
+}
+
+// expandChannel is the reconstruction the renderer performs — replicate the high
+// bits down into the low ones. Dither error is measured against this rather than
+// an exact q*255/levels so the diffused error matches what actually lands on the
+// panel.
+func expandChannel(q uint32, bits uint) uint32 {
+	if bits == 5 {
+		return q<<3 | q>>2
+	}
+	return q<<2 | q>>4
+}
+
+// packRGB565 packs 0xRRGGBB into 5/6/5, rounding each channel to the nearest
+// representable level. The previous (r>>3)<<11 | (g>>2)<<5 | b>>3 truncated
+// instead, always rounding down, which biased every image darker by up to most
+// of a level per channel.
 func packRGB565(rgb uint32) uint16 {
-	r, g, b := (rgb>>16)&0xFF, (rgb>>8)&0xFF, rgb&0xFF
-	return uint16((r>>3)<<11 | (g>>2)<<5 | b>>3)
+	r := quantiseChannel(int32(rgb>>16&0xFF), 5)
+	g := quantiseChannel(int32(rgb>>8&0xFF), 6)
+	b := quantiseChannel(int32(rgb&0xFF), 5)
+	return uint16(r<<11 | g<<5 | b)
 }
 
 // decodeGfx expands the three wire formats to 0xRRGGBB pixels.
