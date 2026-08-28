@@ -213,9 +213,9 @@ func (rp *RawPanel) readFromPanel() error {
 				return err
 			} else {
 				currentPayloadLength := binary.LittleEndian.Uint32(headerArray[0:4])
-				if currentPayloadLength < 500000 {
+				if currentPayloadLength < helpers.MaxBinaryPayloadSize {
 					payload := make([]byte, currentPayloadLength)
-					rp.connection.SetReadDeadline(time.Now().Add(2 * time.Second)) // Set a deadline that we want all data within at most 2 seconds. This helps a run-away scenario where not all data arrives or we read the wront (and too big) header
+					rp.connection.SetReadDeadline(time.Now().Add(helpers.BinaryPayloadReadDeadline(currentPayloadLength))) // Set a deadline that we want all the data within. This helps a run-away scenario where not all data arrives or we read the wront (and too big) header
 					_, err := io.ReadFull(rp.connection, payload)
 					if err != nil {
 						log.Errorln(err)

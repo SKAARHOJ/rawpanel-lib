@@ -18,6 +18,32 @@ import (
 	"go.uber.org/atomic"
 )
 
+// MaxBinaryPayloadSize is the largest protobuf payload the binary Raw Panel
+// readers will accept for a single 4-byte length-prefixed frame.
+//
+// It has to clear the biggest legitimate message by a good margin: a full screen
+// RGB16bit HWCGfx background for a 400x1280 touch panel is 400*1280*2 = 1,024,000
+// bytes of image data on its own, and a system may batch several states into one
+// message.
+//
+// It also has to stay well below the value an ASCII line yields when its first
+// four bytes are misread as a little-endian length, since that is what the
+// binary/ASCII auto detect keys on. Four printable ASCII characters always give
+// >= 0x20202020 (538,976,288), so any cap in the low megabytes keeps auto detect
+// working while still bounding how much a bogus header can make us allocate.
+const MaxBinaryPayloadSize = 8 << 20 // 8 MiB
+
+// BinaryPayloadReadDeadline is how long a reader waits for the rest of a frame
+// once its header has been accepted. The deadline is what stops a bogus (or
+// mis-framed) header from parking a connection forever, but it must not cut off
+// a payload that is merely large: a flat 2 seconds was fine when frames capped
+// out at 500 KB and would need ~32 Mbit/s sustained to carry a full 8 MiB one.
+// So keep the 2 second floor for small frames and add a second per megabyte,
+// which is a slow link by any panel's standard and still bounds the wait.
+func BinaryPayloadReadDeadline(payloadLength uint32) time.Duration {
+	return 2*time.Second + time.Duration(payloadLength>>20)*time.Second
+}
+
 type ConnectToPanelConfig struct {
 	NoConnectionRetryPeriod int    // Period in seconds between retries in case of no
 	ReConnectionRetryPeriod int    // Period in seconds between retries in case of disconnect
@@ -192,9 +218,9 @@ func ConnectToPanel(panelIPAndPort string, msgsToPanel <-chan []*rwp.InboundMess
 						break
 					} else {
 						currentPayloadLength := binary.LittleEndian.Uint32(headerArray[0:4])
-						if currentPayloadLength < 500000 {
+						if currentPayloadLength < MaxBinaryPayloadSize {
 							payload := make([]byte, currentPayloadLength)
-							conn.SetReadDeadline(time.Now().Add(2 * time.Second)) // Set a deadline that we want all data within at most 2 seconds. This helps a run-away scenario where not all data arrives or we read the wront (and too big) header
+							conn.SetReadDeadline(time.Now().Add(BinaryPayloadReadDeadline(currentPayloadLength))) // Set a deadline that we want all the data within. This helps a run-away scenario where not all data arrives or we read the wront (and too big) header
 							_, err := io.ReadFull(conn, payload)
 							if err != nil {
 								log.Debugln(err)
