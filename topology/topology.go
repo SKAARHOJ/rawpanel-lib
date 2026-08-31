@@ -17,6 +17,12 @@ type Topology struct {
 	HWc       []TopologyHWcomponent
 	TypeIndex map[uint32]TopologyHWcTypeDef `json:"typeIndex"`
 	Grids     []Grid                        `json:"grids,omitempty"`
+	// Rotatable says the panel can be worn in more than one orientation, so this geometry is
+	// only how it is being held right now and a client may offer to change it. A property of
+	// the chassis, not of any one component, which is why it sits on the topology itself.
+	// Absent (false) is the safe default: a fixed-mount panel is the common case, and offering
+	// to turn one would be offering something that cannot happen.
+	Rotatable bool `json:"rotatable,omitempty"`
 
 	sync.RWMutex `json:"-"`
 }
