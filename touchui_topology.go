@@ -240,6 +240,12 @@ func touchUITypeDef(t rwp.TouchUIWidget_WidgetTypeE, opts *rwp.TouchUIWidgetOpti
 	case rwp.TouchUIWidget_ENCODER:
 		def.In = "pb" // pulsed + push (the -/+ taps pulse, the center is the push)
 		def.Desc = "TouchUI encoder"
+		// The center key prints a caption, so it is a text component like the KNOB above,
+		// and Capabilities() advertises ENCODER with TouchUIStateText. The Disp is what
+		// actually opens that path: Reactor gates text on it (dispatch/DFeedback.go), and a
+		// component without one is also drawn with a label of its own by the simulator -
+		// which lands on top of the caption the renderer already draws on the live screen.
+		def.Disp = &topology.TopologyHWcTypeDef_Display{W: 12, H: 3, Subidx: -1, Type: "text"}
 		def.Sub = []topology.TopologyHWcTypeDefSubEl{
 			subCircle(0, 0, 150, touchUIStyleTrack),
 			subRect(-130, -8, 60, 16, 4, touchUIStyleAccent),
