@@ -455,6 +455,9 @@ func MergeTopology(base, widget *topology.Topology) *topology.Topology {
 	if out.Title == "" {
 		out.Title = widget.Title
 	}
+	// Whether the panel can be worn turned is the chassis's property, so it comes from the
+	// native half; a widget topology is laid out on a screen and has no opinion about it.
+	out.Rotatable = base.Rotatable
 
 	// Native components + type index, verbatim.
 	out.HWc = append(out.HWc, base.HWc...)
@@ -505,6 +508,10 @@ func StripMergedTouchUI(t *topology.Topology) *topology.Topology {
 	out := &topology.Topology{
 		Title:     t.Title,
 		TypeIndex: map[uint32]topology.TopologyHWcTypeDef{},
+		// Dropping the widgets leaves the chassis, which is what can be worn turned; this is
+		// persisted as the physical profile, so losing it here would make the panel look
+		// fixed-mount for good.
+		Rotatable: t.Rotatable,
 	}
 
 	widgetIDs := map[uint32]bool{}
