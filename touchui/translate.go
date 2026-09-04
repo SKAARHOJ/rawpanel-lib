@@ -274,6 +274,9 @@ func resolveFeed(w *rwp.TouchUIWidget, ordinal int, resolve FeedResolver) *gen.V
 		Width:        opts.GetSourceWidth(),
 		Height:       opts.GetSourceHeight(),
 		HiddenPolicy: gen.VideoFeed_HiddenPolicy(opts.GetHiddenPolicy()),
+		// The two enums are declared with the same values in both protos, so this
+		// stays a cast — see the ScalingE/Scaling comments on either side.
+		Scaling: gen.VideoFeed_Scaling(opts.GetScaling()),
 	}
 	if feed.Source == "" && resolve != nil {
 		src, w, h, policy := resolve(ordinal)

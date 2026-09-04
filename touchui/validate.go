@@ -15,16 +15,22 @@ const (
 	MaxLabelLen       = 47 // nanopb max_size includes the NUL
 	MaxTitleLen       = 23
 	MaxSourceLen      = 127
-	MaxVideoWidgets   = 4 // pi DRM video planes
+	// Not a nanopb cap: VideoFeed rides inside WidgetDef rather than in a repeated
+	// field of its own, so this costs nothing in the static decode. It is purely how
+	// many feeds the renderer will track (MAX_FEEDS in its pi target — keep the two
+	// in step). It was 4 because that renderer gave every feed its own DRM plane
+	// (primary + one overlay each + one for the GUI); feeds never overlap, so they
+	// now share one plane and the ceiling is what the panel can decode instead.
+	MaxVideoWidgets = 8
 
-	MaxChoices          = 32 // DROPDOWN: entries in Options.Choices
-	MaxChoiceLen        = 23
+	MaxChoices   = 32 // DROPDOWN: entries in Options.Choices
+	MaxChoiceLen = 23
 	// The '\n'-joined wire form has its own cap, independent of the count and the per-label
 	// one: it is touchmanager.options' WidgetDef.choices max_size minus the NUL. 32 entries
 	// of 23 bytes plus 31 separators is 767 bytes, which nanopb would truncate MID-LABEL —
 	// and a cut landing on a separator silently changes the option count, shifting every
 	// index after it.
-	MaxChoicesJoined = 255
+	MaxChoicesJoined    = 255
 	MaxCompressorParams = 6 // COMPRESSOR: one per RoleE
 	MaxParamLabelLen    = 15
 	MaxEditLen          = 63 // LABEL: Options.EditMaxLen ceiling
@@ -132,6 +138,9 @@ func validateWidgetOptions(widget *rwp.TouchUIWidget, hwcIDs map[uint32]bool) er
 	}
 	if len(opts.GetMarkers()) > 0 && widget.GetType() != rwp.TouchUIWidget_VIDEO {
 		return fmt.Errorf("widget %d: Markers are only valid on a VIDEO widget", id)
+	}
+	if opts.GetScaling() != rwp.TouchUIWidgetOptions_STRETCH && widget.GetType() != rwp.TouchUIWidget_VIDEO {
+		return fmt.Errorf("widget %d: Scaling is only valid on a VIDEO widget", id)
 	}
 
 	switch widget.GetType() {
