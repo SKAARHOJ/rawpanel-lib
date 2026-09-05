@@ -191,12 +191,7 @@ func joinChoices(choices []string) string {
 	out := make([]string, 0, len(choices))
 	used := 0
 	for _, c := range choices {
-		// A newline inside a label would split one option into two and shift every index
-		// after it, desyncing the domain the client emits against.
-		c = strings.NewReplacer("\r", " ", "\n", " ").Replace(c)
-		if len(c) > MaxChoiceLen {
-			c = c[:MaxChoiceLen]
-		}
+		c = sanitizeChoice(c)
 		need := len(c)
 		if len(out) > 0 {
 			need++ // the separator
@@ -208,6 +203,17 @@ func joinChoices(choices []string) string {
 		used += need
 	}
 	return strings.Join(out, "\n")
+}
+
+// sanitizeChoice makes one entry safe to put in a '\n'-joined list. A newline inside a label
+// would split one option into two and shift every index after it, desyncing the domain the
+// client emits against; the length cap is the per-entry half of the panel's budget.
+func sanitizeChoice(c string) string {
+	c = strings.NewReplacer("\r", " ", "\n", " ").Replace(c)
+	if len(c) > MaxChoiceLen {
+		c = c[:MaxChoiceLen]
+	}
+	return c
 }
 
 // compressorRoleDefaults is the natural-unit range each role gets when a client leaves
@@ -329,6 +335,10 @@ func StateToFrames(hwc uint32, state *rwp.HWCState, epoch uint32) []*gen.ServerM
 		ws.Overlay = overlayStateFrom(o)
 		touched = true
 	}
+	if d := state.GetHWCDomain(); d != nil {
+		ws.Domain = domainStateFrom(d)
+		touched = true
+	}
 	if touched {
 		frames = append(frames, &gen.ServerMessage{Kind: &gen.ServerMessage_State{State: ws}})
 	}
@@ -359,6 +369,13 @@ func EventToRWP(ev *gen.WidgetEvent) *rwp.HWCEvent {
 		out.Pulsed = &rwp.PulsedEvent{Value: kind.Pulsed.GetValue()}
 	case *gen.WidgetEvent_Absolute:
 		out.Absolute = &rwp.AbsoluteEvent{Value: uint32(kind.Absolute.GetValue())}
+		// A DROPDOWN whose domain declares values reports WHAT was picked as well as where
+		// it sat. Both ride one HWCEvent — its arms are plain fields, not a oneof — so a
+		// client sees a whole pick or none of it, and one that only reads Absolute is
+		// exactly as well off as it was before domains existed.
+		if v := kind.Absolute.GetDomainValue(); v != "" {
+			out.Text = &rwp.TextEvent{Value: v}
+		}
 	case *gen.WidgetEvent_Vector:
 		// One renderer arm, two RWP messages: an XYPAD in relative mode reports movement
 		// (SpeedVector), otherwise position (AbsoluteVector). The absolute form is unsigned
@@ -382,6 +399,78 @@ func EventToRWP(ev *gen.WidgetEvent) *rwp.HWCEvent {
 		return nil
 	}
 	return out
+}
+
+// domainStateFrom digests a runtime domain for the renderer. Choices and values are joined
+// TOGETHER rather than through two independent joinChoices calls: joinChoices degrades by
+// dropping whole trailing entries, and two lists trimmed separately can lose a different
+// number of them — after which entry N of one no longer describes entry N of the other, and
+// every pick past the cut reports the wrong value. Truncating them as pairs cannot desync.
+func domainStateFrom(d *rwp.HWCDomain) *gen.DomainState {
+	choices, values := joinDomain(d.GetChoices(), d.GetValues())
+	return &gen.DomainState{
+		Choices: choices,
+		Values:  values,
+		Min:     d.GetMin(),
+		Max:     d.GetMax(),
+		Step:    d.GetStep(),
+	}
+}
+
+// joinDomain renders a domain's labels and their values as the two '\n'-joined strings the
+// renderer wants. A missing or short Values list yields an empty values string, which the
+// renderer reads as "report the index only" — the historical behavior.
+//
+// Both budgets are checked on every entry and the pair is dropped unless BOTH fit, so the
+// two strings always describe the same number of options.
+func joinDomain(choices, values []string) (string, string) {
+	if len(choices) == 0 {
+		return "", ""
+	}
+	if len(choices) > MaxChoices {
+		choices = choices[:MaxChoices]
+	}
+	// Values are optional; without a full parallel list there is nothing safe to report, so
+	// the whole thing degrades to index-only rather than reporting some picks and not others.
+	withValues := len(values) >= len(choices)
+
+	outC := make([]string, 0, len(choices))
+	outV := make([]string, 0, len(choices))
+	usedC, usedV := 0, 0
+	for i, c := range choices {
+		c = sanitizeChoice(c)
+		needC := len(c)
+		if len(outC) > 0 {
+			needC++ // the separator
+		}
+		if usedC+needC > MaxChoicesJoined {
+			break
+		}
+
+		v := ""
+		needV := 0
+		if withValues {
+			v = sanitizeChoice(values[i])
+			needV = len(v)
+			if len(outV) > 0 {
+				needV++
+			}
+			if usedV+needV > MaxChoicesJoined {
+				break
+			}
+		}
+
+		outC = append(outC, c)
+		usedC += needC
+		if withValues {
+			outV = append(outV, v)
+			usedV += needV
+		}
+	}
+	if !withValues {
+		return strings.Join(outC, "\n"), ""
+	}
+	return strings.Join(outC, "\n"), strings.Join(outV, "\n")
 }
 
 func overlayStateFrom(o *rwp.HWCOverlay) *gen.OverlayState {

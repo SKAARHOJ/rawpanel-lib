@@ -68,14 +68,18 @@ func Capabilities(screenW, screenH, gridRows, gridCols uint32, orientation rwp.T
 				StateMask: helpers.TouchUIStateMode | helpers.TouchUIStateColor | helpers.TouchUIStateText,
 			},
 			{
-				Type:      rwp.TouchUIWidget_SLIDER,
+				Type: rwp.TouchUIWidget_SLIDER,
+				// No Domain bit. HWCDomain can carry a range, but a slider's position is the
+				// same number in both directions: a client that changes the range changes what
+				// its own HWCExtended means at the same time, which is a config-time decision
+				// (Options.Min/Max), not something to move under a live control.
 				EventMask: helpers.TouchUIEventAbsolute,
 				StateMask: helpers.TouchUIStateExtended | helpers.TouchUIStateText,
 			},
 			{
 				Type:      rwp.TouchUIWidget_KNOB, // analog rotary dial
 				EventMask: helpers.TouchUIEventAbsolute,
-				StateMask: helpers.TouchUIStateExtended | helpers.TouchUIStateText,
+				StateMask: helpers.TouchUIStateExtended | helpers.TouchUIStateText, // see SLIDER for why no Domain
 			},
 			{
 				Type:      rwp.TouchUIWidget_ENCODER, // -/press/+ pad
@@ -83,7 +87,9 @@ func Capabilities(screenW, screenH, gridRows, gridCols uint32, orientation rwp.T
 				StateMask: helpers.TouchUIStateText | helpers.TouchUIStateExtended,
 			},
 			{
-				Type:      rwp.TouchUIWidget_METER,
+				Type: rwp.TouchUIWidget_METER,
+				// No Domain bit: a meter reads its value as 0..1000 of full scale and has no
+				// range of its own to replace, unlike the slider and knob below.
 				StateMask: helpers.TouchUIStateExtended | helpers.TouchUIStateText,
 			},
 			{
@@ -96,9 +102,13 @@ func Capabilities(screenW, screenH, gridRows, gridCols uint32, orientation rwp.T
 				StateMask: helpers.TouchUIStateText | helpers.TouchUIStateColor,
 			},
 			{
-				Type:      rwp.TouchUIWidget_DROPDOWN, // discrete 1-of-N picker
-				EventMask: helpers.TouchUIEventAbsolute,
-				StateMask: helpers.TouchUIStateExtended | helpers.TouchUIStateText | helpers.TouchUIStateColor,
+				Type: rwp.TouchUIWidget_DROPDOWN, // discrete 1-of-N picker
+				// Text is in the union because a pick reports the entry's own value when the
+				// widget is carrying an HWCDomain that declares one — the same event as the
+				// index, not a separate gesture. Without a domain the type never emits it.
+				EventMask: helpers.TouchUIEventAbsolute | helpers.TouchUIEventText,
+				StateMask: helpers.TouchUIStateExtended | helpers.TouchUIStateText | helpers.TouchUIStateColor |
+					helpers.TouchUIStateDomain,
 			},
 			{
 				Type: rwp.TouchUIWidget_XYPAD,
