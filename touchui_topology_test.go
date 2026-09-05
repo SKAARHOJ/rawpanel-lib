@@ -280,3 +280,41 @@ func TestCompressorMembersAreNotTopologyComponents(t *testing.T) {
 		}
 	}
 }
+
+// HWCd# domain state: proto -> ASCII -> proto full fidelity. JSON rather than the
+// pipe-separated HWCJog form precisely so a label may contain the separators the other
+// commands use, which is what the "Bus A|B" choice below is there to prove.
+func TestHWCDomainRoundtrip(t *testing.T) {
+	state := &rwp.HWCState{
+		HWCIDs: []uint32{112},
+		HWCDomain: &rwp.HWCDomain{
+			Choices: []string{"Black", "Input 1", "Bus A|B", "Media Player 1"},
+			Values:  []string{"0", "1", "1000", "3010"},
+		},
+	}
+
+	ascii := InboundMessagesToRawPanelASCIIstrings([]*rwp.InboundMessage{{States: []*rwp.HWCState{state}}})
+	if len(ascii) != 1 {
+		t.Fatalf("expected 1 ASCII line, got %d: %v", len(ascii), ascii)
+	}
+	if want := "HWCd#112={"; len(ascii[0]) < len(want) || ascii[0][:len(want)] != want {
+		t.Fatalf("unexpected ASCII form: %s", ascii[0])
+	}
+
+	back := RawPanelASCIIstringsToInboundMessages(ascii)
+	if len(back) != 1 || len(back[0].States) != 1 {
+		t.Fatalf("roundtrip lost the state: %v", back)
+	}
+	if got := back[0].States[0].HWCDomain; !proto.Equal(got, state.HWCDomain) {
+		t.Errorf("domain not identical after roundtrip:\nwant %v\ngot  %v", state.HWCDomain, got)
+	}
+
+	// A range-only domain carries no lists at all, and a Min/Max of 0/0 is a meaningful
+	// value ("leave the configured range alone") rather than an absent one.
+	rng := &rwp.HWCState{HWCIDs: []uint32{113}, HWCDomain: &rwp.HWCDomain{Min: -60, Max: 12, Step: 1}}
+	rngASCII := InboundMessagesToRawPanelASCIIstrings([]*rwp.InboundMessage{{States: []*rwp.HWCState{rng}}})
+	rngBack := RawPanelASCIIstringsToInboundMessages(rngASCII)
+	if got := rngBack[0].States[0].HWCDomain; !proto.Equal(got, rng.HWCDomain) {
+		t.Errorf("range domain not identical after roundtrip:\nwant %v\ngot  %v", rng.HWCDomain, got)
+	}
+}

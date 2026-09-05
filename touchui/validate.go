@@ -142,12 +142,22 @@ func validateWidgetOptions(widget *rwp.TouchUIWidget, hwcIDs map[uint32]bool) er
 	if opts.GetScaling() != rwp.TouchUIWidgetOptions_STRETCH && widget.GetType() != rwp.TouchUIWidget_VIDEO {
 		return fmt.Errorf("widget %d: Scaling is only valid on a VIDEO widget", id)
 	}
+	// Only a DROPDOWN's domain is worth declaring: it is the one whose domain a client can
+	// replace without also redefining what the widget's own value means. A SLIDER or KNOB
+	// reports a position, and moving its range moves the meaning of every Absolute event and
+	// every HWCExtended with it — a config-time decision (Options.Min/Max), not a live one.
+	if opts.GetDynamicDomain() && widget.GetType() != rwp.TouchUIWidget_DROPDOWN {
+		return fmt.Errorf("widget %d: DynamicDomain is only valid on a DROPDOWN", id)
+	}
 
 	switch widget.GetType() {
 	case rwp.TouchUIWidget_DROPDOWN:
 		choices := opts.GetChoices()
-		if len(choices) == 0 {
-			return fmt.Errorf("widget %d: DROPDOWN has no Choices", id)
+		// An empty list is a broken widget unless the config says the list arrives at
+		// runtime, in which case Choices is only the fallback shown until the first
+		// HWCDomain lands and having none is a legitimate way to say "wait for it".
+		if len(choices) == 0 && !opts.GetDynamicDomain() {
+			return fmt.Errorf("widget %d: DROPDOWN has no Choices and does not declare DynamicDomain", id)
 		}
 		if len(choices) > MaxChoices {
 			return fmt.Errorf("widget %d: %d Choices exceeds the maximum of %d", id, len(choices), MaxChoices)

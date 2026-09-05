@@ -14,7 +14,15 @@ func defaultEventMask(w *rwp.TouchUIWidget) uint32 {
 	switch w.GetType() {
 	case rwp.TouchUIWidget_BUTTON, rwp.TouchUIWidget_TOGGLE:
 		return helpers.TouchUIEventBinary
-	case rwp.TouchUIWidget_SLIDER, rwp.TouchUIWidget_KNOB, rwp.TouchUIWidget_DROPDOWN:
+	case rwp.TouchUIWidget_SLIDER, rwp.TouchUIWidget_KNOB:
+		return helpers.TouchUIEventAbsolute
+	case rwp.TouchUIWidget_DROPDOWN:
+		// DynamicDomain is the enabling switch here, the way EditKind is for a LABEL: a
+		// dropdown whose list arrives at runtime also reports the picked entry's value, and
+		// a client that declares one never has to remember to set the Text bit itself.
+		if opts.GetDynamicDomain() {
+			return helpers.TouchUIEventAbsolute | helpers.TouchUIEventText
+		}
 		return helpers.TouchUIEventAbsolute
 	case rwp.TouchUIWidget_ENCODER:
 		return helpers.TouchUIEventPulsed | helpers.TouchUIEventBinary

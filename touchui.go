@@ -45,6 +45,7 @@ const (
 	TouchUIStateExtended uint32 = 1 << 3
 	TouchUIStateGfx      uint32 = 1 << 4
 	TouchUIStateOverlay  uint32 = 1 << 5
+	TouchUIStateDomain   uint32 = 1 << 6 // HWCDomain: a runtime choice list / value range
 )
 
 func touchUIConfigFromString(str string) *rwp.TouchUIConfig {
@@ -75,6 +76,25 @@ func overlayFromString(str string) *rwp.HWCOverlay {
 
 func stringFromOverlay(overlay *rwp.HWCOverlay) string {
 	jsonBytes, err := json.Marshal(overlay)
+	if err != nil {
+		return ""
+	}
+	return string(jsonBytes)
+}
+
+// A domain travels as JSON rather than the pipe-separated form HWCJog uses: it carries free
+// text, and a label is perfectly entitled to contain a "|".
+func domainFromString(str string) *rwp.HWCDomain {
+	domain := &rwp.HWCDomain{}
+	err := json.Unmarshal([]byte(str), domain)
+	if err != nil {
+		return nil
+	}
+	return domain
+}
+
+func stringFromDomain(domain *rwp.HWCDomain) string {
+	jsonBytes, err := json.Marshal(domain)
 	if err != nil {
 		return ""
 	}

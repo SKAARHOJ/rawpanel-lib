@@ -1,6 +1,7 @@
 package touchui
 
 import (
+	"strconv"
 	"strings"
 	"testing"
 
@@ -228,5 +229,61 @@ func TestWidgetOptionsReachTheRenderer(t *testing.T) {
 	}
 	if defs[2].GetEventMask()&helpers.TouchUIEventText == 0 {
 		t.Error("editable label did not advertise Text in its event mask")
+	}
+}
+
+// joinDomain's whole job is that the two lists stay index-parallel: entry N of choices must
+// describe entry N of values no matter where either was cut, because a pick reports one and
+// is indexed by the other.
+func TestJoinDomain(t *testing.T) {
+	c, v := joinDomain([]string{"Black", "Input 1"}, []string{"0", "1"})
+	if c != "Black\nInput 1" || v != "0\n1" {
+		t.Errorf("plain join = %q / %q", c, v)
+	}
+
+	// No values at all, or a short list: index-only rather than reporting some picks and
+	// not others.
+	if _, v := joinDomain([]string{"a", "b"}, nil); v != "" {
+		t.Errorf("valueless domain should join to no values, got %q", v)
+	}
+	if _, v := joinDomain([]string{"a", "b", "c"}, []string{"1", "2"}); v != "" {
+		t.Errorf("short value list should join to no values, got %q", v)
+	}
+
+	// The choices overflow first: long labels against short values. Both lists must lose
+	// the same entries.
+	long := make([]string, MaxChoices)
+	vals := make([]string, MaxChoices)
+	for i := range long {
+		long[i] = strings.Repeat("x", MaxChoiceLen)
+		vals[i] = strconv.Itoa(i)
+	}
+	c, v = joinDomain(long, vals)
+	if got, want := len(strings.Split(c, "\n")), len(strings.Split(v, "\n")); got != want {
+		t.Errorf("choices/values desynced when choices overflowed: %d vs %d entries", got, want)
+	}
+	if len(c) > MaxChoicesJoined {
+		t.Errorf("joined choices %d bytes exceeds %d", len(c), MaxChoicesJoined)
+	}
+
+	// And the other way round: short labels against long values, so the VALUES hit the
+	// budget first. A naive implementation that only measures choices desyncs here.
+	shortC := make([]string, MaxChoices)
+	longV := make([]string, MaxChoices)
+	for i := range shortC {
+		shortC[i] = "x"
+		longV[i] = strings.Repeat("9", MaxChoiceLen)
+	}
+	c, v = joinDomain(shortC, longV)
+	if got, want := len(strings.Split(c, "\n")), len(strings.Split(v, "\n")); got != want {
+		t.Errorf("choices/values desynced when values overflowed: %d vs %d entries", got, want)
+	}
+	if len(v) > MaxChoicesJoined {
+		t.Errorf("joined values %d bytes exceeds %d", len(v), MaxChoicesJoined)
+	}
+
+	// A newline inside a value would split it in two exactly as it would a label.
+	if _, v := joinDomain([]string{"a"}, []string{"1\n2"}); v != "1 2" {
+		t.Errorf("newline in a value not neutralized: %q", v)
 	}
 }

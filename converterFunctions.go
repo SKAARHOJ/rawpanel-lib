@@ -16,7 +16,7 @@ import (
 )
 
 // Set up regular expressions:
-var regex_cmd = regexp.MustCompile("^(HWC#|HWCx#|HWCj#|HWCc#|HWCt#|HWCo#|HWCrawADCValues#)([0-9,]+)=(.*)$")
+var regex_cmd = regexp.MustCompile("^(HWC#|HWCx#|HWCj#|HWCc#|HWCt#|HWCo#|HWCd#|HWCrawADCValues#)([0-9,]+)=(.*)$")
 var regex_gfx = regexp.MustCompile("^(HWCgRGB#|HWCgGray#|HWCg#)([0-9,]+)=([0-9]+)(/([0-9]+),([0-9]+)x([0-9]+)(,([0-9]+),([0-9]+)|)|):(.*)$")
 var regex_genericDual = regexp.MustCompile("^(PanelBrightness)=([0-9]+),([0-9]+)$")
 var regex_genericTriple = regexp.MustCompile("^(PanelBrightness)=([0-9]+),([0-9]+),([0-9]+)$")
@@ -375,6 +375,15 @@ func RawPanelASCIIstringsToInboundMessages(rp20_ascii []string) []*rwp.InboundMe
 							{
 								HWCIDs:     HWCidArray,
 								HWCOverlay: overlayFromString(regex_cmd.FindStringSubmatch(inputString)[3]),
+							},
+						},
+					}
+				case "HWCd#":
+					msg = &rwp.InboundMessage{
+						States: []*rwp.HWCState{
+							{
+								HWCIDs:    HWCidArray,
+								HWCDomain: domainFromString(regex_cmd.FindStringSubmatch(inputString)[3]),
 							},
 						},
 					}
@@ -1040,6 +1049,9 @@ func InboundMessagesToRawPanelASCIIstrings(inboundMsgs []*rwp.InboundMessage) []
 								sline += ":" + base64.StdEncoding.EncodeToString(stateRec.HWCGfx.ImageData[lines*bytesPerLine:lines*bytesPerLine+segmentLength])
 								returnStrings = append(returnStrings, sline)
 							}
+						}
+						if stateRec.HWCDomain != nil {
+							returnStrings = append(returnStrings, fmt.Sprintf("HWCd#%s=%s", su.IntImplode(singleHWCIDarray, ","), stripLineBreaks(stringFromDomain(stateRec.HWCDomain))))
 						}
 						if stateRec.HWCOverlay != nil {
 							returnStrings = append(returnStrings, fmt.Sprintf("HWCo#%s=%s", su.IntImplode(singleHWCIDarray, ","), stripLineBreaks(stringFromOverlay(stateRec.HWCOverlay))))

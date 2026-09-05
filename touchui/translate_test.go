@@ -441,3 +441,66 @@ func TestJoinChoicesDropsWholeOptions(t *testing.T) {
 		t.Errorf("kept %d options, want %d", len(parts), want)
 	}
 }
+
+// The whole reactor -> renderer path for a domain: an HWCDomain on an outbound state has to
+// come out the other side as a DomainState the renderer can hand straight to
+// lv_dropdown_set_options, with the values still index-parallel to the labels.
+func TestStateToFramesDomain(t *testing.T) {
+	state := &rwp.HWCState{
+		HWCIDs: []uint32{112},
+		HWCDomain: &rwp.HWCDomain{
+			Choices: []string{"Black", "Input 1", "Media Player 1"},
+			Values:  []string{"0", "1", "3010"},
+		},
+		HWCExtended: &rwp.HWCExtended{Interpretation: rwp.HWCExtended_STEPS, Value: 2},
+	}
+	frames := StateToFrames(112, state, 9)
+	if len(frames) != 1 {
+		t.Fatalf("expected 1 WidgetState frame, got %d", len(frames))
+	}
+	d := frames[0].GetState().GetDomain()
+	if d == nil {
+		t.Fatal("no domain in the digested frame")
+	}
+	if d.GetChoices() != "Black\nInput 1\nMedia Player 1" {
+		t.Errorf("choices = %q", d.GetChoices())
+	}
+	if d.GetValues() != "0\n1\n3010" {
+		t.Errorf("values = %q", d.GetValues())
+	}
+	// The domain and the selection ride the same frame, so the renderer can install the list
+	// before it reads the index against it.
+	if frames[0].GetState().GetValue().GetValue() != 2 {
+		t.Errorf("the selection should travel with its domain: %+v", frames[0].GetState().GetValue())
+	}
+
+	// A state with no domain must add none — the renderer applies deltas, and an empty
+	// DomainState would read as "replace the list with nothing".
+	plain := &rwp.HWCState{HWCIDs: []uint32{112}, HWCExtended: &rwp.HWCExtended{Value: 1}}
+	if d := StateToFrames(112, plain, 9)[0].GetState().GetDomain(); d != nil {
+		t.Errorf("a domainless state produced a domain: %+v", d)
+	}
+}
+
+// EventToRWP has to carry a dropdown pick's value up alongside its index, in ONE HWCEvent —
+// rwp.HWCEvent has plain fields rather than a oneof precisely so both arms fit.
+func TestEventToRWPDomainValue(t *testing.T) {
+	ev := &gen.WidgetEvent{
+		HwcId: 112,
+		Kind:  &gen.WidgetEvent_Absolute{Absolute: &gen.AbsoluteEv{Value: 2, DomainValue: "3010"}},
+	}
+	out := EventToRWP(ev)
+	if out.GetAbsolute().GetValue() != 2 {
+		t.Errorf("index lost: %+v", out.GetAbsolute())
+	}
+	if out.GetText().GetValue() != "3010" {
+		t.Errorf("picked value lost: %+v", out.GetText())
+	}
+
+	// Without a domain value the event is exactly what it always was: no Text arm, so a
+	// behavior bound the historical way sees no change at all.
+	plain := &gen.WidgetEvent{HwcId: 112, Kind: &gen.WidgetEvent_Absolute{Absolute: &gen.AbsoluteEv{Value: 2}}}
+	if out := EventToRWP(plain); out.GetText() != nil {
+		t.Errorf("a plain pick grew a Text arm: %+v", out.GetText())
+	}
+}
