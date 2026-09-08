@@ -21,6 +21,67 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
+// Where a piece of chrome sits. Chrome floats above the pages and is not part
+// of the layout, so a corner is a corner of the screen as displayed - Go hands
+// the tree over already rotated, and these are not turned with it.
+type GlobalOptions_ChromeLoc int32
+
+const (
+	GlobalOptions_CHROME_DEFAULT      GlobalOptions_ChromeLoc = 0 // the built-in placement: top right
+	GlobalOptions_CHROME_HIDDEN       GlobalOptions_ChromeLoc = 1
+	GlobalOptions_CHROME_TOP_LEFT     GlobalOptions_ChromeLoc = 2
+	GlobalOptions_CHROME_TOP_RIGHT    GlobalOptions_ChromeLoc = 3
+	GlobalOptions_CHROME_BOTTOM_LEFT  GlobalOptions_ChromeLoc = 4
+	GlobalOptions_CHROME_BOTTOM_RIGHT GlobalOptions_ChromeLoc = 5
+)
+
+// Enum value maps for GlobalOptions_ChromeLoc.
+var (
+	GlobalOptions_ChromeLoc_name = map[int32]string{
+		0: "CHROME_DEFAULT",
+		1: "CHROME_HIDDEN",
+		2: "CHROME_TOP_LEFT",
+		3: "CHROME_TOP_RIGHT",
+		4: "CHROME_BOTTOM_LEFT",
+		5: "CHROME_BOTTOM_RIGHT",
+	}
+	GlobalOptions_ChromeLoc_value = map[string]int32{
+		"CHROME_DEFAULT":      0,
+		"CHROME_HIDDEN":       1,
+		"CHROME_TOP_LEFT":     2,
+		"CHROME_TOP_RIGHT":    3,
+		"CHROME_BOTTOM_LEFT":  4,
+		"CHROME_BOTTOM_RIGHT": 5,
+	}
+)
+
+func (x GlobalOptions_ChromeLoc) Enum() *GlobalOptions_ChromeLoc {
+	p := new(GlobalOptions_ChromeLoc)
+	*p = x
+	return p
+}
+
+func (x GlobalOptions_ChromeLoc) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (GlobalOptions_ChromeLoc) Descriptor() protoreflect.EnumDescriptor {
+	return file_touchmanager_proto_enumTypes[0].Descriptor()
+}
+
+func (GlobalOptions_ChromeLoc) Type() protoreflect.EnumType {
+	return &file_touchmanager_proto_enumTypes[0]
+}
+
+func (x GlobalOptions_ChromeLoc) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use GlobalOptions_ChromeLoc.Descriptor instead.
+func (GlobalOptions_ChromeLoc) EnumDescriptor() ([]byte, []int) {
+	return file_touchmanager_proto_rawDescGZIP(), []int{4, 0}
+}
+
 type WidgetDef_Type int32
 
 const (
@@ -86,11 +147,11 @@ func (x WidgetDef_Type) String() string {
 }
 
 func (WidgetDef_Type) Descriptor() protoreflect.EnumDescriptor {
-	return file_touchmanager_proto_enumTypes[0].Descriptor()
+	return file_touchmanager_proto_enumTypes[1].Descriptor()
 }
 
 func (WidgetDef_Type) Type() protoreflect.EnumType {
-	return &file_touchmanager_proto_enumTypes[0]
+	return &file_touchmanager_proto_enumTypes[1]
 }
 
 func (x WidgetDef_Type) Number() protoreflect.EnumNumber {
@@ -142,11 +203,11 @@ func (x WidgetDef_EditKind) String() string {
 }
 
 func (WidgetDef_EditKind) Descriptor() protoreflect.EnumDescriptor {
-	return file_touchmanager_proto_enumTypes[1].Descriptor()
+	return file_touchmanager_proto_enumTypes[2].Descriptor()
 }
 
 func (WidgetDef_EditKind) Type() protoreflect.EnumType {
-	return &file_touchmanager_proto_enumTypes[1]
+	return &file_touchmanager_proto_enumTypes[2]
 }
 
 func (x WidgetDef_EditKind) Number() protoreflect.EnumNumber {
@@ -193,11 +254,11 @@ func (x WidgetDef_KnobVariant) String() string {
 }
 
 func (WidgetDef_KnobVariant) Descriptor() protoreflect.EnumDescriptor {
-	return file_touchmanager_proto_enumTypes[2].Descriptor()
+	return file_touchmanager_proto_enumTypes[3].Descriptor()
 }
 
 func (WidgetDef_KnobVariant) Type() protoreflect.EnumType {
-	return &file_touchmanager_proto_enumTypes[2]
+	return &file_touchmanager_proto_enumTypes[3]
 }
 
 func (x WidgetDef_KnobVariant) Number() protoreflect.EnumNumber {
@@ -241,11 +302,11 @@ func (x WidgetDef_SliderVariant) String() string {
 }
 
 func (WidgetDef_SliderVariant) Descriptor() protoreflect.EnumDescriptor {
-	return file_touchmanager_proto_enumTypes[3].Descriptor()
+	return file_touchmanager_proto_enumTypes[4].Descriptor()
 }
 
 func (WidgetDef_SliderVariant) Type() protoreflect.EnumType {
-	return &file_touchmanager_proto_enumTypes[3]
+	return &file_touchmanager_proto_enumTypes[4]
 }
 
 func (x WidgetDef_SliderVariant) Number() protoreflect.EnumNumber {
@@ -291,11 +352,11 @@ func (x WidgetDef_LabelAlign) String() string {
 }
 
 func (WidgetDef_LabelAlign) Descriptor() protoreflect.EnumDescriptor {
-	return file_touchmanager_proto_enumTypes[4].Descriptor()
+	return file_touchmanager_proto_enumTypes[5].Descriptor()
 }
 
 func (WidgetDef_LabelAlign) Type() protoreflect.EnumType {
-	return &file_touchmanager_proto_enumTypes[4]
+	return &file_touchmanager_proto_enumTypes[5]
 }
 
 func (x WidgetDef_LabelAlign) Number() protoreflect.EnumNumber {
@@ -349,11 +410,11 @@ func (x CompressorParam_Role) String() string {
 }
 
 func (CompressorParam_Role) Descriptor() protoreflect.EnumDescriptor {
-	return file_touchmanager_proto_enumTypes[5].Descriptor()
+	return file_touchmanager_proto_enumTypes[6].Descriptor()
 }
 
 func (CompressorParam_Role) Type() protoreflect.EnumType {
-	return &file_touchmanager_proto_enumTypes[5]
+	return &file_touchmanager_proto_enumTypes[6]
 }
 
 func (x CompressorParam_Role) Number() protoreflect.EnumNumber {
@@ -398,11 +459,11 @@ func (x VideoFeed_HiddenPolicy) String() string {
 }
 
 func (VideoFeed_HiddenPolicy) Descriptor() protoreflect.EnumDescriptor {
-	return file_touchmanager_proto_enumTypes[6].Descriptor()
+	return file_touchmanager_proto_enumTypes[7].Descriptor()
 }
 
 func (VideoFeed_HiddenPolicy) Type() protoreflect.EnumType {
-	return &file_touchmanager_proto_enumTypes[6]
+	return &file_touchmanager_proto_enumTypes[7]
 }
 
 func (x VideoFeed_HiddenPolicy) Number() protoreflect.EnumNumber {
@@ -452,11 +513,11 @@ func (x VideoFeed_Scaling) String() string {
 }
 
 func (VideoFeed_Scaling) Descriptor() protoreflect.EnumDescriptor {
-	return file_touchmanager_proto_enumTypes[7].Descriptor()
+	return file_touchmanager_proto_enumTypes[8].Descriptor()
 }
 
 func (VideoFeed_Scaling) Type() protoreflect.EnumType {
-	return &file_touchmanager_proto_enumTypes[7]
+	return &file_touchmanager_proto_enumTypes[8]
 }
 
 func (x VideoFeed_Scaling) Number() protoreflect.EnumNumber {
@@ -522,11 +583,11 @@ func (x ConfigMenuItem_Type) String() string {
 }
 
 func (ConfigMenuItem_Type) Descriptor() protoreflect.EnumDescriptor {
-	return file_touchmanager_proto_enumTypes[8].Descriptor()
+	return file_touchmanager_proto_enumTypes[9].Descriptor()
 }
 
 func (ConfigMenuItem_Type) Type() protoreflect.EnumType {
-	return &file_touchmanager_proto_enumTypes[8]
+	return &file_touchmanager_proto_enumTypes[9]
 }
 
 func (x ConfigMenuItem_Type) Number() protoreflect.EnumNumber {
@@ -580,11 +641,11 @@ func (x ConfigMenuCtl_Op) String() string {
 }
 
 func (ConfigMenuCtl_Op) Descriptor() protoreflect.EnumDescriptor {
-	return file_touchmanager_proto_enumTypes[9].Descriptor()
+	return file_touchmanager_proto_enumTypes[10].Descriptor()
 }
 
 func (ConfigMenuCtl_Op) Type() protoreflect.EnumType {
-	return &file_touchmanager_proto_enumTypes[9]
+	return &file_touchmanager_proto_enumTypes[10]
 }
 
 func (x ConfigMenuCtl_Op) Number() protoreflect.EnumNumber {
@@ -641,11 +702,11 @@ func (x ConfigMenuEvent_Kind) String() string {
 }
 
 func (ConfigMenuEvent_Kind) Descriptor() protoreflect.EnumDescriptor {
-	return file_touchmanager_proto_enumTypes[10].Descriptor()
+	return file_touchmanager_proto_enumTypes[11].Descriptor()
 }
 
 func (ConfigMenuEvent_Kind) Type() protoreflect.EnumType {
-	return &file_touchmanager_proto_enumTypes[10]
+	return &file_touchmanager_proto_enumTypes[11]
 }
 
 func (x ConfigMenuEvent_Kind) Number() protoreflect.EnumNumber {
@@ -1123,10 +1184,15 @@ type GlobalOptions struct {
 	ShowVideoFps  bool                   `protobuf:"varint,3,opt,name=show_video_fps,json=showVideoFps,proto3" json:"show_video_fps,omitempty"`    // FPS / per-camera stats line
 	// Inverted polarity vs the flags above: false (or absent options) = the
 	// built-in config menu cogwheel shows (the always-available default), true =
-	// cogwheel hidden and the menu closed if open.
-	HideConfigMenu bool `protobuf:"varint,4,opt,name=hide_config_menu,json=hideConfigMenu,proto3" json:"hide_config_menu,omitempty"`
-	unknownFields  protoimpl.UnknownFields
-	sizeCache      protoimpl.SizeCache
+	// cogwheel hidden and the menu closed if open. Redundant with config_menu_loc
+	// == CHROME_HIDDEN, which Go sets alongside it; kept as the single flag the
+	// renderer actually tests for visibility.
+	HideConfigMenu  bool                    `protobuf:"varint,4,opt,name=hide_config_menu,json=hideConfigMenu,proto3" json:"hide_config_menu,omitempty"`
+	PageSelectorLoc GlobalOptions_ChromeLoc `protobuf:"varint,5,opt,name=page_selector_loc,json=pageSelectorLoc,proto3,enum=touchmanager.GlobalOptions_ChromeLoc" json:"page_selector_loc,omitempty"` // the page tab bar
+	ConfigMenuLoc   GlobalOptions_ChromeLoc `protobuf:"varint,6,opt,name=config_menu_loc,json=configMenuLoc,proto3,enum=touchmanager.GlobalOptions_ChromeLoc" json:"config_menu_loc,omitempty"`       // the cogwheel
+	PageSelectorRgb uint32                  `protobuf:"varint,7,opt,name=page_selector_rgb,json=pageSelectorRgb,proto3" json:"page_selector_rgb,omitempty"`                                           // active tab tint, 0xRRGGBB; 0 = built-in blue
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
 }
 
 func (x *GlobalOptions) Reset() {
@@ -1185,6 +1251,27 @@ func (x *GlobalOptions) GetHideConfigMenu() bool {
 		return x.HideConfigMenu
 	}
 	return false
+}
+
+func (x *GlobalOptions) GetPageSelectorLoc() GlobalOptions_ChromeLoc {
+	if x != nil {
+		return x.PageSelectorLoc
+	}
+	return GlobalOptions_CHROME_DEFAULT
+}
+
+func (x *GlobalOptions) GetConfigMenuLoc() GlobalOptions_ChromeLoc {
+	if x != nil {
+		return x.ConfigMenuLoc
+	}
+	return GlobalOptions_CHROME_DEFAULT
+}
+
+func (x *GlobalOptions) GetPageSelectorRgb() uint32 {
+	if x != nil {
+		return x.PageSelectorRgb
+	}
+	return 0
 }
 
 type PageDef struct {
@@ -3703,12 +3790,22 @@ const file_touchmanager_proto_rawDesc = "" +
 	"\vactive_page\x18\x04 \x01(\rR\n" +
 	"activePage\x125\n" +
 	"\aoptions\x18\x05 \x01(\v2\x1b.touchmanager.GlobalOptionsR\aoptions\x121\n" +
-	"\amarkers\x18\x06 \x03(\v2\x17.touchmanager.MarkerDefR\amarkers\"\xa4\x01\n" +
+	"\amarkers\x18\x06 \x03(\v2\x17.touchmanager.MarkerDefR\amarkers\"\x83\x04\n" +
 	"\rGlobalOptions\x12&\n" +
 	"\x0fshow_debug_info\x18\x01 \x01(\bR\rshowDebugInfo\x12\x1b\n" +
 	"\tshow_taps\x18\x02 \x01(\rR\bshowTaps\x12$\n" +
 	"\x0eshow_video_fps\x18\x03 \x01(\bR\fshowVideoFps\x12(\n" +
-	"\x10hide_config_menu\x18\x04 \x01(\bR\x0ehideConfigMenu\"\x9c\x01\n" +
+	"\x10hide_config_menu\x18\x04 \x01(\bR\x0ehideConfigMenu\x12Q\n" +
+	"\x11page_selector_loc\x18\x05 \x01(\x0e2%.touchmanager.GlobalOptions.ChromeLocR\x0fpageSelectorLoc\x12M\n" +
+	"\x0fconfig_menu_loc\x18\x06 \x01(\x0e2%.touchmanager.GlobalOptions.ChromeLocR\rconfigMenuLoc\x12*\n" +
+	"\x11page_selector_rgb\x18\a \x01(\rR\x0fpageSelectorRgb\"\x8e\x01\n" +
+	"\tChromeLoc\x12\x12\n" +
+	"\x0eCHROME_DEFAULT\x10\x00\x12\x11\n" +
+	"\rCHROME_HIDDEN\x10\x01\x12\x13\n" +
+	"\x0fCHROME_TOP_LEFT\x10\x02\x12\x14\n" +
+	"\x10CHROME_TOP_RIGHT\x10\x03\x12\x16\n" +
+	"\x12CHROME_BOTTOM_LEFT\x10\x04\x12\x17\n" +
+	"\x13CHROME_BOTTOM_RIGHT\x10\x05\"\x9c\x01\n" +
 	"\aPageDef\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\rR\x02id\x12\x14\n" +
 	"\x05title\x18\x02 \x01(\tR\x05title\x12\x1b\n" +
@@ -4017,106 +4114,109 @@ func file_touchmanager_proto_rawDescGZIP() []byte {
 	return file_touchmanager_proto_rawDescData
 }
 
-var file_touchmanager_proto_enumTypes = make([]protoimpl.EnumInfo, 11)
+var file_touchmanager_proto_enumTypes = make([]protoimpl.EnumInfo, 12)
 var file_touchmanager_proto_msgTypes = make([]protoimpl.MessageInfo, 35)
 var file_touchmanager_proto_goTypes = []any{
-	(WidgetDef_Type)(0),          // 0: touchmanager.WidgetDef.Type
-	(WidgetDef_EditKind)(0),      // 1: touchmanager.WidgetDef.EditKind
-	(WidgetDef_KnobVariant)(0),   // 2: touchmanager.WidgetDef.KnobVariant
-	(WidgetDef_SliderVariant)(0), // 3: touchmanager.WidgetDef.SliderVariant
-	(WidgetDef_LabelAlign)(0),    // 4: touchmanager.WidgetDef.LabelAlign
-	(CompressorParam_Role)(0),    // 5: touchmanager.CompressorParam.Role
-	(VideoFeed_HiddenPolicy)(0),  // 6: touchmanager.VideoFeed.HiddenPolicy
-	(VideoFeed_Scaling)(0),       // 7: touchmanager.VideoFeed.Scaling
-	(ConfigMenuItem_Type)(0),     // 8: touchmanager.ConfigMenuItem.Type
-	(ConfigMenuCtl_Op)(0),        // 9: touchmanager.ConfigMenuCtl.Op
-	(ConfigMenuEvent_Kind)(0),    // 10: touchmanager.ConfigMenuEvent.Kind
-	(*ServerMessage)(nil),        // 11: touchmanager.ServerMessage
-	(*SetOrientation)(nil),       // 12: touchmanager.SetOrientation
-	(*SetSleep)(nil),             // 13: touchmanager.SetSleep
-	(*WidgetTree)(nil),           // 14: touchmanager.WidgetTree
-	(*GlobalOptions)(nil),        // 15: touchmanager.GlobalOptions
-	(*PageDef)(nil),              // 16: touchmanager.PageDef
-	(*WidgetDef)(nil),            // 17: touchmanager.WidgetDef
-	(*CompressorParam)(nil),      // 18: touchmanager.CompressorParam
-	(*VideoFeed)(nil),            // 19: touchmanager.VideoFeed
-	(*MarkerDef)(nil),            // 20: touchmanager.MarkerDef
-	(*WidgetState)(nil),          // 21: touchmanager.WidgetState
-	(*ModeState)(nil),            // 22: touchmanager.ModeState
-	(*TextState)(nil),            // 23: touchmanager.TextState
-	(*ValueState)(nil),           // 24: touchmanager.ValueState
-	(*DomainState)(nil),          // 25: touchmanager.DomainState
-	(*OverlayState)(nil),         // 26: touchmanager.OverlayState
-	(*OverlayBox)(nil),           // 27: touchmanager.OverlayBox
-	(*WidgetGfx)(nil),            // 28: touchmanager.WidgetGfx
-	(*PageGfx)(nil),              // 29: touchmanager.PageGfx
-	(*ActivePage)(nil),           // 30: touchmanager.ActivePage
-	(*Ping)(nil),                 // 31: touchmanager.Ping
-	(*ConfigMenuItem)(nil),       // 32: touchmanager.ConfigMenuItem
-	(*ConfigMenuPage)(nil),       // 33: touchmanager.ConfigMenuPage
-	(*ConfigMenuCtl)(nil),        // 34: touchmanager.ConfigMenuCtl
-	(*ConfigMenuEvent)(nil),      // 35: touchmanager.ConfigMenuEvent
-	(*UiEvent)(nil),              // 36: touchmanager.UiEvent
-	(*Hello)(nil),                // 37: touchmanager.Hello
-	(*WidgetEvent)(nil),          // 38: touchmanager.WidgetEvent
-	(*BinaryEv)(nil),             // 39: touchmanager.BinaryEv
-	(*PulsedEv)(nil),             // 40: touchmanager.PulsedEv
-	(*AbsoluteEv)(nil),           // 41: touchmanager.AbsoluteEv
-	(*VectorEv)(nil),             // 42: touchmanager.VectorEv
-	(*TextEv)(nil),               // 43: touchmanager.TextEv
-	(*PageSelect)(nil),           // 44: touchmanager.PageSelect
-	(*RawTouch)(nil),             // 45: touchmanager.RawTouch
+	(GlobalOptions_ChromeLoc)(0), // 0: touchmanager.GlobalOptions.ChromeLoc
+	(WidgetDef_Type)(0),          // 1: touchmanager.WidgetDef.Type
+	(WidgetDef_EditKind)(0),      // 2: touchmanager.WidgetDef.EditKind
+	(WidgetDef_KnobVariant)(0),   // 3: touchmanager.WidgetDef.KnobVariant
+	(WidgetDef_SliderVariant)(0), // 4: touchmanager.WidgetDef.SliderVariant
+	(WidgetDef_LabelAlign)(0),    // 5: touchmanager.WidgetDef.LabelAlign
+	(CompressorParam_Role)(0),    // 6: touchmanager.CompressorParam.Role
+	(VideoFeed_HiddenPolicy)(0),  // 7: touchmanager.VideoFeed.HiddenPolicy
+	(VideoFeed_Scaling)(0),       // 8: touchmanager.VideoFeed.Scaling
+	(ConfigMenuItem_Type)(0),     // 9: touchmanager.ConfigMenuItem.Type
+	(ConfigMenuCtl_Op)(0),        // 10: touchmanager.ConfigMenuCtl.Op
+	(ConfigMenuEvent_Kind)(0),    // 11: touchmanager.ConfigMenuEvent.Kind
+	(*ServerMessage)(nil),        // 12: touchmanager.ServerMessage
+	(*SetOrientation)(nil),       // 13: touchmanager.SetOrientation
+	(*SetSleep)(nil),             // 14: touchmanager.SetSleep
+	(*WidgetTree)(nil),           // 15: touchmanager.WidgetTree
+	(*GlobalOptions)(nil),        // 16: touchmanager.GlobalOptions
+	(*PageDef)(nil),              // 17: touchmanager.PageDef
+	(*WidgetDef)(nil),            // 18: touchmanager.WidgetDef
+	(*CompressorParam)(nil),      // 19: touchmanager.CompressorParam
+	(*VideoFeed)(nil),            // 20: touchmanager.VideoFeed
+	(*MarkerDef)(nil),            // 21: touchmanager.MarkerDef
+	(*WidgetState)(nil),          // 22: touchmanager.WidgetState
+	(*ModeState)(nil),            // 23: touchmanager.ModeState
+	(*TextState)(nil),            // 24: touchmanager.TextState
+	(*ValueState)(nil),           // 25: touchmanager.ValueState
+	(*DomainState)(nil),          // 26: touchmanager.DomainState
+	(*OverlayState)(nil),         // 27: touchmanager.OverlayState
+	(*OverlayBox)(nil),           // 28: touchmanager.OverlayBox
+	(*WidgetGfx)(nil),            // 29: touchmanager.WidgetGfx
+	(*PageGfx)(nil),              // 30: touchmanager.PageGfx
+	(*ActivePage)(nil),           // 31: touchmanager.ActivePage
+	(*Ping)(nil),                 // 32: touchmanager.Ping
+	(*ConfigMenuItem)(nil),       // 33: touchmanager.ConfigMenuItem
+	(*ConfigMenuPage)(nil),       // 34: touchmanager.ConfigMenuPage
+	(*ConfigMenuCtl)(nil),        // 35: touchmanager.ConfigMenuCtl
+	(*ConfigMenuEvent)(nil),      // 36: touchmanager.ConfigMenuEvent
+	(*UiEvent)(nil),              // 37: touchmanager.UiEvent
+	(*Hello)(nil),                // 38: touchmanager.Hello
+	(*WidgetEvent)(nil),          // 39: touchmanager.WidgetEvent
+	(*BinaryEv)(nil),             // 40: touchmanager.BinaryEv
+	(*PulsedEv)(nil),             // 41: touchmanager.PulsedEv
+	(*AbsoluteEv)(nil),           // 42: touchmanager.AbsoluteEv
+	(*VectorEv)(nil),             // 43: touchmanager.VectorEv
+	(*TextEv)(nil),               // 44: touchmanager.TextEv
+	(*PageSelect)(nil),           // 45: touchmanager.PageSelect
+	(*RawTouch)(nil),             // 46: touchmanager.RawTouch
 }
 var file_touchmanager_proto_depIdxs = []int32{
-	14, // 0: touchmanager.ServerMessage.tree:type_name -> touchmanager.WidgetTree
-	21, // 1: touchmanager.ServerMessage.state:type_name -> touchmanager.WidgetState
-	28, // 2: touchmanager.ServerMessage.gfx:type_name -> touchmanager.WidgetGfx
-	30, // 3: touchmanager.ServerMessage.page:type_name -> touchmanager.ActivePage
-	31, // 4: touchmanager.ServerMessage.ping:type_name -> touchmanager.Ping
-	33, // 5: touchmanager.ServerMessage.menu_page:type_name -> touchmanager.ConfigMenuPage
-	34, // 6: touchmanager.ServerMessage.menu_ctl:type_name -> touchmanager.ConfigMenuCtl
-	12, // 7: touchmanager.ServerMessage.orientation:type_name -> touchmanager.SetOrientation
-	13, // 8: touchmanager.ServerMessage.sleep:type_name -> touchmanager.SetSleep
-	29, // 9: touchmanager.ServerMessage.page_bg:type_name -> touchmanager.PageGfx
-	16, // 10: touchmanager.WidgetTree.pages:type_name -> touchmanager.PageDef
-	15, // 11: touchmanager.WidgetTree.options:type_name -> touchmanager.GlobalOptions
-	20, // 12: touchmanager.WidgetTree.markers:type_name -> touchmanager.MarkerDef
-	17, // 13: touchmanager.PageDef.widgets:type_name -> touchmanager.WidgetDef
-	0,  // 14: touchmanager.WidgetDef.type:type_name -> touchmanager.WidgetDef.Type
-	19, // 15: touchmanager.WidgetDef.feed:type_name -> touchmanager.VideoFeed
-	18, // 16: touchmanager.WidgetDef.params:type_name -> touchmanager.CompressorParam
-	1,  // 17: touchmanager.WidgetDef.edit_kind:type_name -> touchmanager.WidgetDef.EditKind
-	2,  // 18: touchmanager.WidgetDef.knob_variant:type_name -> touchmanager.WidgetDef.KnobVariant
-	3,  // 19: touchmanager.WidgetDef.slider_variant:type_name -> touchmanager.WidgetDef.SliderVariant
-	4,  // 20: touchmanager.WidgetDef.label_align:type_name -> touchmanager.WidgetDef.LabelAlign
-	5,  // 21: touchmanager.CompressorParam.role:type_name -> touchmanager.CompressorParam.Role
-	6,  // 22: touchmanager.VideoFeed.hidden_policy:type_name -> touchmanager.VideoFeed.HiddenPolicy
-	7,  // 23: touchmanager.VideoFeed.scaling:type_name -> touchmanager.VideoFeed.Scaling
-	22, // 24: touchmanager.WidgetState.mode:type_name -> touchmanager.ModeState
-	23, // 25: touchmanager.WidgetState.text:type_name -> touchmanager.TextState
-	24, // 26: touchmanager.WidgetState.value:type_name -> touchmanager.ValueState
-	26, // 27: touchmanager.WidgetState.overlay:type_name -> touchmanager.OverlayState
-	25, // 28: touchmanager.WidgetState.domain:type_name -> touchmanager.DomainState
-	27, // 29: touchmanager.OverlayState.boxes:type_name -> touchmanager.OverlayBox
-	8,  // 30: touchmanager.ConfigMenuItem.type:type_name -> touchmanager.ConfigMenuItem.Type
-	32, // 31: touchmanager.ConfigMenuPage.items:type_name -> touchmanager.ConfigMenuItem
-	9,  // 32: touchmanager.ConfigMenuCtl.op:type_name -> touchmanager.ConfigMenuCtl.Op
-	10, // 33: touchmanager.ConfigMenuEvent.kind:type_name -> touchmanager.ConfigMenuEvent.Kind
-	37, // 34: touchmanager.UiEvent.hello:type_name -> touchmanager.Hello
-	38, // 35: touchmanager.UiEvent.widget:type_name -> touchmanager.WidgetEvent
-	44, // 36: touchmanager.UiEvent.page_select:type_name -> touchmanager.PageSelect
-	45, // 37: touchmanager.UiEvent.touch:type_name -> touchmanager.RawTouch
-	35, // 38: touchmanager.UiEvent.menu:type_name -> touchmanager.ConfigMenuEvent
-	39, // 39: touchmanager.WidgetEvent.binary:type_name -> touchmanager.BinaryEv
-	40, // 40: touchmanager.WidgetEvent.pulsed:type_name -> touchmanager.PulsedEv
-	41, // 41: touchmanager.WidgetEvent.absolute:type_name -> touchmanager.AbsoluteEv
-	42, // 42: touchmanager.WidgetEvent.vector:type_name -> touchmanager.VectorEv
-	43, // 43: touchmanager.WidgetEvent.text:type_name -> touchmanager.TextEv
-	44, // [44:44] is the sub-list for method output_type
-	44, // [44:44] is the sub-list for method input_type
-	44, // [44:44] is the sub-list for extension type_name
-	44, // [44:44] is the sub-list for extension extendee
-	0,  // [0:44] is the sub-list for field type_name
+	15, // 0: touchmanager.ServerMessage.tree:type_name -> touchmanager.WidgetTree
+	22, // 1: touchmanager.ServerMessage.state:type_name -> touchmanager.WidgetState
+	29, // 2: touchmanager.ServerMessage.gfx:type_name -> touchmanager.WidgetGfx
+	31, // 3: touchmanager.ServerMessage.page:type_name -> touchmanager.ActivePage
+	32, // 4: touchmanager.ServerMessage.ping:type_name -> touchmanager.Ping
+	34, // 5: touchmanager.ServerMessage.menu_page:type_name -> touchmanager.ConfigMenuPage
+	35, // 6: touchmanager.ServerMessage.menu_ctl:type_name -> touchmanager.ConfigMenuCtl
+	13, // 7: touchmanager.ServerMessage.orientation:type_name -> touchmanager.SetOrientation
+	14, // 8: touchmanager.ServerMessage.sleep:type_name -> touchmanager.SetSleep
+	30, // 9: touchmanager.ServerMessage.page_bg:type_name -> touchmanager.PageGfx
+	17, // 10: touchmanager.WidgetTree.pages:type_name -> touchmanager.PageDef
+	16, // 11: touchmanager.WidgetTree.options:type_name -> touchmanager.GlobalOptions
+	21, // 12: touchmanager.WidgetTree.markers:type_name -> touchmanager.MarkerDef
+	0,  // 13: touchmanager.GlobalOptions.page_selector_loc:type_name -> touchmanager.GlobalOptions.ChromeLoc
+	0,  // 14: touchmanager.GlobalOptions.config_menu_loc:type_name -> touchmanager.GlobalOptions.ChromeLoc
+	18, // 15: touchmanager.PageDef.widgets:type_name -> touchmanager.WidgetDef
+	1,  // 16: touchmanager.WidgetDef.type:type_name -> touchmanager.WidgetDef.Type
+	20, // 17: touchmanager.WidgetDef.feed:type_name -> touchmanager.VideoFeed
+	19, // 18: touchmanager.WidgetDef.params:type_name -> touchmanager.CompressorParam
+	2,  // 19: touchmanager.WidgetDef.edit_kind:type_name -> touchmanager.WidgetDef.EditKind
+	3,  // 20: touchmanager.WidgetDef.knob_variant:type_name -> touchmanager.WidgetDef.KnobVariant
+	4,  // 21: touchmanager.WidgetDef.slider_variant:type_name -> touchmanager.WidgetDef.SliderVariant
+	5,  // 22: touchmanager.WidgetDef.label_align:type_name -> touchmanager.WidgetDef.LabelAlign
+	6,  // 23: touchmanager.CompressorParam.role:type_name -> touchmanager.CompressorParam.Role
+	7,  // 24: touchmanager.VideoFeed.hidden_policy:type_name -> touchmanager.VideoFeed.HiddenPolicy
+	8,  // 25: touchmanager.VideoFeed.scaling:type_name -> touchmanager.VideoFeed.Scaling
+	23, // 26: touchmanager.WidgetState.mode:type_name -> touchmanager.ModeState
+	24, // 27: touchmanager.WidgetState.text:type_name -> touchmanager.TextState
+	25, // 28: touchmanager.WidgetState.value:type_name -> touchmanager.ValueState
+	27, // 29: touchmanager.WidgetState.overlay:type_name -> touchmanager.OverlayState
+	26, // 30: touchmanager.WidgetState.domain:type_name -> touchmanager.DomainState
+	28, // 31: touchmanager.OverlayState.boxes:type_name -> touchmanager.OverlayBox
+	9,  // 32: touchmanager.ConfigMenuItem.type:type_name -> touchmanager.ConfigMenuItem.Type
+	33, // 33: touchmanager.ConfigMenuPage.items:type_name -> touchmanager.ConfigMenuItem
+	10, // 34: touchmanager.ConfigMenuCtl.op:type_name -> touchmanager.ConfigMenuCtl.Op
+	11, // 35: touchmanager.ConfigMenuEvent.kind:type_name -> touchmanager.ConfigMenuEvent.Kind
+	38, // 36: touchmanager.UiEvent.hello:type_name -> touchmanager.Hello
+	39, // 37: touchmanager.UiEvent.widget:type_name -> touchmanager.WidgetEvent
+	45, // 38: touchmanager.UiEvent.page_select:type_name -> touchmanager.PageSelect
+	46, // 39: touchmanager.UiEvent.touch:type_name -> touchmanager.RawTouch
+	36, // 40: touchmanager.UiEvent.menu:type_name -> touchmanager.ConfigMenuEvent
+	40, // 41: touchmanager.WidgetEvent.binary:type_name -> touchmanager.BinaryEv
+	41, // 42: touchmanager.WidgetEvent.pulsed:type_name -> touchmanager.PulsedEv
+	42, // 43: touchmanager.WidgetEvent.absolute:type_name -> touchmanager.AbsoluteEv
+	43, // 44: touchmanager.WidgetEvent.vector:type_name -> touchmanager.VectorEv
+	44, // 45: touchmanager.WidgetEvent.text:type_name -> touchmanager.TextEv
+	46, // [46:46] is the sub-list for method output_type
+	46, // [46:46] is the sub-list for method input_type
+	46, // [46:46] is the sub-list for extension type_name
+	46, // [46:46] is the sub-list for extension extendee
+	0,  // [0:46] is the sub-list for field type_name
 }
 
 func init() { file_touchmanager_proto_init() }
@@ -4157,7 +4257,7 @@ func file_touchmanager_proto_init() {
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_touchmanager_proto_rawDesc), len(file_touchmanager_proto_rawDesc)),
-			NumEnums:      11,
+			NumEnums:      12,
 			NumMessages:   35,
 			NumExtensions: 0,
 			NumServices:   0,

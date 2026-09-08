@@ -69,10 +69,58 @@ func globalOptions(o *rwp.TouchUIGlobalOptions) *gen.GlobalOptions {
 	if o == nil {
 		return nil
 	}
+	menu := ResolveConfigMenuLocation(o)
 	return &gen.GlobalOptions{
 		ShowDebugInfo: o.GetShowDebugInfo(),
 		ShowTaps:      uint32(o.GetShowTaps()),
 		ShowVideoFps:  o.GetShowVideoFPS(),
+		// Visibility stays its own flag rather than something the renderer infers from
+		// config_menu_loc, because that is the one the cogwheel has always been drawn
+		// from. Both are sent and they cannot disagree: HIDDEN is what sets this.
+		HideConfigMenu:  menu == rwp.TouchUIGlobalOptions_HIDDEN,
+		ConfigMenuLoc:   chromeLoc(menu),
+		PageSelectorLoc: chromeLoc(o.GetPageSelectorLocation()),
+		PageSelectorRgb: ColorToRGB(o.GetPageSelectorColor()),
+	}
+}
+
+// ResolveConfigMenuLocation collapses the two ways a config can speak about the built-in
+// configuration menu into the one the panel acts on. ConfigMenuLocation is the current
+// field and wins wherever it says anything at all; DEFAULT falls back to the older
+// DisableConfigMenu bool, which only ever said "hidden" or "wherever the panel puts it".
+//
+// Exported because the panel daemon needs the same answer for a different purpose: the
+// renderer hides the cogwheel, while hardware-manager-go's touchhost also has to stop the
+// menu controller and its Reactor monitor.
+func ResolveConfigMenuLocation(o *rwp.TouchUIGlobalOptions) rwp.TouchUIGlobalOptions_ChromeLocationE {
+	if loc := o.GetConfigMenuLocation(); loc != rwp.TouchUIGlobalOptions_DEFAULT {
+		return loc
+	}
+	if o.GetDisableConfigMenu() {
+		return rwp.TouchUIGlobalOptions_HIDDEN
+	}
+	return rwp.TouchUIGlobalOptions_DEFAULT
+}
+
+// chromeLoc maps the rwp chrome placement onto the renderer's own enum. The two are
+// declared separately - one is the wire protocol a client writes, the other the IPC
+// contract the renderer reads - so this is a translation, not a cast, and an unknown
+// value from a newer client degrades to the panel's built-in placement rather than
+// putting chrome somewhere arbitrary.
+func chromeLoc(loc rwp.TouchUIGlobalOptions_ChromeLocationE) gen.GlobalOptions_ChromeLoc {
+	switch loc {
+	case rwp.TouchUIGlobalOptions_HIDDEN:
+		return gen.GlobalOptions_CHROME_HIDDEN
+	case rwp.TouchUIGlobalOptions_TOP_LEFT:
+		return gen.GlobalOptions_CHROME_TOP_LEFT
+	case rwp.TouchUIGlobalOptions_TOP_RIGHT:
+		return gen.GlobalOptions_CHROME_TOP_RIGHT
+	case rwp.TouchUIGlobalOptions_BOTTOM_LEFT:
+		return gen.GlobalOptions_CHROME_BOTTOM_LEFT
+	case rwp.TouchUIGlobalOptions_BOTTOM_RIGHT:
+		return gen.GlobalOptions_CHROME_BOTTOM_RIGHT
+	default:
+		return gen.GlobalOptions_CHROME_DEFAULT
 	}
 }
 

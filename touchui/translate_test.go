@@ -504,3 +504,79 @@ func TestEventToRWPDomainValue(t *testing.T) {
 		t.Errorf("a plain pick grew a Text arm: %+v", out.GetText())
 	}
 }
+
+// TestGlobalOptionsChrome covers the chrome placement fields and the precedence between
+// ConfigMenuLocation and the older DisableConfigMenu bool. HideConfigMenu is asserted
+// explicitly because it went unset for the whole life of the flag: the renderer has always
+// read it, and globalOptions simply never filled it in, so the cogwheel stayed on screen
+// for a config that had disabled it.
+func TestGlobalOptionsChrome(t *testing.T) {
+	for _, tc := range []struct {
+		name     string
+		in       *rwp.TouchUIGlobalOptions
+		wantMenu gen.GlobalOptions_ChromeLoc
+		wantSel  gen.GlobalOptions_ChromeLoc
+		wantHide bool
+		wantRGB  uint32
+	}{
+		{
+			name:     "absent fields keep the built-in placement",
+			in:       &rwp.TouchUIGlobalOptions{},
+			wantMenu: gen.GlobalOptions_CHROME_DEFAULT,
+			wantSel:  gen.GlobalOptions_CHROME_DEFAULT,
+		},
+		{
+			name:     "legacy DisableConfigMenu still hides the menu",
+			in:       &rwp.TouchUIGlobalOptions{DisableConfigMenu: true},
+			wantMenu: gen.GlobalOptions_CHROME_HIDDEN,
+			wantSel:  gen.GlobalOptions_CHROME_DEFAULT,
+			wantHide: true,
+		},
+		{
+			name: "ConfigMenuLocation overrides the legacy flag",
+			in: &rwp.TouchUIGlobalOptions{
+				DisableConfigMenu:  true,
+				ConfigMenuLocation: rwp.TouchUIGlobalOptions_BOTTOM_LEFT,
+			},
+			wantMenu: gen.GlobalOptions_CHROME_BOTTOM_LEFT,
+			wantSel:  gen.GlobalOptions_CHROME_DEFAULT,
+		},
+		{
+			name: "both corners and a selector tint",
+			in: &rwp.TouchUIGlobalOptions{
+				PageSelectorLocation: rwp.TouchUIGlobalOptions_BOTTOM_RIGHT,
+				ConfigMenuLocation:   rwp.TouchUIGlobalOptions_TOP_LEFT,
+				PageSelectorColor:    &rwp.Color{ColorRGB: &rwp.ColorRGB{Red: 0x2E, Green: 0x7D, Blue: 0x6B}},
+			},
+			wantMenu: gen.GlobalOptions_CHROME_TOP_LEFT,
+			wantSel:  gen.GlobalOptions_CHROME_BOTTOM_RIGHT,
+			wantRGB:  0x2E7D6B,
+		},
+		{
+			name:     "a hidden selector is not a hidden menu",
+			in:       &rwp.TouchUIGlobalOptions{PageSelectorLocation: rwp.TouchUIGlobalOptions_HIDDEN},
+			wantMenu: gen.GlobalOptions_CHROME_DEFAULT,
+			wantSel:  gen.GlobalOptions_CHROME_HIDDEN,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			got := globalOptions(tc.in)
+			if got.GetConfigMenuLoc() != tc.wantMenu {
+				t.Errorf("ConfigMenuLoc = %v, want %v", got.GetConfigMenuLoc(), tc.wantMenu)
+			}
+			if got.GetPageSelectorLoc() != tc.wantSel {
+				t.Errorf("PageSelectorLoc = %v, want %v", got.GetPageSelectorLoc(), tc.wantSel)
+			}
+			if got.GetHideConfigMenu() != tc.wantHide {
+				t.Errorf("HideConfigMenu = %v, want %v", got.GetHideConfigMenu(), tc.wantHide)
+			}
+			if got.GetPageSelectorRgb() != tc.wantRGB {
+				t.Errorf("PageSelectorRgb = %#06x, want %#06x", got.GetPageSelectorRgb(), tc.wantRGB)
+			}
+		})
+	}
+
+	if globalOptions(nil) != nil {
+		t.Error("nil options should stay nil so the renderer sees an absent message")
+	}
+}
