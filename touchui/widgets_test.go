@@ -212,7 +212,10 @@ func TestWidgetOptionsReachTheRenderer(t *testing.T) {
 					Options: &rwp.TouchUIWidgetOptions{Relative: true}},
 				{HWCID: 102, Type: rwp.TouchUIWidget_LABEL,
 					Options: &rwp.TouchUIWidgetOptions{
-						EditKind: rwp.TouchUIWidgetOptions_PASSWORD, EditMaxLen: 32}},
+						EditKind: rwp.TouchUIWidgetOptions_PASSWORD, EditMaxLen: 32,
+						NoEditField: true}},
+				{HWCID: 103, Type: rwp.TouchUIWidget_BUTTON,
+					Options: &rwp.TouchUIWidgetOptions{NoBorder: true}},
 			},
 		}},
 	}, 1, nil)
@@ -229,6 +232,17 @@ func TestWidgetOptionsReachTheRenderer(t *testing.T) {
 	}
 	if defs[2].GetEventMask()&helpers.TouchUIEventText == 0 {
 		t.Error("editable label did not advertise Text in its event mask")
+	}
+	// NoEditField is styling only: the label must still be editable, i.e. still carry Text.
+	if !defs[2].GetNoEditField() {
+		t.Error("NoEditField was dropped")
+	}
+	if !defs[3].GetNoBorder() {
+		t.Error("NoBorder was dropped")
+	}
+	// The default has to survive as false, or every existing layout loses its frames.
+	if defs[0].GetNoBorder() {
+		t.Error("a widget that never asked for it came out borderless")
 	}
 }
 

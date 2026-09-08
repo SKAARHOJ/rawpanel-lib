@@ -1395,6 +1395,16 @@ type WidgetDef struct {
 	KnobTicks     uint32                  `protobuf:"varint,29,opt,name=knob_ticks,json=knobTicks,proto3" json:"knob_ticks,omitempty"`                                                       // KNOB TICKS/GAUGE: tick marks on the ring, already resolved by Go
 	SliderVariant WidgetDef_SliderVariant `protobuf:"varint,30,opt,name=slider_variant,json=sliderVariant,proto3,enum=touchmanager.WidgetDef_SliderVariant" json:"slider_variant,omitempty"` // SLIDER only; 0 = SLIDER_BAR (default)
 	LabelAlign    WidgetDef_LabelAlign    `protobuf:"varint,31,opt,name=label_align,json=labelAlign,proto3,enum=touchmanager.WidgetDef_LabelAlign" json:"label_align,omitempty"`             // LABEL only; 0 = LABEL_TOP (default)
+	// Draw this widget without its outline; false is the framed look. Applies to every border
+	// the widget owns, the ones inside it included (the 4-way/ENCODER keys, the DROPDOWN's
+	// closed field and its open list) - a borderless tile is borderless throughout. The fill,
+	// the pressed/checked highlight and the chevron stay; a type with no border to begin with
+	// (KNOB, METER, IMAGE, a latching TOGGLE) ignores it.
+	NoBorder bool `protobuf:"varint,32,opt,name=no_border,json=noBorder,proto3" json:"no_border,omitempty"`
+	// LABEL with edit_kind != EDIT_NONE: draw it as a plain caption+value stack, like a passive
+	// label, instead of putting the value in a filled field with a caret. The tap-to-edit
+	// behaviour is unchanged - this is chrome only.
+	NoEditField   bool `protobuf:"varint,33,opt,name=no_edit_field,json=noEditField,proto3" json:"no_edit_field,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1644,6 +1654,20 @@ func (x *WidgetDef) GetLabelAlign() WidgetDef_LabelAlign {
 		return x.LabelAlign
 	}
 	return WidgetDef_LABEL_TOP
+}
+
+func (x *WidgetDef) GetNoBorder() bool {
+	if x != nil {
+		return x.NoBorder
+	}
+	return false
+}
+
+func (x *WidgetDef) GetNoEditField() bool {
+	if x != nil {
+		return x.NoEditField
+	}
+	return false
 }
 
 // One member parameter of a COMPRESSOR: an ordinary fader HWC under its own id, which emits
@@ -3811,7 +3835,7 @@ const file_touchmanager_proto_rawDesc = "" +
 	"\x05title\x18\x02 \x01(\tR\x05title\x12\x1b\n" +
 	"\tgrid_rows\x18\x03 \x01(\rR\bgridRows\x12\x1b\n" +
 	"\tgrid_cols\x18\x04 \x01(\rR\bgridCols\x121\n" +
-	"\awidgets\x18\x05 \x03(\v2\x17.touchmanager.WidgetDefR\awidgets\"\x9c\v\n" +
+	"\awidgets\x18\x05 \x03(\v2\x17.touchmanager.WidgetDefR\awidgets\"\xdd\v\n" +
 	"\tWidgetDef\x12\x15\n" +
 	"\x06hwc_id\x18\x01 \x01(\rR\x05hwcId\x120\n" +
 	"\x04type\x18\x02 \x01(\x0e2\x1c.touchmanager.WidgetDef.TypeR\x04type\x12\x14\n" +
@@ -3849,7 +3873,9 @@ const file_touchmanager_proto_rawDesc = "" +
 	"knob_ticks\x18\x1d \x01(\rR\tknobTicks\x12L\n" +
 	"\x0eslider_variant\x18\x1e \x01(\x0e2%.touchmanager.WidgetDef.SliderVariantR\rsliderVariant\x12C\n" +
 	"\vlabel_align\x18\x1f \x01(\x0e2\".touchmanager.WidgetDef.LabelAlignR\n" +
-	"labelAlign\"\x96\x01\n" +
+	"labelAlign\x12\x1b\n" +
+	"\tno_border\x18  \x01(\bR\bnoBorder\x12\"\n" +
+	"\rno_edit_field\x18! \x01(\bR\vnoEditField\"\x96\x01\n" +
 	"\x04Type\x12\n" +
 	"\n" +
 	"\x06BUTTON\x10\x00\x12\n" +

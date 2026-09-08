@@ -371,6 +371,9 @@ func TestValidateRejects(t *testing.T) {
 		"editkind on a non-label": func(c *rwp.TouchUIConfig) {
 			c.Pages[0].Widgets[0].Options.EditKind = rwp.TouchUIWidgetOptions_TEXT
 		},
+		"noeditfield on a non-label": func(c *rwp.TouchUIConfig) {
+			c.Pages[0].Widgets[0].Options.NoEditField = true
+		},
 		"edit length beyond the cap": func(c *rwp.TouchUIConfig) {
 			c.Pages[0].Widgets[0].Type = rwp.TouchUIWidget_LABEL
 			c.Pages[0].Widgets[0].Options.EditKind = rwp.TouchUIWidgetOptions_TEXT
