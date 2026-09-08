@@ -136,6 +136,13 @@ func validateWidgetOptions(widget *rwp.TouchUIWidget, hwcIDs map[uint32]bool) er
 	if opts.GetLabelAlign() != rwp.TouchUIWidgetOptions_TOP && widget.GetType() != rwp.TouchUIWidget_LABEL {
 		return fmt.Errorf("widget %d: LabelAlign is only valid on a LABEL", id)
 	}
+	// NoEditField suppresses the edit field's chrome, so it is meaningful exactly where that
+	// field is drawn. Rejected off a LABEL like the options above it; on a LABEL that is not
+	// editable it is merely inert, which is worth allowing - it is how a config keeps the
+	// styling choice while EditKind is temporarily NONE.
+	if opts.GetNoEditField() && widget.GetType() != rwp.TouchUIWidget_LABEL {
+		return fmt.Errorf("widget %d: NoEditField is only valid on a LABEL", id)
+	}
 	if len(opts.GetMarkers()) > 0 && widget.GetType() != rwp.TouchUIWidget_VIDEO {
 		return fmt.Errorf("widget %d: Markers are only valid on a VIDEO widget", id)
 	}

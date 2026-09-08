@@ -36,6 +36,7 @@ func maximalTouchUIConfig() *rwp.TouchUIConfig {
 						Col:   2,
 						Options: &rwp.TouchUIWidgetOptions{
 							Momentary: true,
+							NoBorder:  true,
 						},
 					},
 					{
@@ -81,6 +82,10 @@ func maximalTouchUIConfig() *rwp.TouchUIConfig {
 						Y:     0,
 						W:     320,
 						H:     60,
+						Options: &rwp.TouchUIWidgetOptions{
+							EditKind:    rwp.TouchUIWidgetOptions_TEXT,
+							NoEditField: true,
+						},
 					},
 					{
 						HWCID: 207,

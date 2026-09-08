@@ -160,6 +160,7 @@ func widgetToDef(w *rwp.TouchUIWidget) *gen.WidgetDef {
 		NoTap:       opts.GetNoTapEvents(),
 		Momentary:   opts.GetMomentary(),
 		FourWay:     opts.GetFourWay(),
+		NoBorder:    opts.GetNoBorder(),
 		KnobVariant: gen.WidgetDef_KnobVariant(opts.GetKnobVariant()),
 		KnobTicks:   KnobTickCount(w),
 
@@ -172,6 +173,7 @@ func widgetToDef(w *rwp.TouchUIWidget) *gen.WidgetDef {
 		EditKind:     gen.WidgetDef_EditKind(opts.GetEditKind()),
 		EditMaxLen:   opts.GetEditMaxLen(),
 		LabelAlign:   gen.WidgetDef_LabelAlign(opts.GetLabelAlign()),
+		NoEditField:  opts.GetNoEditField(),
 		EventMask:    EffectiveEventMask(w),
 	}
 }

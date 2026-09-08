@@ -7025,15 +7025,17 @@ func (x *TouchUIWidget) GetEventMask() uint32 {
 }
 
 type TouchUIWidgetOptions struct {
-	state         protoimpl.MessageState              `protogen:"open.v1"`
-	Min           int32                               `protobuf:"zigzag32,1,opt,name=Min,proto3" json:"Min,omitempty"` // SLIDER/KNOB/METER value range (default 0..1000, matching Absolute events)
-	Max           int32                               `protobuf:"zigzag32,2,opt,name=Max,proto3" json:"Max,omitempty"`
-	Step          uint32                              `protobuf:"varint,3,opt,name=Step,proto3" json:"Step,omitempty"`                                                                            // SLIDER detents / KNOB pulses per revolution hint
-	Vertical      bool                                `protobuf:"varint,4,opt,name=Vertical,proto3" json:"Vertical,omitempty"`                                                                    // SLIDER/METER orientation
-	Color         *Color                              `protobuf:"bytes,5,opt,name=Color,proto3" json:"Color,omitempty"`                                                                           // Accent color; runtime override via HWCColor
-	NoTapEvents   bool                                `protobuf:"varint,6,opt,name=NoTapEvents,proto3" json:"NoTapEvents,omitempty"`                                                              // IMAGE/LABEL/VIDEO: suppress Binary tap events
-	Momentary     bool                                `protobuf:"varint,7,opt,name=Momentary,proto3" json:"Momentary,omitempty"`                                                                  // TOGGLE rendered but behaving momentary
-	FourWay       bool                                `protobuf:"varint,12,opt,name=FourWay,proto3" json:"FourWay,omitempty"`                                                                     // BUTTON: render a 4-way pad; edge taps emit Binary with Edge=TOP/LEFT/BOTTOM/RIGHT
+	state       protoimpl.MessageState `protogen:"open.v1"`
+	Min         int32                  `protobuf:"zigzag32,1,opt,name=Min,proto3" json:"Min,omitempty"` // SLIDER/KNOB/METER value range (default 0..1000, matching Absolute events)
+	Max         int32                  `protobuf:"zigzag32,2,opt,name=Max,proto3" json:"Max,omitempty"`
+	Step        uint32                 `protobuf:"varint,3,opt,name=Step,proto3" json:"Step,omitempty"`               // SLIDER detents / KNOB pulses per revolution hint
+	Vertical    bool                   `protobuf:"varint,4,opt,name=Vertical,proto3" json:"Vertical,omitempty"`       // SLIDER/METER orientation
+	Color       *Color                 `protobuf:"bytes,5,opt,name=Color,proto3" json:"Color,omitempty"`              // Accent color; runtime override via HWCColor
+	NoTapEvents bool                   `protobuf:"varint,6,opt,name=NoTapEvents,proto3" json:"NoTapEvents,omitempty"` // IMAGE/LABEL/VIDEO: suppress Binary tap events
+	Momentary   bool                   `protobuf:"varint,7,opt,name=Momentary,proto3" json:"Momentary,omitempty"`     // TOGGLE rendered but behaving momentary
+	FourWay     bool                   `protobuf:"varint,12,opt,name=FourWay,proto3" json:"FourWay,omitempty"`        // BUTTON: render a 4-way pad; edge taps emit Binary with Edge=TOP/LEFT/BOTTOM/RIGHT
+	// Appearance, any widget:
+	NoBorder      bool                                `protobuf:"varint,26,opt,name=NoBorder,proto3" json:"NoBorder,omitempty"`                                                                   // Draw the widget WITHOUT its outline. Absent/false is the framed look panels have
 	SliderVariant TouchUIWidgetOptions_SliderVariantE `protobuf:"varint,22,opt,name=SliderVariant,proto3,enum=ibeam_rawpanel.TouchUIWidgetOptions_SliderVariantE" json:"SliderVariant,omitempty"` // SLIDER only; 0 = BAR (default)
 	KnobVariant   TouchUIWidgetOptions_KnobVariantE   `protobuf:"varint,20,opt,name=KnobVariant,proto3,enum=ibeam_rawpanel.TouchUIWidgetOptions_KnobVariantE" json:"KnobVariant,omitempty"`       // KNOB only; 0 = ARC (default)
 	KnobTicks     uint32                              `protobuf:"varint,21,opt,name=KnobTicks,proto3" json:"KnobTicks,omitempty"`                                                                 // KNOB TICKS/GAUGE: number of tick marks on the ring, 2..61.
@@ -7051,8 +7053,9 @@ type TouchUIWidgetOptions struct {
 	// under this widget's HWCID. Cancelling emits nothing. The panel does NOT update
 	// the label itself on commit - the client remains the source of truth and echoes
 	// the value it accepted back via HWCText. Implies the Text bit in EventMask.
-	EditMaxLen uint32                           `protobuf:"varint,18,opt,name=EditMaxLen,proto3" json:"EditMaxLen,omitempty"`                                                      // LABEL: max input length in bytes. 0 = panel default (47); capped at 63.
-	LabelAlign TouchUIWidgetOptions_LabelAlignE `protobuf:"varint,23,opt,name=LabelAlign,proto3,enum=ibeam_rawpanel.TouchUIWidgetOptions_LabelAlignE" json:"LabelAlign,omitempty"` // LABEL only; 0 = TOP (default)
+	EditMaxLen  uint32                           `protobuf:"varint,18,opt,name=EditMaxLen,proto3" json:"EditMaxLen,omitempty"`                                                      // LABEL: max input length in bytes. 0 = panel default (47); capped at 63.
+	LabelAlign  TouchUIWidgetOptions_LabelAlignE `protobuf:"varint,23,opt,name=LabelAlign,proto3,enum=ibeam_rawpanel.TouchUIWidgetOptions_LabelAlignE" json:"LabelAlign,omitempty"` // LABEL only; 0 = TOP (default)
+	NoEditField bool                             `protobuf:"varint,27,opt,name=NoEditField,proto3" json:"NoEditField,omitempty"`                                                    // LABEL with EditKind != NONE: draw the tile as a PLAIN LABEL - caption over value,
 	// VIDEO options:
 	Source       string                             `protobuf:"bytes,8,opt,name=Source,proto3" json:"Source,omitempty"` // Source spec, interpreted by the panel (e.g. "/dev/video0", "yuyv:<dev>",
 	HiddenPolicy TouchUIWidgetOptions_HiddenPolicyE `protobuf:"varint,9,opt,name=HiddenPolicy,proto3,enum=ibeam_rawpanel.TouchUIWidgetOptions_HiddenPolicyE" json:"HiddenPolicy,omitempty"`
@@ -7151,6 +7154,13 @@ func (x *TouchUIWidgetOptions) GetFourWay() bool {
 	return false
 }
 
+func (x *TouchUIWidgetOptions) GetNoBorder() bool {
+	if x != nil {
+		return x.NoBorder
+	}
+	return false
+}
+
 func (x *TouchUIWidgetOptions) GetSliderVariant() TouchUIWidgetOptions_SliderVariantE {
 	if x != nil {
 		return x.SliderVariant
@@ -7226,6 +7236,13 @@ func (x *TouchUIWidgetOptions) GetLabelAlign() TouchUIWidgetOptions_LabelAlignE 
 		return x.LabelAlign
 	}
 	return TouchUIWidgetOptions_TOP
+}
+
+func (x *TouchUIWidgetOptions) GetNoEditField() bool {
+	if x != nil {
+		return x.NoEditField
+	}
+	return false
 }
 
 func (x *TouchUIWidgetOptions) GetSource() string {
@@ -8687,7 +8704,7 @@ const file_ibeam_rawpanel_proto_ibeam_rawpanel_proto_rawDesc = "" +
 	"\x05XYPAD\x10\n" +
 	"\x12\x0e\n" +
 	"\n" +
-	"COMPRESSOR\x10\v\"\xae\v\n" +
+	"COMPRESSOR\x10\v\"\xec\v\n" +
 	"\x14TouchUIWidgetOptions\x12\x10\n" +
 	"\x03Min\x18\x01 \x01(\x11R\x03Min\x12\x10\n" +
 	"\x03Max\x18\x02 \x01(\x11R\x03Max\x12\x12\n" +
@@ -8696,7 +8713,8 @@ const file_ibeam_rawpanel_proto_ibeam_rawpanel_proto_rawDesc = "" +
 	"\x05Color\x18\x05 \x01(\v2\x15.ibeam_rawpanel.ColorR\x05Color\x12 \n" +
 	"\vNoTapEvents\x18\x06 \x01(\bR\vNoTapEvents\x12\x1c\n" +
 	"\tMomentary\x18\a \x01(\bR\tMomentary\x12\x18\n" +
-	"\aFourWay\x18\f \x01(\bR\aFourWay\x12Y\n" +
+	"\aFourWay\x18\f \x01(\bR\aFourWay\x12\x1a\n" +
+	"\bNoBorder\x18\x1a \x01(\bR\bNoBorder\x12Y\n" +
 	"\rSliderVariant\x18\x16 \x01(\x0e23.ibeam_rawpanel.TouchUIWidgetOptions.SliderVariantER\rSliderVariant\x12S\n" +
 	"\vKnobVariant\x18\x14 \x01(\x0e21.ibeam_rawpanel.TouchUIWidgetOptions.KnobVariantER\vKnobVariant\x12\x1c\n" +
 	"\tKnobTicks\x18\x15 \x01(\rR\tKnobTicks\x12\x18\n" +
@@ -8711,7 +8729,8 @@ const file_ibeam_rawpanel_proto_ibeam_rawpanel_proto_rawDesc = "" +
 	"EditMaxLen\x12P\n" +
 	"\n" +
 	"LabelAlign\x18\x17 \x01(\x0e20.ibeam_rawpanel.TouchUIWidgetOptions.LabelAlignER\n" +
-	"LabelAlign\x12\x16\n" +
+	"LabelAlign\x12 \n" +
+	"\vNoEditField\x18\x1b \x01(\bR\vNoEditField\x12\x16\n" +
 	"\x06Source\x18\b \x01(\tR\x06Source\x12V\n" +
 	"\fHiddenPolicy\x18\t \x01(\x0e22.ibeam_rawpanel.TouchUIWidgetOptions.HiddenPolicyER\fHiddenPolicy\x12 \n" +
 	"\vSourceWidth\x18\n" +
