@@ -194,12 +194,18 @@ func validateWidgetOptions(widget *rwp.TouchUIWidget, hwcIDs map[uint32]bool) er
 		if opts.GetRelative() && opts.GetCenterReturn() {
 			return fmt.Errorf("widget %d: CenterReturn is meaningless with Relative — a delta pad has no position to return to", id)
 		}
+		if opts.GetRelative() && opts.GetJoystick() {
+			return fmt.Errorf("widget %d: Joystick and Relative both claim the SpeedVector — one as deflection from the centre, one as movement", id)
+		}
 
 	case rwp.TouchUIWidget_VIDEO:
 		// A video region draws no cursor of its own, so there is nothing to send home; unlike
 		// the XYPAD rule this holds in both modes.
 		if opts.GetCenterReturn() {
 			return fmt.Errorf("widget %d: CenterReturn is meaningless on a VIDEO widget — it has no cursor to return", id)
+		}
+		if opts.GetJoystick() {
+			return fmt.Errorf("widget %d: Joystick is meaningless on a VIDEO widget — a touch on a picture is a place, not a deflection", id)
 		}
 		markers := opts.GetMarkers()
 		if len(markers) > MaxMarkersPerWidget {

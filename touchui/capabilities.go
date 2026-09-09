@@ -112,8 +112,8 @@ func Capabilities(screenW, screenH, gridRows, gridCols uint32, orientation rwp.T
 			},
 			{
 				Type: rwp.TouchUIWidget_XYPAD,
-				// Vector rather than Absolute|Speed: both modes ride a *Vector event and
-				// Options.Relative picks which one. Binary is the touch/release pair.
+				// Vector rather than Absolute|Speed: every mode rides a *Vector event and
+				// Options.Relative/Joystick pick which one. Binary is the touch/release pair.
 				EventMask: helpers.TouchUIEventVector | helpers.TouchUIEventBinary,
 				StateMask: helpers.TouchUIStateOverlay | helpers.TouchUIStateGfx | helpers.TouchUIStateColor,
 			},

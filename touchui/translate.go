@@ -169,6 +169,7 @@ func widgetToDef(w *rwp.TouchUIWidget) *gen.WidgetDef {
 		Choices:      joinChoices(opts.GetChoices()),
 		Relative:     opts.GetRelative(),
 		CenterReturn: opts.GetCenterReturn(),
+		Joystick:     opts.GetJoystick(),
 		Params:       compressorParams(opts.GetParams()),
 		EditKind:     gen.WidgetDef_EditKind(opts.GetEditKind()),
 		EditMaxLen:   opts.GetEditMaxLen(),
@@ -427,9 +428,11 @@ func EventToRWP(ev *gen.WidgetEvent) *rwp.HWCEvent {
 			out.Text = &rwp.TextEvent{Value: v}
 		}
 	case *gen.WidgetEvent_Vector:
-		// One renderer arm, two RWP messages: an XYPAD in relative mode reports movement
-		// (SpeedVector), otherwise position (AbsoluteVector). The absolute form is unsigned
-		// on the wire, so clamp — a negative here would wrap into a huge coordinate.
+		// One renderer arm, two RWP messages: a pad reporting a speed — movement in relative
+		// mode, deflection from the centre in joystick mode — rides a SpeedVector, a pad
+		// reporting position rides an AbsoluteVector. The renderer flags which it sent. The
+		// absolute form is unsigned on the wire, so clamp — a negative here would wrap into
+		// a huge coordinate.
 		vals := kind.Vector.GetValue()
 		if kind.Vector.GetRelative() {
 			out.SpeedVector = &rwp.SpeedVectorEvent{Value: append([]int32(nil), vals...)}
