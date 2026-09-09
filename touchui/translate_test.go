@@ -343,6 +343,15 @@ func TestValidateRejects(t *testing.T) {
 			c.Pages[0].Widgets[0].Options.Relative = true
 			c.Pages[0].Widgets[0].Options.CenterReturn = true
 		},
+		"relative xypad that is also a joystick": func(c *rwp.TouchUIConfig) {
+			c.Pages[0].Widgets[0].Type = rwp.TouchUIWidget_XYPAD
+			c.Pages[0].Widgets[0].Options.Relative = true
+			c.Pages[0].Widgets[0].Options.Joystick = true
+		},
+		"joystick video region": func(c *rwp.TouchUIConfig) {
+			c.Pages[0].Widgets[0].Type = rwp.TouchUIWidget_VIDEO
+			c.Pages[0].Widgets[0].Options.Joystick = true
+		},
 		"compressor without params": func(c *rwp.TouchUIConfig) {
 			c.Pages[0].Widgets[0].Type = rwp.TouchUIWidget_COMPRESSOR
 		},
