@@ -321,9 +321,6 @@ func TestValidateRejects(t *testing.T) {
 			}
 		},
 
-		"dropdown without choices": func(c *rwp.TouchUIConfig) {
-			c.Pages[0].Widgets[0].Type = rwp.TouchUIWidget_DROPDOWN
-		},
 		"choice with a newline": func(c *rwp.TouchUIConfig) {
 			c.Pages[0].Widgets[0].Type = rwp.TouchUIWidget_DROPDOWN
 			c.Pages[0].Widgets[0].Options.Choices = []string{"a\nb"}
@@ -398,6 +395,19 @@ func TestValidateRejects(t *testing.T) {
 	}
 	if err := Validate(testConfig()); err != nil {
 		t.Errorf("pristine config should validate: %v", err)
+	}
+
+	// An empty choice list is a placeholder, not a fault. With DynamicDomain it means "wait
+	// for the first HWCDomain"; without one it is a list the author has not written yet.
+	// Either way the renderer has a defined answer — a single "-" — so neither is worth
+	// failing the whole SetTouchUI over.
+	for _, dynamicDomain := range []bool{false, true} {
+		cfg := testConfig()
+		cfg.Pages[0].Widgets[0].Type = rwp.TouchUIWidget_DROPDOWN
+		cfg.Pages[0].Widgets[0].Options.DynamicDomain = dynamicDomain
+		if err := Validate(cfg); err != nil {
+			t.Errorf("dropdown with no choices (DynamicDomain=%v) should validate: %v", dynamicDomain, err)
+		}
 	}
 }
 
