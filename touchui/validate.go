@@ -160,12 +160,10 @@ func validateWidgetOptions(widget *rwp.TouchUIWidget, hwcIDs map[uint32]bool) er
 	switch widget.GetType() {
 	case rwp.TouchUIWidget_DROPDOWN:
 		choices := opts.GetChoices()
-		// An empty list is a broken widget unless the config says the list arrives at
-		// runtime, in which case Choices is only the fallback shown until the first
-		// HWCDomain lands and having none is a legitimate way to say "wait for it".
-		if len(choices) == 0 && !opts.GetDynamicDomain() {
-			return fmt.Errorf("widget %d: DROPDOWN has no Choices and does not declare DynamicDomain", id)
-		}
+		// An empty list is legal. With DynamicDomain it says "wait for the first HWCDomain";
+		// without one it is a placeholder the author has not filled in yet. Neither is worth
+		// failing a whole SetTouchUI over, because the renderer already has a defined answer:
+		// it shows a single "-" option until a list arrives.
 		if len(choices) > MaxChoices {
 			return fmt.Errorf("widget %d: %d Choices exceeds the maximum of %d", id, len(choices), MaxChoices)
 		}
