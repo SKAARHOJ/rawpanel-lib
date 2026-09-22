@@ -128,6 +128,17 @@ func Capabilities(screenW, screenH, gridRows, gridCols uint32, orientation rwp.T
 				StateMask: helpers.TouchUIStateExtended | helpers.TouchUIStateText,
 			},
 			{
+				Type: rwp.TouchUIWidget_EQUALIZER,
+				// The container emits nothing and carries no value of its own — unlike a
+				// compressor, whose Extended bit is live gain reduction. Every band parameter
+				// is an ordinary fader HWC under its own id (Absolute out, HWCExtended(FADER)
+				// in), which a per-type cap table cannot express; TouchUIEqualizerParam
+				// documents it, and unlike a compressor's members they are advertised as
+				// topology components too.
+				EventMask: 0,
+				StateMask: helpers.TouchUIStateText | helpers.TouchUIStateColor,
+			},
+			{
 				Type:      rwp.TouchUIWidget_IMAGE,
 				EventMask: helpers.TouchUIEventBinary,
 				StateMask: helpers.TouchUIStateGfx,

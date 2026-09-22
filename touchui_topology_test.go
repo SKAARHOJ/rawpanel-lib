@@ -281,6 +281,80 @@ func TestCompressorMembersAreNotTopologyComponents(t *testing.T) {
 	}
 }
 
+// The opposite of the compressor above, and deliberately so: an EQ is driven from the
+// encoders around it, and a client can only bind a behavior to an HWC the panel advertises.
+// Each band parameter must therefore be a component of its own, with a display, so text
+// feedback reaches it at all (Reactor gates that on Disp != nil).
+func TestEqualizerBandsAreTopologyComponents(t *testing.T) {
+	top := TouchUIConfigToTopology(&rwp.TouchUIConfig{
+		Pages: []*rwp.TouchUIPage{{
+			Id: 1, GridRows: 1, GridCols: 1,
+			Widgets: []*rwp.TouchUIWidget{
+				{HWCID: 310, Type: rwp.TouchUIWidget_EQUALIZER, Row: 1, Col: 1,
+					Options: &rwp.TouchUIWidgetOptions{EqBands: []*rwp.TouchUIEqualizerParam{
+						{HWCID: 401, Band: 1, Role: rwp.TouchUIEqualizerParam_FREQ},
+						{HWCID: 402, Band: 1, Role: rwp.TouchUIEqualizerParam_GAIN},
+						{HWCID: 403, Band: 2, Role: rwp.TouchUIEqualizerParam_FREQ},
+					}}},
+			},
+		}},
+	})
+
+	byID := map[uint32]topology.TopologyHWcomponent{}
+	for _, comp := range top.HWc {
+		byID[comp.Id] = comp
+	}
+	for _, id := range []uint32{310, 401, 402, 403} {
+		if _, ok := byID[id]; !ok {
+			t.Fatalf("HWC %d is missing from the topology", id)
+		}
+	}
+
+	// A parameter with no Label of its own is still nameable in a configurator.
+	if got := byID[401].Txt; got != "Band 1 Freq" {
+		t.Errorf("band param 401 is called %q, want \"Band 1 Freq\"", got)
+	}
+	def, ok := top.TypeIndex[byID[401].Type]
+	if !ok {
+		t.Fatalf("band param type %d is not in the TypeIndex", byID[401].Type)
+	}
+	if def.Disp == nil {
+		t.Error("band parameters have no display, so no text feedback would ever reach them")
+	}
+	if def.In != "av" {
+		t.Errorf("band parameter In = %q, want \"av\" — it is an ordinary fader", def.In)
+	}
+	// Two bands means two columns: the ordinal places a column, not the band number.
+	if byID[403].X == byID[401].X {
+		t.Error("band 2 was laid out in band 1's column")
+	}
+	// One row per role, in role order, so a band's controls stack rather than overlap.
+	if byID[402].Y <= byID[401].Y {
+		t.Error("gain did not stack below frequency")
+	}
+	// The grid is anchored to the bottom half: the response curve above it is what identifies
+	// the widget in a client's panel view, and a full-height grid buries it.
+	// The widget is scaled to its grid span, so its real extent is the override, not the
+	// shared type def.
+	eqComp := byID[310]
+	eqH := top.TypeIndex[eqComp.Type].H
+	if eqComp.TypeOverride != nil {
+		eqH = eqComp.TypeOverride.H
+	}
+	midY := eqComp.Y + eqH/2
+	for _, id := range []uint32{401, 402, 403} {
+		if byID[id].Y < midY {
+			t.Errorf("band param %d sits in the top half of the widget (y=%d, widget mid=%d)",
+				id, byID[id].Y, midY)
+		}
+	}
+	// Boxes are inset in their cells rather than tiling edge to edge.
+	bandDef := top.TypeIndex[byID[401].Type]
+	if colW := byID[403].X - byID[401].X; bandDef.W >= colW {
+		t.Errorf("band box is %d wide in a %d column — it fills the cell edge to edge", bandDef.W, colW)
+	}
+}
+
 // HWCd# domain state: proto -> ASCII -> proto full fidelity. JSON rather than the
 // pipe-separated HWCJog form precisely so a label may contain the separators the other
 // commands use, which is what the "Bus A|B" choice below is there to prove.
@@ -316,5 +390,34 @@ func TestHWCDomainRoundtrip(t *testing.T) {
 	rngBack := RawPanelASCIIstringsToInboundMessages(rngASCII)
 	if got := rngBack[0].States[0].HWCDomain; !proto.Equal(got, rng.HWCDomain) {
 		t.Errorf("range domain not identical after roundtrip:\nwant %v\ngot  %v", rng.HWCDomain, got)
+	}
+}
+
+// Columns follow the band NUMBER, not the order the parameters happen to sit in the list.
+// An editor that rewrites a band appends its parameters at the end, and the renderer spreads
+// the resting frequencies by band number — so ordering by anything else would put band 1's
+// controls under band 5's handle.
+func TestEqualizerBandColumnsFollowBandNumber(t *testing.T) {
+	// Deliberately out of order, the way a re-added band 1 lands.
+	top := TouchUIConfigToTopology(&rwp.TouchUIConfig{
+		Pages: []*rwp.TouchUIPage{{
+			Id: 1, GridRows: 1, GridCols: 1,
+			Widgets: []*rwp.TouchUIWidget{
+				{HWCID: 310, Type: rwp.TouchUIWidget_EQUALIZER, Row: 1, Col: 1,
+					Options: &rwp.TouchUIWidgetOptions{EqBands: []*rwp.TouchUIEqualizerParam{
+						{HWCID: 402, Band: 3, Role: rwp.TouchUIEqualizerParam_FREQ},
+						{HWCID: 403, Band: 2, Role: rwp.TouchUIEqualizerParam_FREQ},
+						{HWCID: 401, Band: 1, Role: rwp.TouchUIEqualizerParam_FREQ},
+					}}},
+			},
+		}},
+	})
+
+	x := map[uint32]int{}
+	for _, comp := range top.HWc {
+		x[comp.Id] = comp.X
+	}
+	if !(x[401] < x[403] && x[403] < x[402]) {
+		t.Errorf("columns are not in band order: band1=%d band2=%d band3=%d", x[401], x[403], x[402])
 	}
 }

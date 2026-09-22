@@ -1673,6 +1673,9 @@ const (
 	// (500,500). Relative mode uses the same signs (+dy is upward) and the same 0..1000-per-edge
 	// domain as the absolute mode, i.e. deltas are NOT in pixels.
 	TouchUIWidget_COMPRESSOR TouchUIWidget_WidgetTypeE = 11 // dynamics transfer-curve  -> emits nothing itself; drawn from the member fader parameters in Options.Params.
+	// Each parameter is a standard fader HWC (Absolute out / HWCExtended(FADER) in), individually automatable.
+	// The COMPRESSOR is a single topology component; its member HWCIDs are known only to compressor-aware clients.
+	TouchUIWidget_EQUALIZER TouchUIWidget_WidgetTypeE = 12 // EQ frequency-response curve -> emits nothing itself; drawn from the band parameters in Options.EqBands.
 )
 
 // Enum value maps for TouchUIWidget_WidgetTypeE.
@@ -1690,6 +1693,7 @@ var (
 		9:  "DROPDOWN",
 		10: "XYPAD",
 		11: "COMPRESSOR",
+		12: "EQUALIZER",
 	}
 	TouchUIWidget_WidgetTypeE_value = map[string]int32{
 		"BUTTON":     0,
@@ -1704,6 +1708,7 @@ var (
 		"DROPDOWN":   9,
 		"XYPAD":      10,
 		"COMPRESSOR": 11,
+		"EQUALIZER":  12,
 	}
 )
 
@@ -2093,6 +2098,119 @@ func (x TouchUICompressorParam_RoleE) Number() protoreflect.EnumNumber {
 // Deprecated: Use TouchUICompressorParam_RoleE.Descriptor instead.
 func (TouchUICompressorParam_RoleE) EnumDescriptor() ([]byte, []int) {
 	return file_ibeam_rawpanel_proto_ibeam_rawpanel_proto_rawDescGZIP(), []int{66, 0}
+}
+
+// and the handle on the curve carries the number.
+type TouchUIEqualizerParam_RoleE int32
+
+const (
+	TouchUIEqualizerParam_FREQ TouchUIEqualizerParam_RoleE = 0 // Hz - see the mapping note on Min/Max below
+	TouchUIEqualizerParam_GAIN TouchUIEqualizerParam_RoleE = 1 // dB
+	TouchUIEqualizerParam_Q    TouchUIEqualizerParam_RoleE = 2 // Q factor x10, so 0.1..10.0 is the integer range 1..100. Tenths because
+	// Min/Max are integers and a Q range that could not go below 1 would exclude
+	// every wide bell and shelf.
+	TouchUIEqualizerParam_SHAPE TouchUIEqualizerParam_RoleE = 3 // ShapeE index below, rounded to the nearest whole value
+)
+
+// Enum value maps for TouchUIEqualizerParam_RoleE.
+var (
+	TouchUIEqualizerParam_RoleE_name = map[int32]string{
+		0: "FREQ",
+		1: "GAIN",
+		2: "Q",
+		3: "SHAPE",
+	}
+	TouchUIEqualizerParam_RoleE_value = map[string]int32{
+		"FREQ":  0,
+		"GAIN":  1,
+		"Q":     2,
+		"SHAPE": 3,
+	}
+)
+
+func (x TouchUIEqualizerParam_RoleE) Enum() *TouchUIEqualizerParam_RoleE {
+	p := new(TouchUIEqualizerParam_RoleE)
+	*p = x
+	return p
+}
+
+func (x TouchUIEqualizerParam_RoleE) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (TouchUIEqualizerParam_RoleE) Descriptor() protoreflect.EnumDescriptor {
+	return file_ibeam_rawpanel_proto_ibeam_rawpanel_proto_enumTypes[36].Descriptor()
+}
+
+func (TouchUIEqualizerParam_RoleE) Type() protoreflect.EnumType {
+	return &file_ibeam_rawpanel_proto_ibeam_rawpanel_proto_enumTypes[36]
+}
+
+func (x TouchUIEqualizerParam_RoleE) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use TouchUIEqualizerParam_RoleE.Descriptor instead.
+func (TouchUIEqualizerParam_RoleE) EnumDescriptor() ([]byte, []int) {
+	return file_ibeam_rawpanel_proto_ibeam_rawpanel_proto_rawDescGZIP(), []int{67, 0}
+}
+
+type TouchUIEqualizerParam_ShapeE int32
+
+const (
+	TouchUIEqualizerParam_BELL       TouchUIEqualizerParam_ShapeE = 0 //   not a field: a console reports the shape per band at runtime, so it is an
+	TouchUIEqualizerParam_LOW_SHELF  TouchUIEqualizerParam_ShapeE = 1 //   ordinary addressable parameter like frequency or gain. A band with no SHAPE
+	TouchUIEqualizerParam_HIGH_SHELF TouchUIEqualizerParam_ShapeE = 2 //   parameter is drawn as a BELL.
+	TouchUIEqualizerParam_HIGH_PASS  TouchUIEqualizerParam_ShapeE = 3
+	TouchUIEqualizerParam_LOW_PASS   TouchUIEqualizerParam_ShapeE = 4
+	TouchUIEqualizerParam_NOTCH      TouchUIEqualizerParam_ShapeE = 5
+)
+
+// Enum value maps for TouchUIEqualizerParam_ShapeE.
+var (
+	TouchUIEqualizerParam_ShapeE_name = map[int32]string{
+		0: "BELL",
+		1: "LOW_SHELF",
+		2: "HIGH_SHELF",
+		3: "HIGH_PASS",
+		4: "LOW_PASS",
+		5: "NOTCH",
+	}
+	TouchUIEqualizerParam_ShapeE_value = map[string]int32{
+		"BELL":       0,
+		"LOW_SHELF":  1,
+		"HIGH_SHELF": 2,
+		"HIGH_PASS":  3,
+		"LOW_PASS":   4,
+		"NOTCH":      5,
+	}
+)
+
+func (x TouchUIEqualizerParam_ShapeE) Enum() *TouchUIEqualizerParam_ShapeE {
+	p := new(TouchUIEqualizerParam_ShapeE)
+	*p = x
+	return p
+}
+
+func (x TouchUIEqualizerParam_ShapeE) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (TouchUIEqualizerParam_ShapeE) Descriptor() protoreflect.EnumDescriptor {
+	return file_ibeam_rawpanel_proto_ibeam_rawpanel_proto_enumTypes[37].Descriptor()
+}
+
+func (TouchUIEqualizerParam_ShapeE) Type() protoreflect.EnumType {
+	return &file_ibeam_rawpanel_proto_ibeam_rawpanel_proto_enumTypes[37]
+}
+
+func (x TouchUIEqualizerParam_ShapeE) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use TouchUIEqualizerParam_ShapeE.Descriptor instead.
+func (TouchUIEqualizerParam_ShapeE) EnumDescriptor() ([]byte, []int) {
+	return file_ibeam_rawpanel_proto_ibeam_rawpanel_proto_rawDescGZIP(), []int{67, 1}
 }
 
 // Wrapper for all incoming messages (Incoming = to Panel from System)
@@ -7117,7 +7235,9 @@ type TouchUIWidgetOptions struct {
 	// Meaningless (and rejected) together with Relative: a delta pad has no position to return to.
 	Joystick bool `protobuf:"varint,28,opt,name=Joystick,proto3" json:"Joystick,omitempty"` // XYPAD: emit SpeedVector[x-500,y-500], the deflection from the centre, each
 	// COMPRESSOR options:
-	Params   []*TouchUICompressorParam      `protobuf:"bytes,16,rep,name=Params,proto3" json:"Params,omitempty"`                                                         // COMPRESSOR: member fader parameters that define the transfer curve.
+	Params []*TouchUICompressorParam `protobuf:"bytes,16,rep,name=Params,proto3" json:"Params,omitempty"` // COMPRESSOR: member fader parameters that define the transfer curve.
+	// EQUALIZER options:
+	EqBands  []*TouchUIEqualizerParam       `protobuf:"bytes,29,rep,name=EqBands,proto3" json:"EqBands,omitempty"`                                                       // EQUALIZER: band parameters that define the frequency response.
 	EditKind TouchUIWidgetOptions_EditKindE `protobuf:"varint,17,opt,name=EditKind,proto3,enum=ibeam_rawpanel.TouchUIWidgetOptions_EditKindE" json:"EditKind,omitempty"` // LABEL only. Non-NONE makes the tile tappable: the panel opens its on-screen
 	// keyboard seeded with the text the label is CURRENTLY DISPLAYING (whatever the
 	// last HWCText put there; PASSWORD seeds empty) and, on commit, emits TextEvent
@@ -7291,6 +7411,13 @@ func (x *TouchUIWidgetOptions) GetJoystick() bool {
 func (x *TouchUIWidgetOptions) GetParams() []*TouchUICompressorParam {
 	if x != nil {
 		return x.Params
+	}
+	return nil
+}
+
+func (x *TouchUIWidgetOptions) GetEqBands() []*TouchUIEqualizerParam {
+	if x != nil {
+		return x.EqBands
 	}
 	return nil
 }
@@ -7538,6 +7665,106 @@ func (x *TouchUICompressorParam) GetLabel() string {
 	return ""
 }
 
+// TouchUIEqualizerParam is one parameter of one band of an EQUALIZER widget (see
+// TouchUIWidget.WidgetTypeE.EQUALIZER). Like a compressor member, each parameter is a standard fader HWC in its own
+// right: it emits Absolute under its HWCID and is set from the system via HWCExtended(FADER) under the same id.
+//
+// The list is FLAT - Band and Role together identify a parameter and there is no per-band message. That is what lets a
+// band declare only the controls it has: a high-pass band that offers frequency alone is one entry, not one entry and
+// three zeroed fields. It could not have been expressed by leaving an id out either, since HWCID 0 already means
+// "assign on push".
+//
+// Unlike a compressor's members, these ARE topology components in their own right. An EQ is driven from the encoders
+// and faders around it far more often than from the glass, and a client can only bind a feedback to an HWC the panel
+// advertises - so "Band 3 Freq" has to be a component a configurator can see.
+type TouchUIEqualizerParam struct {
+	state protoimpl.MessageState      `protogen:"open.v1"`
+	HWCID uint32                      `protobuf:"varint,1,opt,name=HWCID,proto3" json:"HWCID,omitempty"` // Addressable fader HWC for this parameter (own events/states). MUST NOT collide with other HWC ids.
+	Band  uint32                      `protobuf:"varint,2,opt,name=Band,proto3" json:"Band,omitempty"`   // 1-based band number, at most 8. Bands are drawn and numbered in this order,
+	Role  TouchUIEqualizerParam_RoleE `protobuf:"varint,3,opt,name=Role,proto3,enum=ibeam_rawpanel.TouchUIEqualizerParam_RoleE" json:"Role,omitempty"`
+	Min   int32                       `protobuf:"zigzag32,4,opt,name=Min,proto3" json:"Min,omitempty"` // Natural-unit range mapped onto the Absolute 0..1000 domain (0/0 = panel
+	Max   int32                       `protobuf:"zigzag32,5,opt,name=Max,proto3" json:"Max,omitempty"` //   default for the role). The mapping is LINEAR for every role except FREQ,
+	// which is LOGARITHMIC: value = Min * (Max/Min)^(wire/1000). A linear octave
+	// scale would spend four fifths of the travel above 4 kHz and give 20..40 Hz
+	// a single step, and the plot's frequency axis is logarithmic for the same
+	// reason. Clients reading the Absolute event must use the same curve.
+	Label         string `protobuf:"bytes,6,opt,name=Label,proto3" json:"Label,omitempty"` // Optional parameter caption, at most 15 bytes (else the panel uses a role default)
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *TouchUIEqualizerParam) Reset() {
+	*x = TouchUIEqualizerParam{}
+	mi := &file_ibeam_rawpanel_proto_ibeam_rawpanel_proto_msgTypes[67]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *TouchUIEqualizerParam) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*TouchUIEqualizerParam) ProtoMessage() {}
+
+func (x *TouchUIEqualizerParam) ProtoReflect() protoreflect.Message {
+	mi := &file_ibeam_rawpanel_proto_ibeam_rawpanel_proto_msgTypes[67]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use TouchUIEqualizerParam.ProtoReflect.Descriptor instead.
+func (*TouchUIEqualizerParam) Descriptor() ([]byte, []int) {
+	return file_ibeam_rawpanel_proto_ibeam_rawpanel_proto_rawDescGZIP(), []int{67}
+}
+
+func (x *TouchUIEqualizerParam) GetHWCID() uint32 {
+	if x != nil {
+		return x.HWCID
+	}
+	return 0
+}
+
+func (x *TouchUIEqualizerParam) GetBand() uint32 {
+	if x != nil {
+		return x.Band
+	}
+	return 0
+}
+
+func (x *TouchUIEqualizerParam) GetRole() TouchUIEqualizerParam_RoleE {
+	if x != nil {
+		return x.Role
+	}
+	return TouchUIEqualizerParam_FREQ
+}
+
+func (x *TouchUIEqualizerParam) GetMin() int32 {
+	if x != nil {
+		return x.Min
+	}
+	return 0
+}
+
+func (x *TouchUIEqualizerParam) GetMax() int32 {
+	if x != nil {
+		return x.Max
+	}
+	return 0
+}
+
+func (x *TouchUIEqualizerParam) GetLabel() string {
+	if x != nil {
+		return x.Label
+	}
+	return ""
+}
+
 // TouchUICapabilities is normally the answer to Command.SendTouchUICapabilities, but a panel that
 // can rotate also sends it spontaneously whenever its orientation changes - ScreenWidth/ScreenHeight
 // and the grid recommendation swap with it, so this is how a client learns it must re-lay-out.
@@ -7559,7 +7786,7 @@ type TouchUICapabilities struct {
 
 func (x *TouchUICapabilities) Reset() {
 	*x = TouchUICapabilities{}
-	mi := &file_ibeam_rawpanel_proto_ibeam_rawpanel_proto_msgTypes[67]
+	mi := &file_ibeam_rawpanel_proto_ibeam_rawpanel_proto_msgTypes[68]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7571,7 +7798,7 @@ func (x *TouchUICapabilities) String() string {
 func (*TouchUICapabilities) ProtoMessage() {}
 
 func (x *TouchUICapabilities) ProtoReflect() protoreflect.Message {
-	mi := &file_ibeam_rawpanel_proto_ibeam_rawpanel_proto_msgTypes[67]
+	mi := &file_ibeam_rawpanel_proto_ibeam_rawpanel_proto_msgTypes[68]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7584,7 +7811,7 @@ func (x *TouchUICapabilities) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TouchUICapabilities.ProtoReflect.Descriptor instead.
 func (*TouchUICapabilities) Descriptor() ([]byte, []int) {
-	return file_ibeam_rawpanel_proto_ibeam_rawpanel_proto_rawDescGZIP(), []int{67}
+	return file_ibeam_rawpanel_proto_ibeam_rawpanel_proto_rawDescGZIP(), []int{68}
 }
 
 func (x *TouchUICapabilities) GetScreenWidth() uint32 {
@@ -7664,7 +7891,7 @@ type TouchUIWidgetTypeCap struct {
 
 func (x *TouchUIWidgetTypeCap) Reset() {
 	*x = TouchUIWidgetTypeCap{}
-	mi := &file_ibeam_rawpanel_proto_ibeam_rawpanel_proto_msgTypes[68]
+	mi := &file_ibeam_rawpanel_proto_ibeam_rawpanel_proto_msgTypes[69]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7676,7 +7903,7 @@ func (x *TouchUIWidgetTypeCap) String() string {
 func (*TouchUIWidgetTypeCap) ProtoMessage() {}
 
 func (x *TouchUIWidgetTypeCap) ProtoReflect() protoreflect.Message {
-	mi := &file_ibeam_rawpanel_proto_ibeam_rawpanel_proto_msgTypes[68]
+	mi := &file_ibeam_rawpanel_proto_ibeam_rawpanel_proto_msgTypes[69]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7689,7 +7916,7 @@ func (x *TouchUIWidgetTypeCap) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TouchUIWidgetTypeCap.ProtoReflect.Descriptor instead.
 func (*TouchUIWidgetTypeCap) Descriptor() ([]byte, []int) {
-	return file_ibeam_rawpanel_proto_ibeam_rawpanel_proto_rawDescGZIP(), []int{68}
+	return file_ibeam_rawpanel_proto_ibeam_rawpanel_proto_rawDescGZIP(), []int{69}
 }
 
 func (x *TouchUIWidgetTypeCap) GetType() TouchUIWidget_WidgetTypeE {
@@ -7723,7 +7950,7 @@ type HWCSegments_Segment struct {
 
 func (x *HWCSegments_Segment) Reset() {
 	*x = HWCSegments_Segment{}
-	mi := &file_ibeam_rawpanel_proto_ibeam_rawpanel_proto_msgTypes[69]
+	mi := &file_ibeam_rawpanel_proto_ibeam_rawpanel_proto_msgTypes[70]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7735,7 +7962,7 @@ func (x *HWCSegments_Segment) String() string {
 func (*HWCSegments_Segment) ProtoMessage() {}
 
 func (x *HWCSegments_Segment) ProtoReflect() protoreflect.Message {
-	mi := &file_ibeam_rawpanel_proto_ibeam_rawpanel_proto_msgTypes[69]
+	mi := &file_ibeam_rawpanel_proto_ibeam_rawpanel_proto_msgTypes[70]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7776,7 +8003,7 @@ type HWCJog_TargetPositionM struct {
 
 func (x *HWCJog_TargetPositionM) Reset() {
 	*x = HWCJog_TargetPositionM{}
-	mi := &file_ibeam_rawpanel_proto_ibeam_rawpanel_proto_msgTypes[70]
+	mi := &file_ibeam_rawpanel_proto_ibeam_rawpanel_proto_msgTypes[71]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7788,7 +8015,7 @@ func (x *HWCJog_TargetPositionM) String() string {
 func (*HWCJog_TargetPositionM) ProtoMessage() {}
 
 func (x *HWCJog_TargetPositionM) ProtoReflect() protoreflect.Message {
-	mi := &file_ibeam_rawpanel_proto_ibeam_rawpanel_proto_msgTypes[70]
+	mi := &file_ibeam_rawpanel_proto_ibeam_rawpanel_proto_msgTypes[71]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7824,7 +8051,7 @@ type HWCText_ScaleM struct {
 
 func (x *HWCText_ScaleM) Reset() {
 	*x = HWCText_ScaleM{}
-	mi := &file_ibeam_rawpanel_proto_ibeam_rawpanel_proto_msgTypes[71]
+	mi := &file_ibeam_rawpanel_proto_ibeam_rawpanel_proto_msgTypes[72]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7836,7 +8063,7 @@ func (x *HWCText_ScaleM) String() string {
 func (*HWCText_ScaleM) ProtoMessage() {}
 
 func (x *HWCText_ScaleM) ProtoReflect() protoreflect.Message {
-	mi := &file_ibeam_rawpanel_proto_ibeam_rawpanel_proto_msgTypes[71]
+	mi := &file_ibeam_rawpanel_proto_ibeam_rawpanel_proto_msgTypes[72]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7901,7 +8128,7 @@ type HWCText_TextStyle struct {
 
 func (x *HWCText_TextStyle) Reset() {
 	*x = HWCText_TextStyle{}
-	mi := &file_ibeam_rawpanel_proto_ibeam_rawpanel_proto_msgTypes[72]
+	mi := &file_ibeam_rawpanel_proto_ibeam_rawpanel_proto_msgTypes[73]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7913,7 +8140,7 @@ func (x *HWCText_TextStyle) String() string {
 func (*HWCText_TextStyle) ProtoMessage() {}
 
 func (x *HWCText_TextStyle) ProtoReflect() protoreflect.Message {
-	mi := &file_ibeam_rawpanel_proto_ibeam_rawpanel_proto_msgTypes[72]
+	mi := &file_ibeam_rawpanel_proto_ibeam_rawpanel_proto_msgTypes[73]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7982,7 +8209,7 @@ type HWCText_TextStyle_Font struct {
 
 func (x *HWCText_TextStyle_Font) Reset() {
 	*x = HWCText_TextStyle_Font{}
-	mi := &file_ibeam_rawpanel_proto_ibeam_rawpanel_proto_msgTypes[73]
+	mi := &file_ibeam_rawpanel_proto_ibeam_rawpanel_proto_msgTypes[74]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7994,7 +8221,7 @@ func (x *HWCText_TextStyle_Font) String() string {
 func (*HWCText_TextStyle_Font) ProtoMessage() {}
 
 func (x *HWCText_TextStyle_Font) ProtoReflect() protoreflect.Message {
-	mi := &file_ibeam_rawpanel_proto_ibeam_rawpanel_proto_msgTypes[73]
+	mi := &file_ibeam_rawpanel_proto_ibeam_rawpanel_proto_msgTypes[74]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -8046,7 +8273,7 @@ type HWCOverlay_Box struct {
 
 func (x *HWCOverlay_Box) Reset() {
 	*x = HWCOverlay_Box{}
-	mi := &file_ibeam_rawpanel_proto_ibeam_rawpanel_proto_msgTypes[74]
+	mi := &file_ibeam_rawpanel_proto_ibeam_rawpanel_proto_msgTypes[75]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -8058,7 +8285,7 @@ func (x *HWCOverlay_Box) String() string {
 func (*HWCOverlay_Box) ProtoMessage() {}
 
 func (x *HWCOverlay_Box) ProtoReflect() protoreflect.Message {
-	mi := &file_ibeam_rawpanel_proto_ibeam_rawpanel_proto_msgTypes[74]
+	mi := &file_ibeam_rawpanel_proto_ibeam_rawpanel_proto_msgTypes[75]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -8807,7 +9034,7 @@ const file_ibeam_rawpanel_proto_ibeam_rawpanel_proto_rawDesc = "" +
 	"\x05Title\x18\x02 \x01(\tR\x05Title\x12\x1a\n" +
 	"\bGridRows\x18\x03 \x01(\rR\bGridRows\x12\x1a\n" +
 	"\bGridCols\x18\x04 \x01(\rR\bGridCols\x127\n" +
-	"\aWidgets\x18\x05 \x03(\v2\x1d.ibeam_rawpanel.TouchUIWidgetR\aWidgets\"\x88\x04\n" +
+	"\aWidgets\x18\x05 \x03(\v2\x1d.ibeam_rawpanel.TouchUIWidgetR\aWidgets\"\x97\x04\n" +
 	"\rTouchUIWidget\x12\x14\n" +
 	"\x05HWCID\x18\x01 \x01(\rR\x05HWCID\x12=\n" +
 	"\x04Type\x18\x02 \x01(\x0e2).ibeam_rawpanel.TouchUIWidget.WidgetTypeER\x04Type\x12\x14\n" +
@@ -8822,7 +9049,7 @@ const file_ibeam_rawpanel_proto_ibeam_rawpanel_proto_rawDesc = "" +
 	" \x01(\rR\x01W\x12\f\n" +
 	"\x01H\x18\v \x01(\rR\x01H\x12>\n" +
 	"\aOptions\x18\f \x01(\v2$.ibeam_rawpanel.TouchUIWidgetOptionsR\aOptions\x12\x1c\n" +
-	"\tEventMask\x18\r \x01(\rR\tEventMask\"\x9d\x01\n" +
+	"\tEventMask\x18\r \x01(\rR\tEventMask\"\xac\x01\n" +
 	"\vWidgetTypeE\x12\n" +
 	"\n" +
 	"\x06BUTTON\x10\x00\x12\n" +
@@ -8840,7 +9067,8 @@ const file_ibeam_rawpanel_proto_ibeam_rawpanel_proto_rawDesc = "" +
 	"\x05XYPAD\x10\n" +
 	"\x12\x0e\n" +
 	"\n" +
-	"COMPRESSOR\x10\v\"\x88\f\n" +
+	"COMPRESSOR\x10\v\x12\r\n" +
+	"\tEQUALIZER\x10\f\"\xc9\f\n" +
 	"\x14TouchUIWidgetOptions\x12\x10\n" +
 	"\x03Min\x18\x01 \x01(\x11R\x03Min\x12\x10\n" +
 	"\x03Max\x18\x02 \x01(\x11R\x03Max\x12\x12\n" +
@@ -8859,7 +9087,8 @@ const file_ibeam_rawpanel_proto_ibeam_rawpanel_proto_rawDesc = "" +
 	"\bRelative\x18\x0e \x01(\bR\bRelative\x12\"\n" +
 	"\fCenterReturn\x18\x0f \x01(\bR\fCenterReturn\x12\x1a\n" +
 	"\bJoystick\x18\x1c \x01(\bR\bJoystick\x12>\n" +
-	"\x06Params\x18\x10 \x03(\v2&.ibeam_rawpanel.TouchUICompressorParamR\x06Params\x12J\n" +
+	"\x06Params\x18\x10 \x03(\v2&.ibeam_rawpanel.TouchUICompressorParamR\x06Params\x12?\n" +
+	"\aEqBands\x18\x1d \x03(\v2%.ibeam_rawpanel.TouchUIEqualizerParamR\aEqBands\x12J\n" +
 	"\bEditKind\x18\x11 \x01(\x0e2..ibeam_rawpanel.TouchUIWidgetOptions.EditKindER\bEditKind\x12\x1e\n" +
 	"\n" +
 	"EditMaxLen\x18\x12 \x01(\rR\n" +
@@ -8924,7 +9153,27 @@ const file_ibeam_rawpanel_proto_ibeam_rawpanel_proto_rawDesc = "" +
 	"\x06MAKEUP\x10\x03\x12\n" +
 	"\n" +
 	"\x06ATTACK\x10\x04\x12\v\n" +
-	"\aRELEASE\x10\x05\"\xb5\x03\n" +
+	"\aRELEASE\x10\x05\"\xc6\x02\n" +
+	"\x15TouchUIEqualizerParam\x12\x14\n" +
+	"\x05HWCID\x18\x01 \x01(\rR\x05HWCID\x12\x12\n" +
+	"\x04Band\x18\x02 \x01(\rR\x04Band\x12?\n" +
+	"\x04Role\x18\x03 \x01(\x0e2+.ibeam_rawpanel.TouchUIEqualizerParam.RoleER\x04Role\x12\x10\n" +
+	"\x03Min\x18\x04 \x01(\x11R\x03Min\x12\x10\n" +
+	"\x03Max\x18\x05 \x01(\x11R\x03Max\x12\x14\n" +
+	"\x05Label\x18\x06 \x01(\tR\x05Label\"-\n" +
+	"\x05RoleE\x12\b\n" +
+	"\x04FREQ\x10\x00\x12\b\n" +
+	"\x04GAIN\x10\x01\x12\x05\n" +
+	"\x01Q\x10\x02\x12\t\n" +
+	"\x05SHAPE\x10\x03\"Y\n" +
+	"\x06ShapeE\x12\b\n" +
+	"\x04BELL\x10\x00\x12\r\n" +
+	"\tLOW_SHELF\x10\x01\x12\x0e\n" +
+	"\n" +
+	"HIGH_SHELF\x10\x02\x12\r\n" +
+	"\tHIGH_PASS\x10\x03\x12\f\n" +
+	"\bLOW_PASS\x10\x04\x12\t\n" +
+	"\x05NOTCH\x10\x05\"\xb5\x03\n" +
 	"\x13TouchUICapabilities\x12 \n" +
 	"\vScreenWidth\x18\x01 \x01(\rR\vScreenWidth\x12\"\n" +
 	"\fScreenHeight\x18\x02 \x01(\rR\fScreenHeight\x12\x1a\n" +
@@ -8954,8 +9203,8 @@ func file_ibeam_rawpanel_proto_ibeam_rawpanel_proto_rawDescGZIP() []byte {
 	return file_ibeam_rawpanel_proto_ibeam_rawpanel_proto_rawDescData
 }
 
-var file_ibeam_rawpanel_proto_ibeam_rawpanel_proto_enumTypes = make([]protoimpl.EnumInfo, 36)
-var file_ibeam_rawpanel_proto_ibeam_rawpanel_proto_msgTypes = make([]protoimpl.MessageInfo, 76)
+var file_ibeam_rawpanel_proto_ibeam_rawpanel_proto_enumTypes = make([]protoimpl.EnumInfo, 38)
+var file_ibeam_rawpanel_proto_ibeam_rawpanel_proto_msgTypes = make([]protoimpl.MessageInfo, 77)
 var file_ibeam_rawpanel_proto_ibeam_rawpanel_proto_goTypes = []any{
 	(InboundMessage_FlowMsg)(0),                   // 0: ibeam_rawpanel.InboundMessage.FlowMsg
 	(Register_RegisterE)(0),                       // 1: ibeam_rawpanel.Register.RegisterE
@@ -8993,222 +9242,227 @@ var file_ibeam_rawpanel_proto_ibeam_rawpanel_proto_goTypes = []any{
 	(TouchUIWidgetOptions_HiddenPolicyE)(0),       // 33: ibeam_rawpanel.TouchUIWidgetOptions.HiddenPolicyE
 	(TouchUIWidgetOptions_ScalingE)(0),            // 34: ibeam_rawpanel.TouchUIWidgetOptions.ScalingE
 	(TouchUICompressorParam_RoleE)(0),             // 35: ibeam_rawpanel.TouchUICompressorParam.RoleE
-	(*InboundMessage)(nil),                        // 36: ibeam_rawpanel.InboundMessage
-	(*Command)(nil),                               // 37: ibeam_rawpanel.Command
-	(*JSONconfig)(nil),                            // 38: ibeam_rawpanel.JSONconfig
-	(*Register)(nil),                              // 39: ibeam_rawpanel.Register
-	(*SleepTimeout)(nil),                          // 40: ibeam_rawpanel.SleepTimeout
-	(*SleepMode)(nil),                             // 41: ibeam_rawpanel.SleepMode
-	(*SleepScreenSaver)(nil),                      // 42: ibeam_rawpanel.SleepScreenSaver
-	(*WebserverState)(nil),                        // 43: ibeam_rawpanel.WebserverState
-	(*HeartBeatTimer)(nil),                        // 44: ibeam_rawpanel.HeartBeatTimer
-	(*DimmedGain)(nil),                            // 45: ibeam_rawpanel.DimmedGain
-	(*Brightness)(nil),                            // 46: ibeam_rawpanel.Brightness
-	(*PublishSystemStat)(nil),                     // 47: ibeam_rawpanel.PublishSystemStat
-	(*LoadCPU)(nil),                               // 48: ibeam_rawpanel.LoadCPU
-	(*HWCState)(nil),                              // 49: ibeam_rawpanel.HWCState
-	(*Processors)(nil),                            // 50: ibeam_rawpanel.Processors
-	(*PublishRawADCValues)(nil),                   // 51: ibeam_rawpanel.PublishRawADCValues
-	(*HWCMode)(nil),                               // 52: ibeam_rawpanel.HWCMode
-	(*HWCExtended)(nil),                           // 53: ibeam_rawpanel.HWCExtended
-	(*HWCSegments)(nil),                           // 54: ibeam_rawpanel.HWCSegments
-	(*HWCJog)(nil),                                // 55: ibeam_rawpanel.HWCJog
-	(*HWCDomain)(nil),                             // 56: ibeam_rawpanel.HWCDomain
-	(*HWCColor)(nil),                              // 57: ibeam_rawpanel.HWCColor
-	(*Color)(nil),                                 // 58: ibeam_rawpanel.Color
-	(*ColorRGB)(nil),                              // 59: ibeam_rawpanel.ColorRGB
-	(*ColorIndex)(nil),                            // 60: ibeam_rawpanel.ColorIndex
-	(*HWCText)(nil),                               // 61: ibeam_rawpanel.HWCText
-	(*HWCGfx)(nil),                                // 62: ibeam_rawpanel.HWCGfx
-	(*HWCOverlay)(nil),                            // 63: ibeam_rawpanel.HWCOverlay
-	(*ProcGfxConverter)(nil),                      // 64: ibeam_rawpanel.ProcGfxConverter
-	(*ProcAudioMeter)(nil),                        // 65: ibeam_rawpanel.ProcAudioMeter
-	(*ProcStrength)(nil),                          // 66: ibeam_rawpanel.ProcStrength
-	(*ProcTextToGraphics)(nil),                    // 67: ibeam_rawpanel.ProcTextToGraphics
-	(*ProcTest)(nil),                              // 68: ibeam_rawpanel.ProcTest
-	(*ProcUniText)(nil),                           // 69: ibeam_rawpanel.ProcUniText
-	(*ProcIcon)(nil),                              // 70: ibeam_rawpanel.ProcIcon
-	(*OutboundMessage)(nil),                       // 71: ibeam_rawpanel.OutboundMessage
-	(*SleepState)(nil),                            // 72: ibeam_rawpanel.SleepState
-	(*Connections)(nil),                           // 73: ibeam_rawpanel.Connections
-	(*Message)(nil),                               // 74: ibeam_rawpanel.Message
-	(*Environment)(nil),                           // 75: ibeam_rawpanel.Environment
-	(*RunTimeStats)(nil),                          // 76: ibeam_rawpanel.RunTimeStats
-	(*BusStatus)(nil),                             // 77: ibeam_rawpanel.BusStatus
-	(*HWCEvent)(nil),                              // 78: ibeam_rawpanel.HWCEvent
-	(*BinaryEvent)(nil),                           // 79: ibeam_rawpanel.BinaryEvent
-	(*PulsedEvent)(nil),                           // 80: ibeam_rawpanel.PulsedEvent
-	(*AbsoluteEvent)(nil),                         // 81: ibeam_rawpanel.AbsoluteEvent
-	(*SpeedEvent)(nil),                            // 82: ibeam_rawpanel.SpeedEvent
-	(*AbsoluteVectorEvent)(nil),                   // 83: ibeam_rawpanel.AbsoluteVectorEvent
-	(*SpeedVectorEvent)(nil),                      // 84: ibeam_rawpanel.SpeedVectorEvent
-	(*TextEvent)(nil),                             // 85: ibeam_rawpanel.TextEvent
-	(*RawAnalogEvent)(nil),                        // 86: ibeam_rawpanel.RawAnalogEvent
-	(*SystemStat)(nil),                            // 87: ibeam_rawpanel.SystemStat
-	(*PanelInfo)(nil),                             // 88: ibeam_rawpanel.PanelInfo
-	(*RawPanelSupport)(nil),                       // 89: ibeam_rawpanel.RawPanelSupport
-	(*PanelTopology)(nil),                         // 90: ibeam_rawpanel.PanelTopology
-	(*BurninProfile)(nil),                         // 91: ibeam_rawpanel.BurninProfile
-	(*CalibrationProfile)(nil),                    // 92: ibeam_rawpanel.CalibrationProfile
-	(*NetworkConfig)(nil),                         // 93: ibeam_rawpanel.NetworkConfig
-	(*TouchUIConfig)(nil),                         // 94: ibeam_rawpanel.TouchUIConfig
-	(*TouchUIGlobalOptions)(nil),                  // 95: ibeam_rawpanel.TouchUIGlobalOptions
-	(*TouchUISetActivePage)(nil),                  // 96: ibeam_rawpanel.TouchUISetActivePage
-	(*TouchUIActivePage)(nil),                     // 97: ibeam_rawpanel.TouchUIActivePage
-	(*TouchUIPage)(nil),                           // 98: ibeam_rawpanel.TouchUIPage
-	(*TouchUIWidget)(nil),                         // 99: ibeam_rawpanel.TouchUIWidget
-	(*TouchUIWidgetOptions)(nil),                  // 100: ibeam_rawpanel.TouchUIWidgetOptions
-	(*TouchUIMarker)(nil),                         // 101: ibeam_rawpanel.TouchUIMarker
-	(*TouchUICompressorParam)(nil),                // 102: ibeam_rawpanel.TouchUICompressorParam
-	(*TouchUICapabilities)(nil),                   // 103: ibeam_rawpanel.TouchUICapabilities
-	(*TouchUIWidgetTypeCap)(nil),                  // 104: ibeam_rawpanel.TouchUIWidgetTypeCap
-	(*HWCSegments_Segment)(nil),                   // 105: ibeam_rawpanel.HWCSegments.Segment
-	(*HWCJog_TargetPositionM)(nil),                // 106: ibeam_rawpanel.HWCJog.TargetPositionM
-	(*HWCText_ScaleM)(nil),                        // 107: ibeam_rawpanel.HWCText.ScaleM
-	(*HWCText_TextStyle)(nil),                     // 108: ibeam_rawpanel.HWCText.TextStyle
-	(*HWCText_TextStyle_Font)(nil),                // 109: ibeam_rawpanel.HWCText.TextStyle.Font
-	(*HWCOverlay_Box)(nil),                        // 110: ibeam_rawpanel.HWCOverlay.Box
-	nil,                                           // 111: ibeam_rawpanel.OutboundMessage.HWCavailabilityEntry
+	(TouchUIEqualizerParam_RoleE)(0),              // 36: ibeam_rawpanel.TouchUIEqualizerParam.RoleE
+	(TouchUIEqualizerParam_ShapeE)(0),             // 37: ibeam_rawpanel.TouchUIEqualizerParam.ShapeE
+	(*InboundMessage)(nil),                        // 38: ibeam_rawpanel.InboundMessage
+	(*Command)(nil),                               // 39: ibeam_rawpanel.Command
+	(*JSONconfig)(nil),                            // 40: ibeam_rawpanel.JSONconfig
+	(*Register)(nil),                              // 41: ibeam_rawpanel.Register
+	(*SleepTimeout)(nil),                          // 42: ibeam_rawpanel.SleepTimeout
+	(*SleepMode)(nil),                             // 43: ibeam_rawpanel.SleepMode
+	(*SleepScreenSaver)(nil),                      // 44: ibeam_rawpanel.SleepScreenSaver
+	(*WebserverState)(nil),                        // 45: ibeam_rawpanel.WebserverState
+	(*HeartBeatTimer)(nil),                        // 46: ibeam_rawpanel.HeartBeatTimer
+	(*DimmedGain)(nil),                            // 47: ibeam_rawpanel.DimmedGain
+	(*Brightness)(nil),                            // 48: ibeam_rawpanel.Brightness
+	(*PublishSystemStat)(nil),                     // 49: ibeam_rawpanel.PublishSystemStat
+	(*LoadCPU)(nil),                               // 50: ibeam_rawpanel.LoadCPU
+	(*HWCState)(nil),                              // 51: ibeam_rawpanel.HWCState
+	(*Processors)(nil),                            // 52: ibeam_rawpanel.Processors
+	(*PublishRawADCValues)(nil),                   // 53: ibeam_rawpanel.PublishRawADCValues
+	(*HWCMode)(nil),                               // 54: ibeam_rawpanel.HWCMode
+	(*HWCExtended)(nil),                           // 55: ibeam_rawpanel.HWCExtended
+	(*HWCSegments)(nil),                           // 56: ibeam_rawpanel.HWCSegments
+	(*HWCJog)(nil),                                // 57: ibeam_rawpanel.HWCJog
+	(*HWCDomain)(nil),                             // 58: ibeam_rawpanel.HWCDomain
+	(*HWCColor)(nil),                              // 59: ibeam_rawpanel.HWCColor
+	(*Color)(nil),                                 // 60: ibeam_rawpanel.Color
+	(*ColorRGB)(nil),                              // 61: ibeam_rawpanel.ColorRGB
+	(*ColorIndex)(nil),                            // 62: ibeam_rawpanel.ColorIndex
+	(*HWCText)(nil),                               // 63: ibeam_rawpanel.HWCText
+	(*HWCGfx)(nil),                                // 64: ibeam_rawpanel.HWCGfx
+	(*HWCOverlay)(nil),                            // 65: ibeam_rawpanel.HWCOverlay
+	(*ProcGfxConverter)(nil),                      // 66: ibeam_rawpanel.ProcGfxConverter
+	(*ProcAudioMeter)(nil),                        // 67: ibeam_rawpanel.ProcAudioMeter
+	(*ProcStrength)(nil),                          // 68: ibeam_rawpanel.ProcStrength
+	(*ProcTextToGraphics)(nil),                    // 69: ibeam_rawpanel.ProcTextToGraphics
+	(*ProcTest)(nil),                              // 70: ibeam_rawpanel.ProcTest
+	(*ProcUniText)(nil),                           // 71: ibeam_rawpanel.ProcUniText
+	(*ProcIcon)(nil),                              // 72: ibeam_rawpanel.ProcIcon
+	(*OutboundMessage)(nil),                       // 73: ibeam_rawpanel.OutboundMessage
+	(*SleepState)(nil),                            // 74: ibeam_rawpanel.SleepState
+	(*Connections)(nil),                           // 75: ibeam_rawpanel.Connections
+	(*Message)(nil),                               // 76: ibeam_rawpanel.Message
+	(*Environment)(nil),                           // 77: ibeam_rawpanel.Environment
+	(*RunTimeStats)(nil),                          // 78: ibeam_rawpanel.RunTimeStats
+	(*BusStatus)(nil),                             // 79: ibeam_rawpanel.BusStatus
+	(*HWCEvent)(nil),                              // 80: ibeam_rawpanel.HWCEvent
+	(*BinaryEvent)(nil),                           // 81: ibeam_rawpanel.BinaryEvent
+	(*PulsedEvent)(nil),                           // 82: ibeam_rawpanel.PulsedEvent
+	(*AbsoluteEvent)(nil),                         // 83: ibeam_rawpanel.AbsoluteEvent
+	(*SpeedEvent)(nil),                            // 84: ibeam_rawpanel.SpeedEvent
+	(*AbsoluteVectorEvent)(nil),                   // 85: ibeam_rawpanel.AbsoluteVectorEvent
+	(*SpeedVectorEvent)(nil),                      // 86: ibeam_rawpanel.SpeedVectorEvent
+	(*TextEvent)(nil),                             // 87: ibeam_rawpanel.TextEvent
+	(*RawAnalogEvent)(nil),                        // 88: ibeam_rawpanel.RawAnalogEvent
+	(*SystemStat)(nil),                            // 89: ibeam_rawpanel.SystemStat
+	(*PanelInfo)(nil),                             // 90: ibeam_rawpanel.PanelInfo
+	(*RawPanelSupport)(nil),                       // 91: ibeam_rawpanel.RawPanelSupport
+	(*PanelTopology)(nil),                         // 92: ibeam_rawpanel.PanelTopology
+	(*BurninProfile)(nil),                         // 93: ibeam_rawpanel.BurninProfile
+	(*CalibrationProfile)(nil),                    // 94: ibeam_rawpanel.CalibrationProfile
+	(*NetworkConfig)(nil),                         // 95: ibeam_rawpanel.NetworkConfig
+	(*TouchUIConfig)(nil),                         // 96: ibeam_rawpanel.TouchUIConfig
+	(*TouchUIGlobalOptions)(nil),                  // 97: ibeam_rawpanel.TouchUIGlobalOptions
+	(*TouchUISetActivePage)(nil),                  // 98: ibeam_rawpanel.TouchUISetActivePage
+	(*TouchUIActivePage)(nil),                     // 99: ibeam_rawpanel.TouchUIActivePage
+	(*TouchUIPage)(nil),                           // 100: ibeam_rawpanel.TouchUIPage
+	(*TouchUIWidget)(nil),                         // 101: ibeam_rawpanel.TouchUIWidget
+	(*TouchUIWidgetOptions)(nil),                  // 102: ibeam_rawpanel.TouchUIWidgetOptions
+	(*TouchUIMarker)(nil),                         // 103: ibeam_rawpanel.TouchUIMarker
+	(*TouchUICompressorParam)(nil),                // 104: ibeam_rawpanel.TouchUICompressorParam
+	(*TouchUIEqualizerParam)(nil),                 // 105: ibeam_rawpanel.TouchUIEqualizerParam
+	(*TouchUICapabilities)(nil),                   // 106: ibeam_rawpanel.TouchUICapabilities
+	(*TouchUIWidgetTypeCap)(nil),                  // 107: ibeam_rawpanel.TouchUIWidgetTypeCap
+	(*HWCSegments_Segment)(nil),                   // 108: ibeam_rawpanel.HWCSegments.Segment
+	(*HWCJog_TargetPositionM)(nil),                // 109: ibeam_rawpanel.HWCJog.TargetPositionM
+	(*HWCText_ScaleM)(nil),                        // 110: ibeam_rawpanel.HWCText.ScaleM
+	(*HWCText_TextStyle)(nil),                     // 111: ibeam_rawpanel.HWCText.TextStyle
+	(*HWCText_TextStyle_Font)(nil),                // 112: ibeam_rawpanel.HWCText.TextStyle.Font
+	(*HWCOverlay_Box)(nil),                        // 113: ibeam_rawpanel.HWCOverlay.Box
+	nil,                                           // 114: ibeam_rawpanel.OutboundMessage.HWCavailabilityEntry
 }
 var file_ibeam_rawpanel_proto_ibeam_rawpanel_proto_depIdxs = []int32{
 	0,   // 0: ibeam_rawpanel.InboundMessage.FlowMessage:type_name -> ibeam_rawpanel.InboundMessage.FlowMsg
-	37,  // 1: ibeam_rawpanel.InboundMessage.Command:type_name -> ibeam_rawpanel.Command
-	49,  // 2: ibeam_rawpanel.InboundMessage.States:type_name -> ibeam_rawpanel.HWCState
-	39,  // 3: ibeam_rawpanel.InboundMessage.Registers:type_name -> ibeam_rawpanel.Register
-	93,  // 4: ibeam_rawpanel.Command.SetNetworkConfig:type_name -> ibeam_rawpanel.NetworkConfig
-	40,  // 5: ibeam_rawpanel.Command.SetSleepTimeout:type_name -> ibeam_rawpanel.SleepTimeout
-	41,  // 6: ibeam_rawpanel.Command.SetSleepMode:type_name -> ibeam_rawpanel.SleepMode
-	42,  // 7: ibeam_rawpanel.Command.SetSleepScreenSaver:type_name -> ibeam_rawpanel.SleepScreenSaver
-	43,  // 8: ibeam_rawpanel.Command.SetWebserverEnabled:type_name -> ibeam_rawpanel.WebserverState
-	46,  // 9: ibeam_rawpanel.Command.PanelBrightness:type_name -> ibeam_rawpanel.Brightness
-	44,  // 10: ibeam_rawpanel.Command.SetHeartBeatTimer:type_name -> ibeam_rawpanel.HeartBeatTimer
-	45,  // 11: ibeam_rawpanel.Command.SetDimmedGain:type_name -> ibeam_rawpanel.DimmedGain
-	47,  // 12: ibeam_rawpanel.Command.PublishSystemStat:type_name -> ibeam_rawpanel.PublishSystemStat
-	48,  // 13: ibeam_rawpanel.Command.LoadCPU:type_name -> ibeam_rawpanel.LoadCPU
-	38,  // 14: ibeam_rawpanel.Command.JSONconfig:type_name -> ibeam_rawpanel.JSONconfig
-	92,  // 15: ibeam_rawpanel.Command.SetCalibrationProfile:type_name -> ibeam_rawpanel.CalibrationProfile
-	75,  // 16: ibeam_rawpanel.Command.SimulateEnvironmentalHealth:type_name -> ibeam_rawpanel.Environment
-	94,  // 17: ibeam_rawpanel.Command.SetTouchUI:type_name -> ibeam_rawpanel.TouchUIConfig
-	96,  // 18: ibeam_rawpanel.Command.SetTouchUIActivePage:type_name -> ibeam_rawpanel.TouchUISetActivePage
+	39,  // 1: ibeam_rawpanel.InboundMessage.Command:type_name -> ibeam_rawpanel.Command
+	51,  // 2: ibeam_rawpanel.InboundMessage.States:type_name -> ibeam_rawpanel.HWCState
+	41,  // 3: ibeam_rawpanel.InboundMessage.Registers:type_name -> ibeam_rawpanel.Register
+	95,  // 4: ibeam_rawpanel.Command.SetNetworkConfig:type_name -> ibeam_rawpanel.NetworkConfig
+	42,  // 5: ibeam_rawpanel.Command.SetSleepTimeout:type_name -> ibeam_rawpanel.SleepTimeout
+	43,  // 6: ibeam_rawpanel.Command.SetSleepMode:type_name -> ibeam_rawpanel.SleepMode
+	44,  // 7: ibeam_rawpanel.Command.SetSleepScreenSaver:type_name -> ibeam_rawpanel.SleepScreenSaver
+	45,  // 8: ibeam_rawpanel.Command.SetWebserverEnabled:type_name -> ibeam_rawpanel.WebserverState
+	48,  // 9: ibeam_rawpanel.Command.PanelBrightness:type_name -> ibeam_rawpanel.Brightness
+	46,  // 10: ibeam_rawpanel.Command.SetHeartBeatTimer:type_name -> ibeam_rawpanel.HeartBeatTimer
+	47,  // 11: ibeam_rawpanel.Command.SetDimmedGain:type_name -> ibeam_rawpanel.DimmedGain
+	49,  // 12: ibeam_rawpanel.Command.PublishSystemStat:type_name -> ibeam_rawpanel.PublishSystemStat
+	50,  // 13: ibeam_rawpanel.Command.LoadCPU:type_name -> ibeam_rawpanel.LoadCPU
+	40,  // 14: ibeam_rawpanel.Command.JSONconfig:type_name -> ibeam_rawpanel.JSONconfig
+	94,  // 15: ibeam_rawpanel.Command.SetCalibrationProfile:type_name -> ibeam_rawpanel.CalibrationProfile
+	77,  // 16: ibeam_rawpanel.Command.SimulateEnvironmentalHealth:type_name -> ibeam_rawpanel.Environment
+	96,  // 17: ibeam_rawpanel.Command.SetTouchUI:type_name -> ibeam_rawpanel.TouchUIConfig
+	98,  // 18: ibeam_rawpanel.Command.SetTouchUIActivePage:type_name -> ibeam_rawpanel.TouchUISetActivePage
 	1,   // 19: ibeam_rawpanel.Register.Reg:type_name -> ibeam_rawpanel.Register.RegisterE
 	2,   // 20: ibeam_rawpanel.SleepMode.Mode:type_name -> ibeam_rawpanel.SleepMode.SlpMode
 	3,   // 21: ibeam_rawpanel.SleepScreenSaver.Type:type_name -> ibeam_rawpanel.SleepScreenSaver.SlpScrSaver
 	4,   // 22: ibeam_rawpanel.LoadCPU.Level:type_name -> ibeam_rawpanel.LoadCPU.LevelE
-	52,  // 23: ibeam_rawpanel.HWCState.HWCMode:type_name -> ibeam_rawpanel.HWCMode
-	57,  // 24: ibeam_rawpanel.HWCState.HWCColor:type_name -> ibeam_rawpanel.HWCColor
-	53,  // 25: ibeam_rawpanel.HWCState.HWCExtended:type_name -> ibeam_rawpanel.HWCExtended
-	61,  // 26: ibeam_rawpanel.HWCState.HWCText:type_name -> ibeam_rawpanel.HWCText
-	62,  // 27: ibeam_rawpanel.HWCState.HWCGfx:type_name -> ibeam_rawpanel.HWCGfx
-	51,  // 28: ibeam_rawpanel.HWCState.PublishRawADCValues:type_name -> ibeam_rawpanel.PublishRawADCValues
-	50,  // 29: ibeam_rawpanel.HWCState.Processors:type_name -> ibeam_rawpanel.Processors
-	63,  // 30: ibeam_rawpanel.HWCState.HWCOverlay:type_name -> ibeam_rawpanel.HWCOverlay
-	55,  // 31: ibeam_rawpanel.HWCState.HWCJog:type_name -> ibeam_rawpanel.HWCJog
-	56,  // 32: ibeam_rawpanel.HWCState.HWCDomain:type_name -> ibeam_rawpanel.HWCDomain
-	54,  // 33: ibeam_rawpanel.HWCState.HWCSegments:type_name -> ibeam_rawpanel.HWCSegments
-	64,  // 34: ibeam_rawpanel.Processors.GfxConv:type_name -> ibeam_rawpanel.ProcGfxConverter
-	65,  // 35: ibeam_rawpanel.Processors.AudioMeter:type_name -> ibeam_rawpanel.ProcAudioMeter
-	67,  // 36: ibeam_rawpanel.Processors.TextToGraphics:type_name -> ibeam_rawpanel.ProcTextToGraphics
-	66,  // 37: ibeam_rawpanel.Processors.StrengthMeter:type_name -> ibeam_rawpanel.ProcStrength
-	68,  // 38: ibeam_rawpanel.Processors.Test:type_name -> ibeam_rawpanel.ProcTest
-	69,  // 39: ibeam_rawpanel.Processors.UniText:type_name -> ibeam_rawpanel.ProcUniText
-	70,  // 40: ibeam_rawpanel.Processors.Icon:type_name -> ibeam_rawpanel.ProcIcon
+	54,  // 23: ibeam_rawpanel.HWCState.HWCMode:type_name -> ibeam_rawpanel.HWCMode
+	59,  // 24: ibeam_rawpanel.HWCState.HWCColor:type_name -> ibeam_rawpanel.HWCColor
+	55,  // 25: ibeam_rawpanel.HWCState.HWCExtended:type_name -> ibeam_rawpanel.HWCExtended
+	63,  // 26: ibeam_rawpanel.HWCState.HWCText:type_name -> ibeam_rawpanel.HWCText
+	64,  // 27: ibeam_rawpanel.HWCState.HWCGfx:type_name -> ibeam_rawpanel.HWCGfx
+	53,  // 28: ibeam_rawpanel.HWCState.PublishRawADCValues:type_name -> ibeam_rawpanel.PublishRawADCValues
+	52,  // 29: ibeam_rawpanel.HWCState.Processors:type_name -> ibeam_rawpanel.Processors
+	65,  // 30: ibeam_rawpanel.HWCState.HWCOverlay:type_name -> ibeam_rawpanel.HWCOverlay
+	57,  // 31: ibeam_rawpanel.HWCState.HWCJog:type_name -> ibeam_rawpanel.HWCJog
+	58,  // 32: ibeam_rawpanel.HWCState.HWCDomain:type_name -> ibeam_rawpanel.HWCDomain
+	56,  // 33: ibeam_rawpanel.HWCState.HWCSegments:type_name -> ibeam_rawpanel.HWCSegments
+	66,  // 34: ibeam_rawpanel.Processors.GfxConv:type_name -> ibeam_rawpanel.ProcGfxConverter
+	67,  // 35: ibeam_rawpanel.Processors.AudioMeter:type_name -> ibeam_rawpanel.ProcAudioMeter
+	69,  // 36: ibeam_rawpanel.Processors.TextToGraphics:type_name -> ibeam_rawpanel.ProcTextToGraphics
+	68,  // 37: ibeam_rawpanel.Processors.StrengthMeter:type_name -> ibeam_rawpanel.ProcStrength
+	70,  // 38: ibeam_rawpanel.Processors.Test:type_name -> ibeam_rawpanel.ProcTest
+	71,  // 39: ibeam_rawpanel.Processors.UniText:type_name -> ibeam_rawpanel.ProcUniText
+	72,  // 40: ibeam_rawpanel.Processors.Icon:type_name -> ibeam_rawpanel.ProcIcon
 	5,   // 41: ibeam_rawpanel.HWCMode.State:type_name -> ibeam_rawpanel.HWCMode.StateE
 	6,   // 42: ibeam_rawpanel.HWCExtended.Interpretation:type_name -> ibeam_rawpanel.HWCExtended.InterpretationE
-	105, // 43: ibeam_rawpanel.HWCSegments.Segments:type_name -> ibeam_rawpanel.HWCSegments.Segment
+	108, // 43: ibeam_rawpanel.HWCSegments.Segments:type_name -> ibeam_rawpanel.HWCSegments.Segment
 	7,   // 44: ibeam_rawpanel.HWCJog.Mode:type_name -> ibeam_rawpanel.HWCJog.ModeE
-	106, // 45: ibeam_rawpanel.HWCJog.TargetPosition:type_name -> ibeam_rawpanel.HWCJog.TargetPositionM
-	59,  // 46: ibeam_rawpanel.HWCColor.ColorRGB:type_name -> ibeam_rawpanel.ColorRGB
-	60,  // 47: ibeam_rawpanel.HWCColor.ColorIndex:type_name -> ibeam_rawpanel.ColorIndex
-	59,  // 48: ibeam_rawpanel.Color.ColorRGB:type_name -> ibeam_rawpanel.ColorRGB
-	60,  // 49: ibeam_rawpanel.Color.ColorIndex:type_name -> ibeam_rawpanel.ColorIndex
+	109, // 45: ibeam_rawpanel.HWCJog.TargetPosition:type_name -> ibeam_rawpanel.HWCJog.TargetPositionM
+	61,  // 46: ibeam_rawpanel.HWCColor.ColorRGB:type_name -> ibeam_rawpanel.ColorRGB
+	62,  // 47: ibeam_rawpanel.HWCColor.ColorIndex:type_name -> ibeam_rawpanel.ColorIndex
+	61,  // 48: ibeam_rawpanel.Color.ColorRGB:type_name -> ibeam_rawpanel.ColorRGB
+	62,  // 49: ibeam_rawpanel.Color.ColorIndex:type_name -> ibeam_rawpanel.ColorIndex
 	8,   // 50: ibeam_rawpanel.ColorIndex.Index:type_name -> ibeam_rawpanel.ColorIndex.Colors
 	9,   // 51: ibeam_rawpanel.HWCText.Formatting:type_name -> ibeam_rawpanel.HWCText.FormattingE
 	10,  // 52: ibeam_rawpanel.HWCText.StateIcon:type_name -> ibeam_rawpanel.HWCText.StateIconE
 	11,  // 53: ibeam_rawpanel.HWCText.ModifierIcon:type_name -> ibeam_rawpanel.HWCText.ModifierIconE
 	12,  // 54: ibeam_rawpanel.HWCText.PairMode:type_name -> ibeam_rawpanel.HWCText.PairModeE
-	107, // 55: ibeam_rawpanel.HWCText.Scale:type_name -> ibeam_rawpanel.HWCText.ScaleM
-	108, // 56: ibeam_rawpanel.HWCText.TextStyling:type_name -> ibeam_rawpanel.HWCText.TextStyle
-	58,  // 57: ibeam_rawpanel.HWCText.PixelColor:type_name -> ibeam_rawpanel.Color
-	58,  // 58: ibeam_rawpanel.HWCText.BackgroundColor:type_name -> ibeam_rawpanel.Color
+	110, // 55: ibeam_rawpanel.HWCText.Scale:type_name -> ibeam_rawpanel.HWCText.ScaleM
+	111, // 56: ibeam_rawpanel.HWCText.TextStyling:type_name -> ibeam_rawpanel.HWCText.TextStyle
+	60,  // 57: ibeam_rawpanel.HWCText.PixelColor:type_name -> ibeam_rawpanel.Color
+	60,  // 58: ibeam_rawpanel.HWCText.BackgroundColor:type_name -> ibeam_rawpanel.Color
 	15,  // 59: ibeam_rawpanel.HWCGfx.ImageType:type_name -> ibeam_rawpanel.HWCGfx.ImageTypeE
-	110, // 60: ibeam_rawpanel.HWCOverlay.Boxes:type_name -> ibeam_rawpanel.HWCOverlay.Box
+	113, // 60: ibeam_rawpanel.HWCOverlay.Boxes:type_name -> ibeam_rawpanel.HWCOverlay.Box
 	16,  // 61: ibeam_rawpanel.ProcGfxConverter.ImageType:type_name -> ibeam_rawpanel.ProcGfxConverter.ImageTypeE
 	17,  // 62: ibeam_rawpanel.ProcGfxConverter.Scaling:type_name -> ibeam_rawpanel.ProcGfxConverter.ScalingE
 	18,  // 63: ibeam_rawpanel.ProcAudioMeter.MeterType:type_name -> ibeam_rawpanel.ProcAudioMeter.MeterTypeE
 	19,  // 64: ibeam_rawpanel.ProcUniText.Align:type_name -> ibeam_rawpanel.ProcUniText.AlignTypeE
 	20,  // 65: ibeam_rawpanel.ProcIcon.IconType:type_name -> ibeam_rawpanel.ProcIcon.ImageTypeE
 	21,  // 66: ibeam_rawpanel.OutboundMessage.FlowMessage:type_name -> ibeam_rawpanel.OutboundMessage.FlowMsg
-	111, // 67: ibeam_rawpanel.OutboundMessage.HWCavailability:type_name -> ibeam_rawpanel.OutboundMessage.HWCavailabilityEntry
-	88,  // 68: ibeam_rawpanel.OutboundMessage.PanelInfo:type_name -> ibeam_rawpanel.PanelInfo
-	90,  // 69: ibeam_rawpanel.OutboundMessage.PanelTopology:type_name -> ibeam_rawpanel.PanelTopology
-	91,  // 70: ibeam_rawpanel.OutboundMessage.BurninProfile:type_name -> ibeam_rawpanel.BurninProfile
-	40,  // 71: ibeam_rawpanel.OutboundMessage.SleepTimeout:type_name -> ibeam_rawpanel.SleepTimeout
-	72,  // 72: ibeam_rawpanel.OutboundMessage.SleepState:type_name -> ibeam_rawpanel.SleepState
-	77,  // 73: ibeam_rawpanel.OutboundMessage.BusStatus:type_name -> ibeam_rawpanel.BusStatus
-	78,  // 74: ibeam_rawpanel.OutboundMessage.Events:type_name -> ibeam_rawpanel.HWCEvent
-	73,  // 75: ibeam_rawpanel.OutboundMessage.Connections:type_name -> ibeam_rawpanel.Connections
-	44,  // 76: ibeam_rawpanel.OutboundMessage.HeartBeatTimer:type_name -> ibeam_rawpanel.HeartBeatTimer
-	45,  // 77: ibeam_rawpanel.OutboundMessage.DimmedGain:type_name -> ibeam_rawpanel.DimmedGain
-	76,  // 78: ibeam_rawpanel.OutboundMessage.RunTimeStats:type_name -> ibeam_rawpanel.RunTimeStats
-	87,  // 79: ibeam_rawpanel.OutboundMessage.SysStat:type_name -> ibeam_rawpanel.SystemStat
-	74,  // 80: ibeam_rawpanel.OutboundMessage.Message:type_name -> ibeam_rawpanel.Message
-	74,  // 81: ibeam_rawpanel.OutboundMessage.ErrorMessage:type_name -> ibeam_rawpanel.Message
-	75,  // 82: ibeam_rawpanel.OutboundMessage.EnvironmentalHealth:type_name -> ibeam_rawpanel.Environment
-	39,  // 83: ibeam_rawpanel.OutboundMessage.Registers:type_name -> ibeam_rawpanel.Register
-	92,  // 84: ibeam_rawpanel.OutboundMessage.CalibrationProfile:type_name -> ibeam_rawpanel.CalibrationProfile
-	92,  // 85: ibeam_rawpanel.OutboundMessage.DefaultCalibrationProfile:type_name -> ibeam_rawpanel.CalibrationProfile
-	93,  // 86: ibeam_rawpanel.OutboundMessage.NetworkConfig:type_name -> ibeam_rawpanel.NetworkConfig
-	103, // 87: ibeam_rawpanel.OutboundMessage.TouchUICapabilities:type_name -> ibeam_rawpanel.TouchUICapabilities
-	94,  // 88: ibeam_rawpanel.OutboundMessage.TouchUIConfig:type_name -> ibeam_rawpanel.TouchUIConfig
-	97,  // 89: ibeam_rawpanel.OutboundMessage.TouchUIActivePage:type_name -> ibeam_rawpanel.TouchUIActivePage
+	114, // 67: ibeam_rawpanel.OutboundMessage.HWCavailability:type_name -> ibeam_rawpanel.OutboundMessage.HWCavailabilityEntry
+	90,  // 68: ibeam_rawpanel.OutboundMessage.PanelInfo:type_name -> ibeam_rawpanel.PanelInfo
+	92,  // 69: ibeam_rawpanel.OutboundMessage.PanelTopology:type_name -> ibeam_rawpanel.PanelTopology
+	93,  // 70: ibeam_rawpanel.OutboundMessage.BurninProfile:type_name -> ibeam_rawpanel.BurninProfile
+	42,  // 71: ibeam_rawpanel.OutboundMessage.SleepTimeout:type_name -> ibeam_rawpanel.SleepTimeout
+	74,  // 72: ibeam_rawpanel.OutboundMessage.SleepState:type_name -> ibeam_rawpanel.SleepState
+	79,  // 73: ibeam_rawpanel.OutboundMessage.BusStatus:type_name -> ibeam_rawpanel.BusStatus
+	80,  // 74: ibeam_rawpanel.OutboundMessage.Events:type_name -> ibeam_rawpanel.HWCEvent
+	75,  // 75: ibeam_rawpanel.OutboundMessage.Connections:type_name -> ibeam_rawpanel.Connections
+	46,  // 76: ibeam_rawpanel.OutboundMessage.HeartBeatTimer:type_name -> ibeam_rawpanel.HeartBeatTimer
+	47,  // 77: ibeam_rawpanel.OutboundMessage.DimmedGain:type_name -> ibeam_rawpanel.DimmedGain
+	78,  // 78: ibeam_rawpanel.OutboundMessage.RunTimeStats:type_name -> ibeam_rawpanel.RunTimeStats
+	89,  // 79: ibeam_rawpanel.OutboundMessage.SysStat:type_name -> ibeam_rawpanel.SystemStat
+	76,  // 80: ibeam_rawpanel.OutboundMessage.Message:type_name -> ibeam_rawpanel.Message
+	76,  // 81: ibeam_rawpanel.OutboundMessage.ErrorMessage:type_name -> ibeam_rawpanel.Message
+	77,  // 82: ibeam_rawpanel.OutboundMessage.EnvironmentalHealth:type_name -> ibeam_rawpanel.Environment
+	41,  // 83: ibeam_rawpanel.OutboundMessage.Registers:type_name -> ibeam_rawpanel.Register
+	94,  // 84: ibeam_rawpanel.OutboundMessage.CalibrationProfile:type_name -> ibeam_rawpanel.CalibrationProfile
+	94,  // 85: ibeam_rawpanel.OutboundMessage.DefaultCalibrationProfile:type_name -> ibeam_rawpanel.CalibrationProfile
+	95,  // 86: ibeam_rawpanel.OutboundMessage.NetworkConfig:type_name -> ibeam_rawpanel.NetworkConfig
+	106, // 87: ibeam_rawpanel.OutboundMessage.TouchUICapabilities:type_name -> ibeam_rawpanel.TouchUICapabilities
+	96,  // 88: ibeam_rawpanel.OutboundMessage.TouchUIConfig:type_name -> ibeam_rawpanel.TouchUIConfig
+	99,  // 89: ibeam_rawpanel.OutboundMessage.TouchUIActivePage:type_name -> ibeam_rawpanel.TouchUIActivePage
 	22,  // 90: ibeam_rawpanel.Environment.RunMode:type_name -> ibeam_rawpanel.Environment.RunModeE
-	79,  // 91: ibeam_rawpanel.HWCEvent.Binary:type_name -> ibeam_rawpanel.BinaryEvent
-	80,  // 92: ibeam_rawpanel.HWCEvent.Pulsed:type_name -> ibeam_rawpanel.PulsedEvent
-	81,  // 93: ibeam_rawpanel.HWCEvent.Absolute:type_name -> ibeam_rawpanel.AbsoluteEvent
-	82,  // 94: ibeam_rawpanel.HWCEvent.Speed:type_name -> ibeam_rawpanel.SpeedEvent
-	83,  // 95: ibeam_rawpanel.HWCEvent.AbsoluteVector:type_name -> ibeam_rawpanel.AbsoluteVectorEvent
-	84,  // 96: ibeam_rawpanel.HWCEvent.SpeedVector:type_name -> ibeam_rawpanel.SpeedVectorEvent
-	85,  // 97: ibeam_rawpanel.HWCEvent.Text:type_name -> ibeam_rawpanel.TextEvent
-	86,  // 98: ibeam_rawpanel.HWCEvent.RawAnalog:type_name -> ibeam_rawpanel.RawAnalogEvent
+	81,  // 91: ibeam_rawpanel.HWCEvent.Binary:type_name -> ibeam_rawpanel.BinaryEvent
+	82,  // 92: ibeam_rawpanel.HWCEvent.Pulsed:type_name -> ibeam_rawpanel.PulsedEvent
+	83,  // 93: ibeam_rawpanel.HWCEvent.Absolute:type_name -> ibeam_rawpanel.AbsoluteEvent
+	84,  // 94: ibeam_rawpanel.HWCEvent.Speed:type_name -> ibeam_rawpanel.SpeedEvent
+	85,  // 95: ibeam_rawpanel.HWCEvent.AbsoluteVector:type_name -> ibeam_rawpanel.AbsoluteVectorEvent
+	86,  // 96: ibeam_rawpanel.HWCEvent.SpeedVector:type_name -> ibeam_rawpanel.SpeedVectorEvent
+	87,  // 97: ibeam_rawpanel.HWCEvent.Text:type_name -> ibeam_rawpanel.TextEvent
+	88,  // 98: ibeam_rawpanel.HWCEvent.RawAnalog:type_name -> ibeam_rawpanel.RawAnalogEvent
 	23,  // 99: ibeam_rawpanel.BinaryEvent.Edge:type_name -> ibeam_rawpanel.BinaryEvent.EdgeID
 	24,  // 100: ibeam_rawpanel.PanelInfo.PanelType:type_name -> ibeam_rawpanel.PanelInfo.PanelTypeE
-	89,  // 101: ibeam_rawpanel.PanelInfo.RawPanelSupport:type_name -> ibeam_rawpanel.RawPanelSupport
-	98,  // 102: ibeam_rawpanel.TouchUIConfig.Pages:type_name -> ibeam_rawpanel.TouchUIPage
-	95,  // 103: ibeam_rawpanel.TouchUIConfig.Options:type_name -> ibeam_rawpanel.TouchUIGlobalOptions
+	91,  // 101: ibeam_rawpanel.PanelInfo.RawPanelSupport:type_name -> ibeam_rawpanel.RawPanelSupport
+	100, // 102: ibeam_rawpanel.TouchUIConfig.Pages:type_name -> ibeam_rawpanel.TouchUIPage
+	97,  // 103: ibeam_rawpanel.TouchUIConfig.Options:type_name -> ibeam_rawpanel.TouchUIGlobalOptions
 	25,  // 104: ibeam_rawpanel.TouchUIGlobalOptions.ShowTaps:type_name -> ibeam_rawpanel.TouchUIGlobalOptions.ShowTapsE
 	26,  // 105: ibeam_rawpanel.TouchUIGlobalOptions.DisplayOrientation:type_name -> ibeam_rawpanel.TouchUIGlobalOptions.DisplayOrientationE
 	27,  // 106: ibeam_rawpanel.TouchUIGlobalOptions.PageSelectorLocation:type_name -> ibeam_rawpanel.TouchUIGlobalOptions.ChromeLocationE
 	27,  // 107: ibeam_rawpanel.TouchUIGlobalOptions.ConfigMenuLocation:type_name -> ibeam_rawpanel.TouchUIGlobalOptions.ChromeLocationE
-	58,  // 108: ibeam_rawpanel.TouchUIGlobalOptions.PageSelectorColor:type_name -> ibeam_rawpanel.Color
-	99,  // 109: ibeam_rawpanel.TouchUIPage.Widgets:type_name -> ibeam_rawpanel.TouchUIWidget
+	60,  // 108: ibeam_rawpanel.TouchUIGlobalOptions.PageSelectorColor:type_name -> ibeam_rawpanel.Color
+	101, // 109: ibeam_rawpanel.TouchUIPage.Widgets:type_name -> ibeam_rawpanel.TouchUIWidget
 	28,  // 110: ibeam_rawpanel.TouchUIWidget.Type:type_name -> ibeam_rawpanel.TouchUIWidget.WidgetTypeE
-	100, // 111: ibeam_rawpanel.TouchUIWidget.Options:type_name -> ibeam_rawpanel.TouchUIWidgetOptions
-	58,  // 112: ibeam_rawpanel.TouchUIWidgetOptions.Color:type_name -> ibeam_rawpanel.Color
+	102, // 111: ibeam_rawpanel.TouchUIWidget.Options:type_name -> ibeam_rawpanel.TouchUIWidgetOptions
+	60,  // 112: ibeam_rawpanel.TouchUIWidgetOptions.Color:type_name -> ibeam_rawpanel.Color
 	29,  // 113: ibeam_rawpanel.TouchUIWidgetOptions.SliderVariant:type_name -> ibeam_rawpanel.TouchUIWidgetOptions.SliderVariantE
 	30,  // 114: ibeam_rawpanel.TouchUIWidgetOptions.KnobVariant:type_name -> ibeam_rawpanel.TouchUIWidgetOptions.KnobVariantE
-	102, // 115: ibeam_rawpanel.TouchUIWidgetOptions.Params:type_name -> ibeam_rawpanel.TouchUICompressorParam
-	31,  // 116: ibeam_rawpanel.TouchUIWidgetOptions.EditKind:type_name -> ibeam_rawpanel.TouchUIWidgetOptions.EditKindE
-	32,  // 117: ibeam_rawpanel.TouchUIWidgetOptions.LabelAlign:type_name -> ibeam_rawpanel.TouchUIWidgetOptions.LabelAlignE
-	33,  // 118: ibeam_rawpanel.TouchUIWidgetOptions.HiddenPolicy:type_name -> ibeam_rawpanel.TouchUIWidgetOptions.HiddenPolicyE
-	34,  // 119: ibeam_rawpanel.TouchUIWidgetOptions.Scaling:type_name -> ibeam_rawpanel.TouchUIWidgetOptions.ScalingE
-	101, // 120: ibeam_rawpanel.TouchUIWidgetOptions.Markers:type_name -> ibeam_rawpanel.TouchUIMarker
-	58,  // 121: ibeam_rawpanel.TouchUIMarker.Color:type_name -> ibeam_rawpanel.Color
-	35,  // 122: ibeam_rawpanel.TouchUICompressorParam.Role:type_name -> ibeam_rawpanel.TouchUICompressorParam.RoleE
-	104, // 123: ibeam_rawpanel.TouchUICapabilities.WidgetTypes:type_name -> ibeam_rawpanel.TouchUIWidgetTypeCap
-	26,  // 124: ibeam_rawpanel.TouchUICapabilities.CurrentOrientation:type_name -> ibeam_rawpanel.TouchUIGlobalOptions.DisplayOrientationE
-	28,  // 125: ibeam_rawpanel.TouchUIWidgetTypeCap.Type:type_name -> ibeam_rawpanel.TouchUIWidget.WidgetTypeE
-	52,  // 126: ibeam_rawpanel.HWCSegments.Segment.HWCMode:type_name -> ibeam_rawpanel.HWCMode
-	57,  // 127: ibeam_rawpanel.HWCSegments.Segment.HWCColor:type_name -> ibeam_rawpanel.HWCColor
-	13,  // 128: ibeam_rawpanel.HWCText.ScaleM.ScaleType:type_name -> ibeam_rawpanel.HWCText.ScaleM.ScaleTypeE
-	109, // 129: ibeam_rawpanel.HWCText.TextStyle.TitleFont:type_name -> ibeam_rawpanel.HWCText.TextStyle.Font
-	109, // 130: ibeam_rawpanel.HWCText.TextStyle.TextFont:type_name -> ibeam_rawpanel.HWCText.TextStyle.Font
-	14,  // 131: ibeam_rawpanel.HWCText.TextStyle.Font.FontFace:type_name -> ibeam_rawpanel.HWCText.TextStyle.Font.FontFaceE
-	58,  // 132: ibeam_rawpanel.HWCOverlay.Box.Color:type_name -> ibeam_rawpanel.Color
-	133, // [133:133] is the sub-list for method output_type
-	133, // [133:133] is the sub-list for method input_type
-	133, // [133:133] is the sub-list for extension type_name
-	133, // [133:133] is the sub-list for extension extendee
-	0,   // [0:133] is the sub-list for field type_name
+	104, // 115: ibeam_rawpanel.TouchUIWidgetOptions.Params:type_name -> ibeam_rawpanel.TouchUICompressorParam
+	105, // 116: ibeam_rawpanel.TouchUIWidgetOptions.EqBands:type_name -> ibeam_rawpanel.TouchUIEqualizerParam
+	31,  // 117: ibeam_rawpanel.TouchUIWidgetOptions.EditKind:type_name -> ibeam_rawpanel.TouchUIWidgetOptions.EditKindE
+	32,  // 118: ibeam_rawpanel.TouchUIWidgetOptions.LabelAlign:type_name -> ibeam_rawpanel.TouchUIWidgetOptions.LabelAlignE
+	33,  // 119: ibeam_rawpanel.TouchUIWidgetOptions.HiddenPolicy:type_name -> ibeam_rawpanel.TouchUIWidgetOptions.HiddenPolicyE
+	34,  // 120: ibeam_rawpanel.TouchUIWidgetOptions.Scaling:type_name -> ibeam_rawpanel.TouchUIWidgetOptions.ScalingE
+	103, // 121: ibeam_rawpanel.TouchUIWidgetOptions.Markers:type_name -> ibeam_rawpanel.TouchUIMarker
+	60,  // 122: ibeam_rawpanel.TouchUIMarker.Color:type_name -> ibeam_rawpanel.Color
+	35,  // 123: ibeam_rawpanel.TouchUICompressorParam.Role:type_name -> ibeam_rawpanel.TouchUICompressorParam.RoleE
+	36,  // 124: ibeam_rawpanel.TouchUIEqualizerParam.Role:type_name -> ibeam_rawpanel.TouchUIEqualizerParam.RoleE
+	107, // 125: ibeam_rawpanel.TouchUICapabilities.WidgetTypes:type_name -> ibeam_rawpanel.TouchUIWidgetTypeCap
+	26,  // 126: ibeam_rawpanel.TouchUICapabilities.CurrentOrientation:type_name -> ibeam_rawpanel.TouchUIGlobalOptions.DisplayOrientationE
+	28,  // 127: ibeam_rawpanel.TouchUIWidgetTypeCap.Type:type_name -> ibeam_rawpanel.TouchUIWidget.WidgetTypeE
+	54,  // 128: ibeam_rawpanel.HWCSegments.Segment.HWCMode:type_name -> ibeam_rawpanel.HWCMode
+	59,  // 129: ibeam_rawpanel.HWCSegments.Segment.HWCColor:type_name -> ibeam_rawpanel.HWCColor
+	13,  // 130: ibeam_rawpanel.HWCText.ScaleM.ScaleType:type_name -> ibeam_rawpanel.HWCText.ScaleM.ScaleTypeE
+	112, // 131: ibeam_rawpanel.HWCText.TextStyle.TitleFont:type_name -> ibeam_rawpanel.HWCText.TextStyle.Font
+	112, // 132: ibeam_rawpanel.HWCText.TextStyle.TextFont:type_name -> ibeam_rawpanel.HWCText.TextStyle.Font
+	14,  // 133: ibeam_rawpanel.HWCText.TextStyle.Font.FontFace:type_name -> ibeam_rawpanel.HWCText.TextStyle.Font.FontFaceE
+	60,  // 134: ibeam_rawpanel.HWCOverlay.Box.Color:type_name -> ibeam_rawpanel.Color
+	135, // [135:135] is the sub-list for method output_type
+	135, // [135:135] is the sub-list for method input_type
+	135, // [135:135] is the sub-list for extension type_name
+	135, // [135:135] is the sub-list for extension extendee
+	0,   // [0:135] is the sub-list for field type_name
 }
 
 func init() { file_ibeam_rawpanel_proto_ibeam_rawpanel_proto_init() }
@@ -9222,8 +9476,8 @@ func file_ibeam_rawpanel_proto_ibeam_rawpanel_proto_init() {
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_ibeam_rawpanel_proto_ibeam_rawpanel_proto_rawDesc), len(file_ibeam_rawpanel_proto_ibeam_rawpanel_proto_rawDesc)),
-			NumEnums:      36,
-			NumMessages:   76,
+			NumEnums:      38,
+			NumMessages:   77,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

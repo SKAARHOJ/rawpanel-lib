@@ -48,6 +48,20 @@ func ConfigToWidgetTree(cfg *rwp.TouchUIConfig, epoch uint32, resolve FeedResolv
 					tree.Markers = append(tree.Markers, markerToDef(m, widget.GetHWCID()))
 				}
 			}
+			if widget.GetType() == rwp.TouchUIWidget_EQUALIZER {
+				// Flat on the tree for the same reason markers are, each carrying its
+				// equalizer's id. The protocol's own list is already flat, so nothing is
+				// being flattened here — only re-parented.
+				// Truncation rather than an error: ConfigToWidgetTree also runs on
+				// panel-local configs that never passed Validate, and nanopb would drop
+				// the overflow silently at the far end anyway.
+				for _, p := range widget.GetOptions().GetEqBands() {
+					if len(tree.EqBands) >= MaxEqParamsAll {
+						break
+					}
+					tree.EqBands = append(tree.EqBands, eqBandToDef(p, widget.GetHWCID()))
+				}
+			}
 			pageDef.Widgets = append(pageDef.Widgets, def)
 		}
 		tree.Pages = append(tree.Pages, pageDef)
@@ -307,6 +321,41 @@ func compressorParams(params []*rwp.TouchUICompressorParam) []*gen.CompressorPar
 		})
 	}
 	return out
+}
+
+// eqRoleDefaults is the natural-unit range each equalizer role gets when a client leaves
+// Min/Max at 0/0, resolved here for the same reason the compressor's are: the renderer carries
+// no role table. Q is in tenths (0.1..10.0) and SHAPE spans the ShapeE enum.
+var eqRoleDefaults = map[rwp.TouchUIEqualizerParam_RoleE][2]int32{
+	rwp.TouchUIEqualizerParam_FREQ:  {20, 20000}, // Hz, mapped logarithmically
+	rwp.TouchUIEqualizerParam_GAIN:  {-18, 18},   // dB
+	rwp.TouchUIEqualizerParam_Q:     {1, 100},    // Q x10
+	rwp.TouchUIEqualizerParam_SHAPE: {0, 5},      // ShapeE
+}
+
+// eqBandToDef translates one equalizer band parameter, binding it to the EQUALIZER it belongs
+// to. Role defaults are resolved here; everything that varies at runtime arrives later as
+// ordinary per-HWC state under the parameter's own id.
+func eqBandToDef(p *rwp.TouchUIEqualizerParam, eqHWC uint32) *gen.EqBandParam {
+	min, max := p.GetMin(), p.GetMax()
+	if min == 0 && max == 0 {
+		if def, ok := eqRoleDefaults[p.GetRole()]; ok {
+			min, max = def[0], def[1]
+		}
+	}
+	label := p.GetLabel()
+	if len(label) > MaxParamLabelLen {
+		label = label[:MaxParamLabelLen]
+	}
+	return &gen.EqBandParam{
+		HwcId:   p.GetHWCID(),
+		EqHwcId: eqHWC,
+		Band:    p.GetBand(),
+		Role:    gen.EqBandParam_Role(p.GetRole()),
+		Min:     min,
+		Max:     max,
+		Label:   label,
+	}
 }
 
 // markerToDef translates one overlay marker, binding it to the VIDEO widget it draws on. Only
