@@ -374,6 +374,42 @@ func TestValidateRejects(t *testing.T) {
 				{HWCID: 401, Role: rwp.TouchUICompressorParam_RATIO},
 			}
 		},
+		"equalizer without bands": func(c *rwp.TouchUIConfig) {
+			c.Pages[0].Widgets[0].Type = rwp.TouchUIWidget_EQUALIZER
+		},
+		// Band and Role together are the key, so the same pair twice is two faders
+		// claiming one handle on the curve.
+		"equalizer with a duplicate role on one band": func(c *rwp.TouchUIConfig) {
+			c.Pages[0].Widgets[0].Type = rwp.TouchUIWidget_EQUALIZER
+			c.Pages[0].Widgets[0].Options.EqBands = []*rwp.TouchUIEqualizerParam{
+				{HWCID: 401, Band: 1, Role: rwp.TouchUIEqualizerParam_FREQ},
+				{HWCID: 402, Band: 1, Role: rwp.TouchUIEqualizerParam_FREQ},
+			}
+		},
+		"equalizer band param colliding with a widget": func(c *rwp.TouchUIConfig) {
+			c.Pages[0].Widgets[0].Type = rwp.TouchUIWidget_EQUALIZER
+			c.Pages[0].Widgets[0].Options.EqBands = []*rwp.TouchUIEqualizerParam{
+				{HWCID: 203, Band: 1, Role: rwp.TouchUIEqualizerParam_FREQ}, // 203 is a VIDEO widget
+			}
+		},
+		"equalizer band number outside the range": func(c *rwp.TouchUIConfig) {
+			c.Pages[0].Widgets[0].Type = rwp.TouchUIWidget_EQUALIZER
+			c.Pages[0].Widgets[0].Options.EqBands = []*rwp.TouchUIEqualizerParam{
+				{HWCID: 401, Band: MaxEqBands + 1, Role: rwp.TouchUIEqualizerParam_FREQ},
+			}
+		},
+		// A logarithmic axis cannot start at 0 Hz: the decade count through it is undefined.
+		"equalizer freq range reaching 0 Hz": func(c *rwp.TouchUIConfig) {
+			c.Pages[0].Widgets[0].Type = rwp.TouchUIWidget_EQUALIZER
+			c.Pages[0].Widgets[0].Options.EqBands = []*rwp.TouchUIEqualizerParam{
+				{HWCID: 401, Band: 1, Role: rwp.TouchUIEqualizerParam_FREQ, Min: 0, Max: 20000},
+			}
+		},
+		"eqbands on a non-equalizer": func(c *rwp.TouchUIConfig) {
+			c.Pages[0].Widgets[0].Options.EqBands = []*rwp.TouchUIEqualizerParam{
+				{HWCID: 401, Band: 1, Role: rwp.TouchUIEqualizerParam_FREQ},
+			}
+		},
 		"editkind on a non-label": func(c *rwp.TouchUIConfig) {
 			c.Pages[0].Widgets[0].Options.EditKind = rwp.TouchUIWidgetOptions_TEXT
 		},

@@ -54,9 +54,10 @@ func defaultEventMask(w *rwp.TouchUIWidget) uint32 {
 		}
 		return helpers.TouchUIEventBinary
 	default:
-		// METER and COMPRESSOR are passive containers; anything the protocol grows
-		// later is treated as passive until it is taught here, which fails quiet
-		// rather than claiming an ability the panel does not implement.
+		// METER, COMPRESSOR and EQUALIZER are passive containers — the last two emit
+		// through their member parameters' own ids, never their own. Anything the
+		// protocol grows later is treated as passive until it is taught here, which
+		// fails quiet rather than claiming an ability the panel does not implement.
 		return 0
 	}
 }

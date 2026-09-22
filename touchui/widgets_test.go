@@ -155,6 +155,59 @@ func TestCompressorRoleDefaults(t *testing.T) {
 	}
 }
 
+// Same contract as the compressor's roles, one layer along: 0/0 means "panel default",
+// an explicit range survives, and the parameter is re-parented onto its equalizer.
+func TestEqBandRoleDefaults(t *testing.T) {
+	freq := eqBandToDef(&rwp.TouchUIEqualizerParam{HWCID: 401, Band: 1, Role: rwp.TouchUIEqualizerParam_FREQ}, 310)
+	if freq.GetMin() != 20 || freq.GetMax() != 20000 {
+		t.Errorf("freq default = %d..%d, want 20..20000", freq.GetMin(), freq.GetMax())
+	}
+	if freq.GetEqHwcId() != 310 {
+		t.Errorf("parent equalizer = %d, want 310", freq.GetEqHwcId())
+	}
+	if freq.GetBand() != 1 {
+		t.Errorf("band = %d, want 1", freq.GetBand())
+	}
+
+	// Q is carried in tenths, so the default spans 0.1..10.0 rather than an integer range
+	// that could never describe a wide bell.
+	q := eqBandToDef(&rwp.TouchUIEqualizerParam{HWCID: 402, Band: 1, Role: rwp.TouchUIEqualizerParam_Q}, 310)
+	if q.GetMin() != 1 || q.GetMax() != 100 {
+		t.Errorf("q default = %d..%d, want 1..100", q.GetMin(), q.GetMax())
+	}
+
+	gain := eqBandToDef(&rwp.TouchUIEqualizerParam{HWCID: 403, Band: 2, Role: rwp.TouchUIEqualizerParam_GAIN, Min: -6, Max: 6}, 310)
+	if gain.GetMin() != -6 || gain.GetMax() != 6 {
+		t.Errorf("explicit range was overwritten: %d..%d", gain.GetMin(), gain.GetMax())
+	}
+}
+
+// Band parameters ride the tree flat, like markers, because a repeated field on WidgetDef is
+// multiplied ~192x in the static size. Each one has to carry its parent's id to get home.
+func TestEqBandsRideTheTreeFlat(t *testing.T) {
+	tree := ConfigToWidgetTree(&rwp.TouchUIConfig{
+		Pages: []*rwp.TouchUIPage{{
+			Id: 1, GridRows: 1, GridCols: 1,
+			Widgets: []*rwp.TouchUIWidget{
+				{HWCID: 310, Type: rwp.TouchUIWidget_EQUALIZER, Row: 1, Col: 1,
+					Options: &rwp.TouchUIWidgetOptions{EqBands: []*rwp.TouchUIEqualizerParam{
+						{HWCID: 401, Band: 1, Role: rwp.TouchUIEqualizerParam_FREQ},
+						{HWCID: 402, Band: 1, Role: rwp.TouchUIEqualizerParam_GAIN},
+					}}},
+			},
+		}},
+	}, 1, nil)
+
+	if len(tree.GetEqBands()) != 2 {
+		t.Fatalf("got %d band params on the tree", len(tree.GetEqBands()))
+	}
+	for _, p := range tree.GetEqBands() {
+		if p.GetEqHwcId() != 310 {
+			t.Errorf("band param %d points at equalizer %d, want 310", p.GetHwcId(), p.GetEqHwcId())
+		}
+	}
+}
+
 // An XYPAD's two axes must travel together, and the mode decides which rwp
 // message carries them.
 func TestEventToRWPVectorAndText(t *testing.T) {

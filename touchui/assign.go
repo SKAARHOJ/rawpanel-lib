@@ -8,11 +8,12 @@ import rwp "github.com/SKAARHOJ/rawpanel-lib/ibeam_rawpanel"
 // (a 0 id is reserved and would fail Validate); Reactor fills them in before pushing.
 const HWCIDBase = 100
 
-// AssignHWCIDs fills in an HWC id for every widget, VIDEO marker and compressor member left
-// at 0, so the config passes Validate and folds into the topology without colliding. Markers
-// and members are addressable HWCs in the same id space as the widgets, which is why all
-// three kinds claim their non-zero ids up front: an id hand-assigned to any of them must
-// never be handed out again, or Validate rejects the collision and the config will not push.
+// AssignHWCIDs fills in an HWC id for every widget, VIDEO marker, compressor member and
+// equalizer band parameter left at 0, so the config passes Validate and folds into the
+// topology without colliding. All of them are addressable HWCs in the same id space as the
+// widgets, which is why every kind claims its non-zero ids up front: an id hand-assigned to
+// any of them must never be handed out again, or Validate rejects the collision and the
+// config will not push.
 // New ids start at HWCIDBase and skip any already in use. Returns true if any id was
 // assigned.
 func AssignHWCIDs(cfg *rwp.TouchUIConfig) bool {
@@ -29,6 +30,11 @@ func AssignHWCIDs(cfg *rwp.TouchUIConfig) bool {
 			}
 			for _, m := range widget.GetOptions().GetMarkers() {
 				if id := m.GetHWCID(); id != 0 {
+					used[id] = true
+				}
+			}
+			for _, p := range widget.GetOptions().GetEqBands() {
+				if id := p.GetHWCID(); id != 0 {
 					used[id] = true
 				}
 			}
@@ -59,6 +65,11 @@ func AssignHWCIDs(cfg *rwp.TouchUIConfig) bool {
 				}
 			}
 			for _, p := range widget.GetOptions().GetParams() {
+				if p.GetHWCID() == 0 {
+					p.HWCID = claim()
+				}
+			}
+			for _, p := range widget.GetOptions().GetEqBands() {
 				if p.GetHWCID() == 0 {
 					p.HWCID = claim()
 				}

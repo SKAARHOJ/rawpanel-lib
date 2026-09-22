@@ -35,6 +35,10 @@ const (
 	MaxParamLabelLen    = 15
 	MaxEditLen          = 63 // LABEL: Options.EditMaxLen ceiling
 
+	MaxEqBands     = 8  // EQUALIZER: distinct Band numbers on one widget
+	MaxEqParams    = 32 // EQUALIZER: entries in Options.EqBands on one widget (8 bands x 4 roles)
+	MaxEqParamsAll = 32 // ...and across the whole config, matching the tree's static cap
+
 	MaxMarkersPerWidget = 8  // VIDEO: Options.Markers on one widget
 	MaxMarkers          = 16 // VIDEO: markers across the whole config, matching the tree's static cap
 	MaxMarkerCoord      = 1000
@@ -55,6 +59,7 @@ func Validate(cfg *rwp.TouchUIConfig) error {
 	hwcIDs := map[uint32]bool{}
 	videoCount := 0
 	markerCount := 0
+	eqParamCount := 0
 
 	for _, page := range pages {
 		if page.GetId() == 0 {
@@ -97,6 +102,9 @@ func Validate(cfg *rwp.TouchUIConfig) error {
 					return fmt.Errorf("widget %d video source exceeds %d bytes", widget.GetHWCID(), MaxSourceLen)
 				}
 			}
+			if widget.GetType() == rwp.TouchUIWidget_EQUALIZER {
+				eqParamCount += len(widget.GetOptions().GetEqBands())
+			}
 			if err := validateWidgetOptions(widget, hwcIDs); err != nil {
 				return err
 			}
@@ -110,6 +118,11 @@ func Validate(cfg *rwp.TouchUIConfig) error {
 	// static cap the UI decodes into is a total.
 	if markerCount > MaxMarkers {
 		return fmt.Errorf("%d markers exceeds the maximum of %d for a config", markerCount, MaxMarkers)
+	}
+	// Same reason as markers: EQ band parameters travel as one flat list on the widget tree,
+	// so a second equalizer on another page spends the same budget as the first.
+	if eqParamCount > MaxEqParamsAll {
+		return fmt.Errorf("%d equalizer band parameters exceeds the maximum of %d for a config", eqParamCount, MaxEqParamsAll)
 	}
 	if want := cfg.GetActivePage(); want != 0 && !pageIDs[want] {
 		return fmt.Errorf("ActivePage %d is not a declared page", want)
@@ -145,6 +158,9 @@ func validateWidgetOptions(widget *rwp.TouchUIWidget, hwcIDs map[uint32]bool) er
 	}
 	if len(opts.GetMarkers()) > 0 && widget.GetType() != rwp.TouchUIWidget_VIDEO {
 		return fmt.Errorf("widget %d: Markers are only valid on a VIDEO widget", id)
+	}
+	if len(opts.GetEqBands()) > 0 && widget.GetType() != rwp.TouchUIWidget_EQUALIZER {
+		return fmt.Errorf("widget %d: EqBands are only valid on an EQUALIZER widget", id)
 	}
 	if opts.GetScaling() != rwp.TouchUIWidgetOptions_STRETCH && widget.GetType() != rwp.TouchUIWidget_VIDEO {
 		return fmt.Errorf("widget %d: Scaling is only valid on a VIDEO widget", id)
@@ -256,6 +272,57 @@ func validateWidgetOptions(widget *rwp.TouchUIWidget, hwcIDs map[uint32]bool) er
 			// pair must describe a real range or the 0..1000 mapping collapses.
 			if (p.GetMin() != 0 || p.GetMax() != 0) && p.GetMin() >= p.GetMax() {
 				return fmt.Errorf("widget %d: compressor param %d has an empty range %d..%d", id, pid, p.GetMin(), p.GetMax())
+			}
+		}
+
+	case rwp.TouchUIWidget_EQUALIZER:
+		params := opts.GetEqBands()
+		if len(params) == 0 {
+			return fmt.Errorf("widget %d: EQUALIZER has no EqBands", id)
+		}
+		if len(params) > MaxEqParams {
+			return fmt.Errorf("widget %d: %d EqBands exceeds the maximum of %d", id, len(params), MaxEqParams)
+		}
+		// Band+Role is the key, so the same pair twice is two faders claiming one handle.
+		// Counting the distinct bands separately is what caps the widget at MaxEqBands:
+		// they are numbered, not indexed, and a config may well skip a number.
+		seen := map[[2]uint32]bool{}
+		bands := map[uint32]bool{}
+		for _, p := range params {
+			pid := p.GetHWCID()
+			if pid == 0 {
+				return fmt.Errorf("widget %d: equalizer band param HWC id 0 is reserved", id)
+			}
+			if hwcIDs[pid] {
+				return fmt.Errorf("equalizer band param HWC id %d (widget %d) collides with another HWC id", pid, id)
+			}
+			hwcIDs[pid] = true
+			band := p.GetBand()
+			if band < 1 || band > MaxEqBands {
+				return fmt.Errorf("widget %d: equalizer band %d is outside 1..%d", id, band, MaxEqBands)
+			}
+			bands[band] = true
+			if len(bands) > MaxEqBands {
+				return fmt.Errorf("widget %d: %d bands exceeds the maximum of %d", id, len(bands), MaxEqBands)
+			}
+			key := [2]uint32{band, uint32(p.GetRole())}
+			if seen[key] {
+				return fmt.Errorf("widget %d: duplicate equalizer role %v on band %d", id, p.GetRole(), band)
+			}
+			seen[key] = true
+			if len(p.GetLabel()) > MaxParamLabelLen {
+				return fmt.Errorf("widget %d: equalizer band param %d label exceeds %d bytes", id, pid, MaxParamLabelLen)
+			}
+			// 0/0 means "panel default for the role", as for a compressor member. FREQ is
+			// additionally barred from reaching 0: its range is mapped logarithmically, and
+			// a decade count through 0 Hz has no meaning.
+			if p.GetMin() != 0 || p.GetMax() != 0 {
+				if p.GetMin() >= p.GetMax() {
+					return fmt.Errorf("widget %d: equalizer band param %d has an empty range %d..%d", id, pid, p.GetMin(), p.GetMax())
+				}
+				if p.GetRole() == rwp.TouchUIEqualizerParam_FREQ && p.GetMin() < 1 {
+					return fmt.Errorf("widget %d: equalizer band param %d FREQ range starts at %d — a logarithmic axis cannot reach 0 Hz", id, pid, p.GetMin())
+				}
 			}
 		}
 	}

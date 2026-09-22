@@ -2,6 +2,7 @@ package rawpanellib
 
 import (
 	"fmt"
+	"sort"
 
 	rwp "github.com/SKAARHOJ/rawpanel-lib/ibeam_rawpanel"
 	"github.com/SKAARHOJ/rawpanel-lib/topology"
@@ -38,8 +39,12 @@ const touchUIMaxDispH = 160
 
 // touchUIMarkerTypeKey is the TypeIndex key for a VIDEO widget's overlay markers. Markers are
 // not a WidgetTypeE, so this sits clear of the widget-ordinal range touchUITypeIndexKey spans
-// (base+0..11, +50 vertical, +100 editable label).
+// (base+0..12, +50 vertical, +100 editable label).
 const touchUIMarkerTypeKey = touchUITypeBase + 200
+
+// touchUIEqBandTypeKey is the TypeIndex key for an EQUALIZER's band parameters, clear of both
+// the widget-ordinal range and the marker key above.
+const touchUIEqBandTypeKey = touchUITypeBase + 210
 
 // touchUIMarkerTypeDef is the type def for one overlay marker HWC. A marker draws nothing on
 // the panel itself — it positions a box on its parent VIDEO widget — so it is inert except for
@@ -102,6 +107,131 @@ func markerComponents(top *topology.Topology, widget *rwp.TouchUIWidget, parent 
 			TypeOverride: &override,
 		}
 		out = append(out, comp)
+	}
+	return out
+}
+
+// touchUIEqBandTypeDef is the type def for one EQUALIZER band parameter HWC. Each is an
+// ordinary fader: it emits Absolute and is driven back like a motorized one, so it gets the
+// same In/Ext a vertical SLIDER has, and the same text Disp — Reactor gates the whole text
+// path on a component having a display (dispatch/DFeedback.go), and a parameter that cannot
+// carry "194Hz" is half a control.
+func touchUIEqBandTypeDef() topology.TopologyHWcTypeDef {
+	return topology.TopologyHWcTypeDef{
+		W:      touchUICellTenthMM/2 - touchUICellGapTenthMM,
+		H:      touchUICellTenthMM/3 - touchUICellGapTenthMM,
+		Subidx: -1,
+		Desc:   "TouchUI equalizer band parameter",
+		In:     "av",
+		Ext:    "pos",
+		Out:    "rgb",
+		Disp:   &topology.TopologyHWcTypeDef_Display{W: 12, H: 2, Subidx: -1, Type: "text"},
+		Sub: []topology.TopologyHWcTypeDefSubEl{
+			subRect(-90, -25, 180, 50, 6, touchUIStyleTrack),
+			subRect(-70, -8, 60, 16, 4, touchUIStyleHandle),
+		},
+	}
+}
+
+// eqRoleOrder is the order band parameters are stacked in, and the order their rows appear.
+// A slice rather than the map below because map iteration is random and the rows must not
+// shuffle between two generations of the same layout.
+var eqRoleOrder = []rwp.TouchUIEqualizerParam_RoleE{
+	rwp.TouchUIEqualizerParam_FREQ,
+	rwp.TouchUIEqualizerParam_GAIN,
+	rwp.TouchUIEqualizerParam_Q,
+	rwp.TouchUIEqualizerParam_SHAPE,
+}
+
+// eqRoleAbbrev is what a band parameter is called in the topology when it carries no Label of
+// its own. Short because the name shares a cell with the band number.
+var eqRoleAbbrev = map[rwp.TouchUIEqualizerParam_RoleE]string{
+	rwp.TouchUIEqualizerParam_FREQ:  "Freq",
+	rwp.TouchUIEqualizerParam_GAIN:  "Gain",
+	rwp.TouchUIEqualizerParam_Q:     "Q",
+	rwp.TouchUIEqualizerParam_SHAPE: "Shape",
+}
+
+// eqBandComponents derives one topology component per band parameter of an EQUALIZER, and
+// registers the shared type def on first use.
+//
+// Unlike a compressor's member parameters — which stay invisible to the topology and are
+// therefore reachable only by compressor-aware clients — these MUST be real components. An EQ
+// is driven from the encoders and faders around it far more often than from the glass, and a
+// client can only bind a behavior to an HWC the panel advertises: without this, "Band 3 Freq"
+// would not exist as far as a configurator is concerned.
+//
+// They are laid out as a grid inside the parent's rect, one column per band and one row per
+// role, which is the arrangement a console puts them in and the only spatial clue available —
+// a parameter paints nothing of its own on the screen. Purely presentational; nothing reads
+// these positions back.
+func eqBandComponents(top *topology.Topology, widget *rwp.TouchUIWidget, parent topology.TopologyHWcomponent, parentW, parentH int) []topology.TopologyHWcomponent {
+	params := widget.GetOptions().GetEqBands()
+	if len(params) == 0 {
+		return nil
+	}
+	if _, known := top.TypeIndex[touchUIEqBandTypeKey]; !known {
+		top.TypeIndex[touchUIEqBandTypeKey] = touchUIEqBandTypeDef()
+	}
+
+	// Column per band, ordered by band NUMBER rather than by where the band first appears in
+	// the list. The two differ as soon as an editor rewrites a band — a band whose parameters
+	// were re-added lands at the end of the list — and the renderer spreads the resting
+	// frequencies by band number, so ordering by anything else puts band 1's controls under
+	// band 5's handle. Numbers may skip, so it is the rank that places a column.
+	bands := make([]uint32, 0, len(params))
+	seen := map[uint32]bool{}
+	for _, p := range params {
+		if !seen[p.GetBand()] {
+			seen[p.GetBand()] = true
+			bands = append(bands, p.GetBand())
+		}
+	}
+	sort.Slice(bands, func(i, j int) bool { return bands[i] < bands[j] })
+	column := make(map[uint32]int, len(bands))
+	for i, band := range bands {
+		column[band] = i
+	}
+
+	// Row per role actually used, in a fixed order. Deriving the rows from what is present
+	// rather than from the full role list keeps a frequency-and-gain EQ two rows tall instead
+	// of leaving the unused ones as gaps.
+	row := map[rwp.TouchUIEqualizerParam_RoleE]int{}
+	for _, role := range eqRoleOrder {
+		for _, p := range params {
+			if p.GetRole() == role {
+				row[role] = len(row)
+				break
+			}
+		}
+	}
+
+	// The grid is anchored to the BOTTOM half and the boxes are inset within their cells.
+	// Filling the widget edge to edge — which a cell-sized box from the top-left corner does —
+	// buries the response curve under a wall of components in a client's panel view, and the
+	// curve is the thing that identifies the widget.
+	gridH := parentH / 2
+	cellW := parentW / len(column)
+	cellH := gridH / len(row)
+	boxW := cellW * 4 / 5
+	boxH := cellH * 4 / 5
+	base := touchUIEqBandTypeDef()
+	override := scaleTypeDef(base, ratio(boxW, base.W), ratio(boxH, base.H))
+
+	out := make([]topology.TopologyHWcomponent, 0, len(params))
+	for _, p := range params {
+		name := p.GetLabel()
+		if name == "" {
+			name = fmt.Sprintf("Band %d %s", p.GetBand(), eqRoleAbbrev[p.GetRole()])
+		}
+		out = append(out, topology.TopologyHWcomponent{
+			Id:           p.GetHWCID(),
+			Txt:          name,
+			Type:         touchUIEqBandTypeKey,
+			X:            parent.X + cellW*column[p.GetBand()] + (cellW-boxW)/2,
+			Y:            parent.Y + parentH - gridH + cellH*row[p.GetRole()] + (cellH-boxH)/2,
+			TypeOverride: &override,
+		})
 	}
 	return out
 }
@@ -318,6 +448,16 @@ func touchUITypeDef(t rwp.TouchUIWidget_WidgetTypeE, opts *rwp.TouchUIWidgetOpti
 		def.W = 2*touchUICellTenthMM - touchUICellGapTenthMM
 		def.H = 2*touchUICellTenthMM - touchUICellGapTenthMM
 		def.Disp = &topology.TopologyHWcTypeDef_Display{W: 160, H: 128, Subidx: -1, Type: "touch"}
+	case rwp.TouchUIWidget_EQUALIZER:
+		// Container emits nothing; the band params are separate fader HWCs, and unlike a
+		// compressor's they are components of their own (see eqBandComponents). Wider than
+		// tall: a frequency response is read across the spectrum, so an EQ that is not at
+		// least twice as wide as it is high shows nothing useful.
+		def.Desc = "TouchUI equalizer curve"
+		def.Out = "rgb" // HWCColor recolours the curve; without an Out, Reactor never sends it
+		def.W = 4*touchUICellTenthMM - touchUICellGapTenthMM
+		def.H = 2*touchUICellTenthMM - touchUICellGapTenthMM
+		def.Disp = &topology.TopologyHWcTypeDef_Display{W: 256, H: 128, Subidx: -1, Type: "touch"}
 	}
 	return def
 }
@@ -424,6 +564,7 @@ func TouchUIConfigToTopology(cfg *rwp.TouchUIConfig) *topology.Topology {
 
 			top.HWc = append(top.HWc, comp)
 			top.HWc = append(top.HWc, markerComponents(top, widget, comp, parentW, parentH)...)
+			top.HWc = append(top.HWc, eqBandComponents(top, widget, comp, parentW, parentH)...)
 		}
 
 		if gridMode {
