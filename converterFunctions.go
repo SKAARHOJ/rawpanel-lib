@@ -16,7 +16,7 @@ import (
 )
 
 // Set up regular expressions:
-var regex_cmd = regexp.MustCompile("^(HWC#|HWCx#|HWCj#|HWCc#|HWCt#|HWCrawADCValues#)([0-9,]+)=(.*)$")
+var regex_cmd = regexp.MustCompile("^(HWC#|HWCx#|HWCj#|HWCc#|HWCs#|HWCt#|HWCrawADCValues#)([0-9,]+)=(.*)$")
 var regex_gfx = regexp.MustCompile("^(HWCgRGB#|HWCgGray#|HWCg#)([0-9,]+)=([0-9]+)(/([0-9]+),([0-9]+)x([0-9]+)(,([0-9]+),([0-9]+)|)|):(.*)$")
 var regex_genericDual = regexp.MustCompile("^(PanelBrightness)=([0-9]+),([0-9]+)$")
 var regex_genericSingle = regexp.MustCompile("^(HeartBeatTimer|DimmedGain|PublishSystemStat|LoadCPU|SleepTimer|SleepMode|SleepScreenSaver|Webserver|JSONonOutbound|PanelBrightness)=([0-9]+)$")
@@ -181,13 +181,18 @@ func RawPanelASCIIstringsToInboundMessages(rp20_ascii []string) []*rwp.InboundMe
 					value, _ := strconv.Atoi(regex_cmd.FindStringSubmatch(inputString)[3])
 					msg = &rwp.InboundMessage{
 						States: []*rwp.HWCState{
-							&rwp.HWCState{
-								HWCIDs: HWCidArray,
-								HWCMode: &rwp.HWCMode{
-									State:        rwp.HWCMode_StateE(value & 0xF),
-									Output:       (value & 0x20) == 0x20,
-									BlinkPattern: uint32((value >> 8) & 0xF),
-								},
+							{
+								HWCIDs:  HWCidArray,
+								HWCMode: modeFromASCII(value),
+							},
+						},
+					}
+				case "HWCs#":
+					msg = &rwp.InboundMessage{
+						States: []*rwp.HWCState{
+							{
+								HWCIDs:      HWCidArray,
+								HWCSegments: segmentsFromASCII(regex_cmd.FindStringSubmatch(inputString)[3]),
 							},
 						},
 					}
@@ -232,34 +237,13 @@ func RawPanelASCIIstringsToInboundMessages(rp20_ascii []string) []*rwp.InboundMe
 					}
 				case "HWCc#":
 					value, _ := strconv.Atoi(regex_cmd.FindStringSubmatch(inputString)[3])
-					if value&0b1000000 > 0 {
-						msg = &rwp.InboundMessage{
-							States: []*rwp.HWCState{
-								&rwp.HWCState{
-									HWCIDs: HWCidArray,
-									HWCColor: &rwp.HWCColor{
-										ColorRGB: &rwp.ColorRGB{
-											Red:   uint32(su.MapAndConstrainValue((value>>4)&0x3, 0, 0x3, 0, 0xFF)),
-											Green: uint32(su.MapAndConstrainValue((value>>2)&0x3, 0, 0x3, 0, 0xFF)),
-											Blue:  uint32(su.MapAndConstrainValue((value>>0)&0x3, 0, 0x3, 0, 0xFF)),
-										},
-									},
-								},
+					msg = &rwp.InboundMessage{
+						States: []*rwp.HWCState{
+							{
+								HWCIDs:   HWCidArray,
+								HWCColor: colorFromASCII(value),
 							},
-						}
-					} else {
-						msg = &rwp.InboundMessage{
-							States: []*rwp.HWCState{
-								&rwp.HWCState{
-									HWCIDs: HWCidArray,
-									HWCColor: &rwp.HWCColor{
-										ColorIndex: &rwp.ColorIndex{
-											Index: rwp.ColorIndex_Colors(value & 0x1F),
-										},
-									},
-								},
-							},
-						}
+						},
 					}
 				case "HWCt#":
 					splitTextString := strings.Split(regex_cmd.FindStringSubmatch(inputString)[3], "|")
@@ -796,21 +780,15 @@ func InboundMessagesToRawPanelASCIIstrings(inboundMsgs []*rwp.InboundMessage) []
 						singleHWCIDarray := []uint32{singleHWCID}
 
 						if stateRec.HWCMode != nil {
-							outputInteger := uint32(stateRec.HWCMode.State&0x7) | uint32((stateRec.HWCMode.BlinkPattern&0xF)<<8) | uint32(su.Qint(stateRec.HWCMode.Output, 0b100000, 0))
-							returnStrings = append(returnStrings, fmt.Sprintf("HWC#%s=%d", su.IntImplode(singleHWCIDarray, ","), outputInteger))
+							returnStrings = append(returnStrings, fmt.Sprintf("HWC#%s=%d", su.IntImplode(singleHWCIDarray, ","), modeToASCII(stateRec.HWCMode)))
 						}
 						if stateRec.HWCColor != nil {
-							if stateRec.HWCColor.ColorRGB != nil {
-								outputInteger := 0b11000000 |
-									((su.MapAndConstrainValue(int(stateRec.HWCColor.ColorRGB.Red), 0, 0xFF, 0, 0x3) & 0x3) << 4) |
-									((su.MapAndConstrainValue(int(stateRec.HWCColor.ColorRGB.Green), 0, 0xFF, 0, 0x3) & 0x3) << 2) |
-									((su.MapAndConstrainValue(int(stateRec.HWCColor.ColorRGB.Blue), 0, 0xFF, 0, 0x3) & 0x3) << 0)
-								returnStrings = append(returnStrings, fmt.Sprintf("HWCc#%s=%d", su.IntImplode(singleHWCIDarray, ","), outputInteger))
-							} else if stateRec.HWCColor.ColorIndex != nil {
-								outputInteger := 0b10000000 |
-									uint32(stateRec.HWCColor.ColorIndex.Index&0x1F)
+							if outputInteger, ok := colorToASCII(stateRec.HWCColor); ok {
 								returnStrings = append(returnStrings, fmt.Sprintf("HWCc#%s=%d", su.IntImplode(singleHWCIDarray, ","), outputInteger))
 							}
+						}
+						if stateRec.HWCSegments != nil {
+							returnStrings = append(returnStrings, fmt.Sprintf("HWCs#%s=%s", su.IntImplode(singleHWCIDarray, ","), segmentsToASCII(stateRec.HWCSegments)))
 						}
 						if stateRec.HWCExtended != nil {
 							outputInteger := uint32(stateRec.HWCExtended.Value&0xFFF) | uint32((stateRec.HWCExtended.Interpretation&0xF)<<12)

@@ -4,3 +4,5 @@ go.work*
 tools/rwp-converter/rwp-converter
 .gitignore
 tools/rwp-converter/rwp-converter.exe
+.scratchpad/
+.playwright-mcp/
