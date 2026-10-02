@@ -11,6 +11,7 @@ require (
 
 require (
 	github.com/SKAARHOJ/ibeam-lib-utils v1.0.0 // indirect
+	github.com/antchfx/xpath v1.3.6 // indirect
 	github.com/disintegration/gift v1.2.1 // indirect
 	github.com/fogleman/gg v1.3.0 // indirect
 	github.com/golang/freetype v0.0.0-20170609003504-e2365dfdc4a0 // indirect
@@ -19,9 +20,11 @@ require (
 	github.com/petermattis/goid v0.0.0-20250813065127-a731cc31b4fe // indirect
 	github.com/sasha-s/go-deadlock v0.3.6 // indirect
 	github.com/sirupsen/logrus v1.9.4 // indirect
+	github.com/subchen/go-xmldom v1.1.2 // indirect
 	go.uber.org/atomic v1.11.0 // indirect
+	golang.org/x/exp v0.0.0-20230728194245-b0cb94b80691 // indirect
 	golang.org/x/image v0.38.0 // indirect
-	golang.org/x/sys v0.45.0 // indirect
+	golang.org/x/sys v0.46.0 // indirect
 )
 
 replace github.com/SKAARHOJ/rawpanel-lib => ../
