@@ -250,7 +250,9 @@ func ConnectToPanel(panelIPAndPort string, msgsToPanel <-chan []*rwp.InboundMess
 						}
 						break
 					} else {
-						msgsFromPanel <- RawPanelASCIIstringsToOutboundMessages([]string{strings.TrimSpace(netData)})
+						// Only the line ending goes: a Text: event's value is the rest of the line,
+						// and spaces at either end of it are part of what the user typed.
+						msgsFromPanel <- RawPanelASCIIstringsToOutboundMessages([]string{strings.TrimRight(netData, "\r\n")})
 					}
 				}
 			}
