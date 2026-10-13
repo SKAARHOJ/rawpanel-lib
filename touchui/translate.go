@@ -7,6 +7,7 @@ package touchui
 import (
 	"fmt"
 	"strings"
+	"unicode/utf8"
 
 	rwp "github.com/SKAARHOJ/rawpanel-lib/ibeam_rawpanel"
 
@@ -25,7 +26,7 @@ type FeedResolver func(ordinal int) (source string, width, height uint32, policy
 func ConfigToWidgetTree(cfg *rwp.TouchUIConfig, epoch uint32, resolve FeedResolver) *gen.WidgetTree {
 	tree := &gen.WidgetTree{
 		Epoch: epoch,
-		Title: cfg.GetTitle(),
+		Title: clipText(cfg.GetTitle(), MaxConfigTitleLen),
 	}
 
 	videoOrdinal := 0
@@ -275,10 +276,7 @@ func joinChoices(choices []string) string {
 // client emits against; the length cap is the per-entry half of the panel's budget.
 func sanitizeChoice(c string) string {
 	c = strings.NewReplacer("\r", " ", "\n", " ").Replace(c)
-	if len(c) > MaxChoiceLen {
-		c = c[:MaxChoiceLen]
-	}
-	return c
+	return clipText(c, MaxChoiceLen)
 }
 
 // compressorRoleDefaults is the natural-unit range each role gets when a client leaves
@@ -534,7 +532,15 @@ func joinDomain(choices, values []string) (string, string) {
 	}
 	// Values are optional; without a full parallel list there is nothing safe to report, so
 	// the whole thing degrades to index-only rather than reporting some picks and not others.
+	// The same goes for a value too long to report: unlike a label, a value is an identity,
+	// and a clipped one is a value the client never sent (two UUIDs sharing a prefix would
+	// even become the same pick).
 	withValues := len(values) >= len(choices)
+	for i := 0; withValues && i < len(choices); i++ {
+		if len(values[i]) > MaxDomainValueLen {
+			withValues = false
+		}
+	}
 
 	outC := make([]string, 0, len(choices))
 	outV := make([]string, 0, len(choices))
@@ -552,7 +558,7 @@ func joinDomain(choices, values []string) (string, string) {
 		v := ""
 		needV := 0
 		if withValues {
-			v = sanitizeChoice(values[i])
+			v = strings.NewReplacer("\r", " ", "\n", " ").Replace(values[i])
 			needV = len(v)
 			if len(outV) > 0 {
 				needV++
@@ -585,7 +591,7 @@ func overlayStateFrom(o *rwp.HWCOverlay) *gen.OverlayState {
 			W:     b.GetW(),
 			H:     b.GetH(),
 			Rgb:   ColorToRGB(b.GetColor()),
-			Label: b.GetLabel(),
+			Label: clipText(b.GetLabel(), MaxOverlayLabelLen),
 		})
 	}
 	return out
@@ -596,9 +602,9 @@ func overlayStateFrom(o *rwp.HWCOverlay) *gen.OverlayState {
 // (icons, scale bars, pair mode) degrade to plain text.
 func textStateFrom(t *rwp.HWCText) *gen.TextState {
 	out := &gen.TextState{
-		Title:       t.GetTitle(),
-		Line1:       t.GetTextline1(),
-		Line2:       t.GetTextline2(),
+		Title:       clipText(t.GetTitle(), MaxTextLen),
+		Line1:       clipText(t.GetTextline1(), MaxTextLen),
+		Line2:       clipText(t.GetTextline2(), MaxTextLine2Len),
 		SolidHeader: t.GetSolidHeaderBar(),
 		PixelRgb:    ColorToRGB(t.GetPixelColor()),
 		BgRgb:       ColorToRGB(t.GetBackgroundColor()),
@@ -609,9 +615,23 @@ func textStateFrom(t *rwp.HWCText) *gen.TextState {
 	fmtE := t.GetFormatting()
 	if out.Line1 == "" && fmtE != rwp.HWCText_FMT_HIDE &&
 		fmtE != rwp.HWCText_FMT_ONELINE && fmtE != rwp.HWCText_FMT_TWOLINES {
-		out.Line1 = formatValue(t.GetIntegerValue(), fmtE)
+		out.Line1 = clipText(formatValue(t.GetIntegerValue(), fmtE), MaxTextLen)
 	}
 	return out
+}
+
+// clipText cuts s to at most max bytes without splitting a UTF-8 sequence. The renderer's
+// nanopb decode rejects the WHOLE message when one string exceeds its field, so runtime text
+// that cannot be refused like a config has to be made to fit on the way in.
+func clipText(s string, max int) string {
+	if len(s) <= max {
+		return s
+	}
+	s = s[:max]
+	for len(s) > 0 && !utf8.ValidString(s) {
+		s = s[:len(s)-1]
+	}
+	return s
 }
 
 // formatValue renders HWCText.IntegerValue per HWCText.FormattingE.

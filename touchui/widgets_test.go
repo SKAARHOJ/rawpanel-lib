@@ -349,6 +349,16 @@ func TestJoinDomain(t *testing.T) {
 		t.Errorf("joined values %d bytes exceeds %d", len(v), MaxChoicesJoined)
 	}
 
+	// Values are identities, not captions: a UUID longer than a label must arrive whole...
+	uuid := "0190f5a4-7c1e-7d3a-9b2f-4e8c1a6d5f01"
+	if _, v := joinDomain([]string{"a"}, []string{uuid}); v != uuid {
+		t.Errorf("value clipped: %q", v)
+	}
+	// ...and one too long to report degrades the domain to index-only rather than clipped.
+	if _, v := joinDomain([]string{"a", "b"}, []string{"1", strings.Repeat("v", MaxDomainValueLen+1)}); v != "" {
+		t.Errorf("over-long value should degrade to index-only, got %q", v)
+	}
+
 	// A newline inside a value would split it in two exactly as it would a label.
 	if _, v := joinDomain([]string{"a"}, []string{"1\n2"}); v != "1 2" {
 		t.Errorf("newline in a value not neutralized: %q", v)

@@ -307,13 +307,14 @@ func TestPageGfxDithers(t *testing.T) {
 
 func TestValidateRejects(t *testing.T) {
 	cases := map[string]func(*rwp.TouchUIConfig){
-		"no pages":        func(c *rwp.TouchUIConfig) { c.Pages = nil },
-		"dup page":        func(c *rwp.TouchUIConfig) { c.Pages[1].Id = 1 },
-		"dup hwc":         func(c *rwp.TouchUIConfig) { c.Pages[1].Widgets[0].HWCID = 201 },
-		"zero hwc":        func(c *rwp.TouchUIConfig) { c.Pages[0].Widgets[0].HWCID = 0 },
-		"outside grid":    func(c *rwp.TouchUIConfig) { c.Pages[0].Widgets[0].Col = 9 },
-		"bad active page": func(c *rwp.TouchUIConfig) { c.ActivePage = 42 },
-		"long label":      func(c *rwp.TouchUIConfig) { c.Pages[0].Widgets[0].Label = string(make([]byte, 60)) },
+		"no pages":          func(c *rwp.TouchUIConfig) { c.Pages = nil },
+		"dup page":          func(c *rwp.TouchUIConfig) { c.Pages[1].Id = 1 },
+		"dup hwc":           func(c *rwp.TouchUIConfig) { c.Pages[1].Widgets[0].HWCID = 201 },
+		"zero hwc":          func(c *rwp.TouchUIConfig) { c.Pages[0].Widgets[0].HWCID = 0 },
+		"outside grid":      func(c *rwp.TouchUIConfig) { c.Pages[0].Widgets[0].Col = 9 },
+		"bad active page":   func(c *rwp.TouchUIConfig) { c.ActivePage = 42 },
+		"long label":        func(c *rwp.TouchUIConfig) { c.Pages[0].Widgets[0].Label = string(make([]byte, 60)) },
+		"long config title": func(c *rwp.TouchUIConfig) { c.Title = strings.Repeat("x", MaxConfigTitleLen+1) },
 		"too many widgets": func(c *rwp.TouchUIConfig) {
 			for i := 0; i < 30; i++ {
 				c.Pages[1].Widgets = append(c.Pages[1].Widgets,
@@ -404,6 +405,14 @@ func TestValidateRejects(t *testing.T) {
 			c.Pages[0].Widgets[0].Options.EqBands = []*rwp.TouchUIEqualizerParam{
 				{HWCID: 401, Band: 1, Role: rwp.TouchUIEqualizerParam_FREQ, Min: 0, Max: 20000},
 			}
+		},
+		"compressor with an unknown role": func(c *rwp.TouchUIConfig) {
+			c.Pages[0].Widgets[0].Type = rwp.TouchUIWidget_COMPRESSOR
+			c.Pages[0].Widgets[0].Options.Params = []*rwp.TouchUICompressorParam{{HWCID: 401, Role: 99}}
+		},
+		"equalizer with an unknown role": func(c *rwp.TouchUIConfig) {
+			c.Pages[0].Widgets[0].Type = rwp.TouchUIWidget_EQUALIZER
+			c.Pages[0].Widgets[0].Options.EqBands = []*rwp.TouchUIEqualizerParam{{HWCID: 401, Band: 1, Role: 99}}
 		},
 		"eqbands on a non-equalizer": func(c *rwp.TouchUIConfig) {
 			c.Pages[0].Widgets[0].Options.EqBands = []*rwp.TouchUIEqualizerParam{
@@ -636,5 +645,43 @@ func TestGlobalOptionsChrome(t *testing.T) {
 
 	if globalOptions(nil) != nil {
 		t.Error("nil options should stay nil so the renderer sees an absent message")
+	}
+}
+
+// A client declaring a huge image with a short payload must get an error, not make the
+// decoder allocate the declared size first.
+func TestGfxRejectsBadDimensions(t *testing.T) {
+	for name, g := range map[string]*rwp.HWCGfx{
+		"short payload for huge dims": {ImageType: rwp.HWCGfx_RGB16bit, W: 4000, H: 4000, ImageData: make([]byte, 16)},
+		"short mono payload":          {ImageType: rwp.HWCGfx_MONO, W: 64, H: 64, ImageData: make([]byte, 8)},
+		"beyond the dimension cap":    {ImageType: rwp.HWCGfx_MONO, W: 65535, H: 65535, ImageData: make([]byte, 16)},
+	} {
+		if _, err := GfxToWidgetGfx(1, g, 0); err == nil {
+			t.Errorf("%s: expected an error", name)
+		}
+	}
+}
+
+// Runtime text cannot be refused like a config, so it is clipped to the renderer's nanopb
+// fields; one byte over would fail the whole message on the panel.
+func TestRuntimeTextIsClipped(t *testing.T) {
+	ts := textStateFrom(&rwp.HWCText{
+		Title:     strings.Repeat("t", 48),
+		Textline1: strings.Repeat("a", 46) + "é", // the 2-byte rune straddles the cap
+		Textline2: strings.Repeat("s", 200),
+	})
+	if len(ts.Title) != MaxTextLen {
+		t.Errorf("title is %d bytes, want %d", len(ts.Title), MaxTextLen)
+	}
+	if ts.Line1 != strings.Repeat("a", 46) {
+		t.Errorf("line1 should drop the split rune whole, got %q", ts.Line1)
+	}
+	if len(ts.Line2) != MaxTextLine2Len {
+		t.Errorf("line2 is %d bytes, want %d", len(ts.Line2), MaxTextLine2Len)
+	}
+
+	ov := overlayStateFrom(&rwp.HWCOverlay{Boxes: []*rwp.HWCOverlay_Box{{Id: 1, Label: strings.Repeat("l", 40)}}})
+	if len(ov.Boxes[0].Label) != MaxOverlayLabelLen {
+		t.Errorf("overlay label is %d bytes, want %d", len(ov.Boxes[0].Label), MaxOverlayLabelLen)
 	}
 }

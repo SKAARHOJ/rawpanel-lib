@@ -22,6 +22,11 @@ const (
 	maxGfxPixels = maxGfxBytes / 2
 )
 
+// maxGfxDim caps each side of an inbound HWCGfx. The source is decoded to full size before
+// it is downscaled, so this bounds the decode buffer (4096x4096 is 64 MiB) for a client that
+// declares a huge image; no real source comes anywhere near it.
+const maxGfxDim = 4096
+
 // GfxToWidgetGfx decodes an inbound HWCGfx (MONO / Gray4bit / RGB16bit wire
 // formats, see ibeam_lib_monogfx for the layout reference) into a
 // little-endian RGB565 WidgetGfx frame, downscaling to the transport budget.
@@ -84,6 +89,9 @@ func gfxToRGB565(g *rwp.HWCGfx, dither bool) (outW, outH int, rgb565 []byte, err
 	w, h := int(g.GetW()), int(g.GetH())
 	if w <= 0 || h <= 0 {
 		return 0, 0, nil, fmt.Errorf("touchui: gfx without dimensions")
+	}
+	if w > maxGfxDim || h > maxGfxDim {
+		return 0, 0, nil, fmt.Errorf("touchui: gfx %dx%d exceeds %dx%d", w, h, maxGfxDim, maxGfxDim)
 	}
 
 	pix, err := decodeGfx(g, w, h) // 0xRRGGBB per pixel, row-major
@@ -245,17 +253,31 @@ func packRGB565(rgb uint32) uint16 {
 }
 
 // decodeGfx expands the three wire formats to 0xRRGGBB pixels.
+// The payload is checked against the declared dimensions before the pixel buffer is
+// allocated, so a short payload claiming a large image costs nothing.
 func decodeGfx(g *rwp.HWCGfx, w, h int) ([]uint32, error) {
 	data := g.GetImageData()
+
+	var need int
+	switch g.GetImageType() {
+	case rwp.HWCGfx_MONO:
+		need = (w + 7) / 8 * h
+	case rwp.HWCGfx_Gray4bit:
+		need = (w*h + 1) / 2
+	case rwp.HWCGfx_RGB16bit:
+		need = w * h * 2
+	default:
+		return nil, fmt.Errorf("touchui: unknown gfx image type %v", g.GetImageType())
+	}
+	if need > len(data) {
+		return nil, fmt.Errorf("touchui: %v gfx short: %d < %d", g.GetImageType(), len(data), need)
+	}
 	pix := make([]uint32, w*h)
 
 	switch g.GetImageType() {
 	case rwp.HWCGfx_MONO:
 		// 1 bit per pixel, MSB first, each row padded to whole bytes.
 		stride := (w + 7) / 8
-		if stride*h > len(data) {
-			return nil, fmt.Errorf("touchui: MONO gfx short: %d < %d", len(data), stride*h)
-		}
 		for y := 0; y < h; y++ {
 			for x := 0; x < w; x++ {
 				if data[y*stride+x/8]&(1<<(7-x%8)) != 0 {
@@ -266,9 +288,6 @@ func decodeGfx(g *rwp.HWCGfx, w, h int) ([]uint32, error) {
 
 	case rwp.HWCGfx_Gray4bit:
 		// 2 pixels per byte, most-significant nibble first.
-		if (w*h+1)/2 > len(data) {
-			return nil, fmt.Errorf("touchui: Gray4 gfx short: %d < %d", len(data), (w*h+1)/2)
-		}
 		for i := 0; i < w*h; i++ {
 			nibble := data[i/2]
 			if i%2 == 0 {
@@ -285,9 +304,6 @@ func decodeGfx(g *rwp.HWCGfx, w, h int) ([]uint32, error) {
 		// pixelColor in Reactor's DFeedback and SetOLEDPixelColor in ibeam_lib_monogfx — and
 		// the reader in rawpanelhelpers.go takes them back out in that order. Reading this as
 		// plain RGB565 swaps red and blue, which is what turned dark blue into dark red.
-		if w*h*2 > len(data) {
-			return nil, fmt.Errorf("touchui: RGB16 gfx short: %d < %d", len(data), w*h*2)
-		}
 		for i := 0; i < w*h; i++ {
 			v := uint16(data[i*2])<<8 | uint16(data[i*2+1])
 			b := uint32(v>>11) & 0x1F
@@ -295,9 +311,6 @@ func decodeGfx(g *rwp.HWCGfx, w, h int) ([]uint32, error) {
 			r := uint32(v) & 0x1F
 			pix[i] = (r<<3|r>>2)<<16 | (gch<<2|gch>>4)<<8 | (b<<3 | b>>2)
 		}
-
-	default:
-		return nil, fmt.Errorf("touchui: unknown gfx image type %v", g.GetImageType())
 	}
 	return pix, nil
 }

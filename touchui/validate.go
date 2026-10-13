@@ -14,6 +14,7 @@ const (
 	MaxWidgetsPerPage = 24
 	MaxLabelLen       = 47 // nanopb max_size includes the NUL
 	MaxTitleLen       = 23
+	MaxConfigTitleLen = 47 // TouchUIConfig.Title (WidgetTree.title)
 	MaxSourceLen      = 127
 	// Not a nanopb cap: VideoFeed rides inside WidgetDef rather than in a repeated
 	// field of its own, so this costs nothing in the static decode. It is purely how
@@ -44,6 +45,15 @@ const (
 	MaxMarkerCoord      = 1000
 )
 
+// Caps for runtime state. Unlike the config, this text arrives one HWC state at a time and
+// cannot be rejected as a whole, so the translation clips it to fit instead (see clipText).
+const (
+	MaxTextLen         = 47  // HWCText Title and Textline1 (TextState.title/line1)
+	MaxTextLine2Len    = 127 // HWCText Textline2, which also carries a VIDEO source override
+	MaxOverlayLabelLen = 31  // HWCOverlay box label
+	MaxDomainValueLen  = 63  // HWCDomain value, sized like the AbsoluteEv.domain_value it is reported in
+)
+
 // Validate checks a TouchUIConfig against the panel's static limits and its
 // referential integrity. It returns the first violation found.
 func Validate(cfg *rwp.TouchUIConfig) error {
@@ -53,6 +63,9 @@ func Validate(cfg *rwp.TouchUIConfig) error {
 	}
 	if len(pages) > MaxPages {
 		return fmt.Errorf("%d pages exceeds the maximum of %d", len(pages), MaxPages)
+	}
+	if len(cfg.GetTitle()) > MaxConfigTitleLen {
+		return fmt.Errorf("config title exceeds %d bytes", MaxConfigTitleLen)
 	}
 
 	pageIDs := map[uint32]bool{}
@@ -261,6 +274,9 @@ func validateWidgetOptions(widget *rwp.TouchUIWidget, hwcIDs map[uint32]bool) er
 				return fmt.Errorf("compressor param HWC id %d (widget %d) collides with another HWC id", pid, id)
 			}
 			hwcIDs[pid] = true
+			if _, known := rwp.TouchUICompressorParam_RoleE_name[int32(p.GetRole())]; !known {
+				return fmt.Errorf("widget %d: compressor param %d has unknown role %d", id, pid, p.GetRole())
+			}
 			if roles[p.GetRole()] {
 				return fmt.Errorf("widget %d: duplicate compressor role %v", id, p.GetRole())
 			}
@@ -300,6 +316,9 @@ func validateWidgetOptions(widget *rwp.TouchUIWidget, hwcIDs map[uint32]bool) er
 			band := p.GetBand()
 			if band < 1 || band > MaxEqBands {
 				return fmt.Errorf("widget %d: equalizer band %d is outside 1..%d", id, band, MaxEqBands)
+			}
+			if _, known := rwp.TouchUIEqualizerParam_RoleE_name[int32(p.GetRole())]; !known {
+				return fmt.Errorf("widget %d: equalizer band param %d has unknown role %d", id, pid, p.GetRole())
 			}
 			bands[band] = true
 			if len(bands) > MaxEqBands {
