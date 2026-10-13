@@ -205,6 +205,11 @@ func eqBandComponents(top *topology.Topology, widget *rwp.TouchUIWidget, parent 
 			}
 		}
 	}
+	// Validate rejects unknown roles, but this also runs on configs that never went through
+	// it; with no known role there is no row to put a box in, and nothing to divide by.
+	if len(row) == 0 {
+		return nil
+	}
 
 	// The grid is anchored to the BOTTOM half and the boxes are inset within their cells.
 	// Filling the widget edge to edge — which a cell-sized box from the top-left corner does —

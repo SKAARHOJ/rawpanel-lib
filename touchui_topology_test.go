@@ -2,6 +2,7 @@ package rawpanellib
 
 import (
 	"encoding/json"
+	"strings"
 	"testing"
 
 	rwp "github.com/SKAARHOJ/rawpanel-lib/ibeam_rawpanel"
@@ -419,5 +420,44 @@ func TestEqualizerBandColumnsFollowBandNumber(t *testing.T) {
 	}
 	if !(x[401] < x[403] && x[403] < x[402]) {
 		t.Errorf("columns are not in band order: band1=%d band2=%d band3=%d", x[401], x[403], x[402])
+	}
+}
+
+// Validate rejects unknown roles, but topology generation must not divide by zero on a config
+// that skipped it.
+func TestEqualizerUnknownRoleDoesNotPanic(t *testing.T) {
+	TouchUIConfigToTopology(&rwp.TouchUIConfig{
+		Pages: []*rwp.TouchUIPage{{
+			Id: 1, GridRows: 1, GridCols: 1,
+			Widgets: []*rwp.TouchUIWidget{
+				{HWCID: 310, Type: rwp.TouchUIWidget_EQUALIZER, Row: 1, Col: 1,
+					Options: &rwp.TouchUIWidgetOptions{EqBands: []*rwp.TouchUIEqualizerParam{
+						{HWCID: 401, Band: 1, Role: 99},
+					}}},
+			},
+		}},
+	})
+}
+
+// Each ASCII line is applied on its own, so a domain must reach the panel before the index
+// that refers to it.
+func TestHWCDomainGoesOutBeforeExtended(t *testing.T) {
+	state := &rwp.HWCState{
+		HWCIDs:      []uint32{112},
+		HWCExtended: &rwp.HWCExtended{Value: 3},
+		HWCDomain:   &rwp.HWCDomain{Choices: []string{"a", "b", "c", "d"}},
+	}
+	ascii := InboundMessagesToRawPanelASCIIstrings([]*rwp.InboundMessage{{States: []*rwp.HWCState{state}}})
+	d, x := -1, -1
+	for i, l := range ascii {
+		if strings.HasPrefix(l, "HWCd#") {
+			d = i
+		}
+		if strings.HasPrefix(l, "HWCx#") {
+			x = i
+		}
+	}
+	if d < 0 || x < 0 || d > x {
+		t.Errorf("want HWCd# before HWCx#, got %v", ascii)
 	}
 }
