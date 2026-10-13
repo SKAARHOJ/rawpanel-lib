@@ -881,6 +881,11 @@ func InboundMessagesToRawPanelASCIIstrings(inboundMsgs []*rwp.InboundMessage) []
 						if stateRec.HWCSegments != nil {
 							returnStrings = append(returnStrings, fmt.Sprintf("HWCs#%s=%s", su.IntImplode(singleHWCIDarray, ","), segmentsToASCII(stateRec.HWCSegments)))
 						}
+						// The domain goes out before HWCx: each ASCII line is applied on its own, and an
+						// index sent first would be clamped against the old list (see HWCDomain).
+						if stateRec.HWCDomain != nil {
+							returnStrings = append(returnStrings, fmt.Sprintf("HWCd#%s=%s", su.IntImplode(singleHWCIDarray, ","), stripLineBreaks(stringFromDomain(stateRec.HWCDomain))))
+						}
 						if stateRec.HWCExtended != nil {
 							outputInteger := uint32(stateRec.HWCExtended.Value&0xFFF) | uint32((stateRec.HWCExtended.Interpretation&0xF)<<12)
 							returnStrings = append(returnStrings, fmt.Sprintf("HWCx#%s=%d", su.IntImplode(singleHWCIDarray, ","), outputInteger))
@@ -1027,9 +1032,6 @@ func InboundMessagesToRawPanelASCIIstrings(inboundMsgs []*rwp.InboundMessage) []
 								sline += ":" + base64.StdEncoding.EncodeToString(stateRec.HWCGfx.ImageData[lines*bytesPerLine:lines*bytesPerLine+segmentLength])
 								returnStrings = append(returnStrings, sline)
 							}
-						}
-						if stateRec.HWCDomain != nil {
-							returnStrings = append(returnStrings, fmt.Sprintf("HWCd#%s=%s", su.IntImplode(singleHWCIDarray, ","), stripLineBreaks(stringFromDomain(stateRec.HWCDomain))))
 						}
 						if stateRec.HWCOverlay != nil {
 							returnStrings = append(returnStrings, fmt.Sprintf("HWCo#%s=%s", su.IntImplode(singleHWCIDarray, ","), stripLineBreaks(stringFromOverlay(stateRec.HWCOverlay))))
