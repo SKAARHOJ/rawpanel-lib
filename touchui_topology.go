@@ -354,7 +354,7 @@ func touchUITypeDef(t rwp.TouchUIWidget_WidgetTypeE, opts *rwp.TouchUIWidgetOpti
 		}
 		def.Subidx = 1 // the handle: clients move this element with the absolute value
 	case rwp.TouchUIWidget_KNOB:
-		def.In = "ar" // analog rotary (absolute 0..1000 dial)
+		def.In = "ar"   // analog rotary (absolute 0..1000 dial)
 		def.Ext = "pos" // position feedback: driven like a motorized fader when the value changes externally
 		def.Desc = "TouchUI knob (rotary fader)"
 		// The dial prints a caption in the middle of the ring, so it is a text component as
@@ -428,8 +428,8 @@ func touchUITypeDef(t rwp.TouchUIWidget_WidgetTypeE, opts *rwp.TouchUIWidgetOpti
 		// neighbouring widgets while open, so it costs no layout height of its own.
 		def.Disp = &topology.TopologyHWcTypeDef_Display{W: 64, H: 32, Subidx: -1, Type: "text"}
 		def.Sub = []topology.TopologyHWcTypeDefSubEl{
-			subRect(-150, -50, 300, 100, 6, touchUIStyleTrack),  // the closed field
-			subRect(105, -15, 30, 30, 3, touchUIStyleHandle),    // the chevron
+			subRect(-150, -50, 300, 100, 6, touchUIStyleTrack), // the closed field
+			subRect(105, -15, 30, 30, 3, touchUIStyleHandle),   // the chevron
 		}
 	case rwp.TouchUIWidget_XYPAD:
 		def.In = "xy" // 2D absolute (or relative) vector input

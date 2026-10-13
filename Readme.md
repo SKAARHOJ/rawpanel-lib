@@ -24,7 +24,7 @@ New ASCII line:
 
 ## TouchUI
 
-Panels with touch surfaces can accept a TouchUI widget configuration from the client (`Command.SetTouchUI` / ASCII `SetTouchUI={json}`). The config declares pages (tabs) of widgets (buttons, toggles, sliders, knobs, meters, labels, image tiles) with layout and options — see the `TouchUI*` messages in `ibeam-rawpanel-proto/ibeam-rawpanel.proto`.
+Panels with touch surfaces can accept a TouchUI widget configuration from the client (`Command.SetTouchUI` / ASCII `SetTouchUI={json}`). The config declares pages (tabs) of widgets (buttons, toggles, sliders, knobs, meters, labels, image tiles, video regions, encoder pads, dropdowns, XY pads, compressor and equalizer curves) with layout and options — see the `TouchUI*` messages in `ibeam-rawpanel-proto/ibeam-rawpanel.proto`.
 
 Widgets are addressed as regular HWCs with client-assigned HWC ids: they emit standard `HWCEvent`s and honor standard `HWCState` feedback, so all existing client code works unchanged. After accepting a config the panel reflects the widgets into its topology JSON and re-sends topology plus the availability map.
 
@@ -34,6 +34,13 @@ New ASCII lines:
 - `ClearTouchUI` — remove all widgets (inbound)
 - `TouchUICapabilities?` / `_touchUICapabilities={json}` — query/report screen size, grid geometry and supported widget types
 - `TouchUIConfig?` / `_touchUIConfig={json}` — query/report the currently active config
+- `SetTouchUIActivePage=N` — switch the displayed page/tab at runtime (inbound)
+- `_touchUIActivePage=N` — the page/tab the panel is displaying now, sent on every change (outbound)
+- `HWCo#xx={json}` — overlay boxes drawn on a widget, e.g. tracking rectangles on a video region; each message replaces the whole set (inbound)
+- `HWCd#xx={json}` — runtime domain of a widget (dropdown choices/values, slider/knob range) without re-sending the config (inbound)
+- `HWC#xx=Abs:x,y` / `HWC#xx=Speed:dx,dy` — multi-value form of the Abs/Speed events, carrying an `AbsoluteVector`/`SpeedVector` (e.g. XY pad, video region) (outbound)
+- `HWC#xx=Text:<value>` — text entered on the panel, e.g. an editable label commit; the value is the rest of the line (outbound)
+- `PanelBrightness=x,y,z` — optional third value sets the screen backlight (inbound)
 - `_support=...,TouchUI` — capability flag
 
 Widget visibility (e.g. hidden behind a non-active tab) is reported via the existing `map=<hwc>:<value>` availability mechanism: bit 31 (`0x80000000`) of the value means "present but offscreen". Legacy semantics (0 = absent, non-zero = present) are unchanged; use the `HWCAvailability*` helper functions to interpret values.
