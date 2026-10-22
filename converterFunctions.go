@@ -1417,6 +1417,8 @@ func RawPanelASCIIstringsToOutboundMessages(rp20_ascii []string) []*rwp.Outbound
 							supportObj.StateFeedback = true
 						case "TextScroll":
 							supportObj.TextScroll = true
+						case "Segments":
+							supportObj.Segments = true
 						}
 					}
 					msg = &rwp.OutboundMessage{
@@ -1872,6 +1874,9 @@ func OutboundMessagesToRawPanelASCIIstrings(outboundMsgs []*rwp.OutboundMessage)
 				}
 				if outboundMsg.PanelInfo.RawPanelSupport.TextScroll {
 					support = append(support, "TextScroll")
+				}
+				if outboundMsg.PanelInfo.RawPanelSupport.Segments {
+					support = append(support, "Segments")
 				}
 				returnStrings = append(returnStrings, "_support="+strings.Join(support, ","))
 			}

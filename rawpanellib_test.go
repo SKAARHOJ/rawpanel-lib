@@ -196,6 +196,11 @@ func TestOutbound(t *testing.T) {
 			[]string{"_support=ASCII,Binary,TextScroll"},
 			[]string{"_support=ASCII,Binary,TextScroll"},
 		},
+		// Testing Support with Segments
+		{
+			[]string{"_support=ASCII,Binary,TextScroll,Segments"},
+			[]string{"_support=ASCII,Binary,TextScroll,Segments"},
+		},
 	}
 
 	for i, tt := range tests {

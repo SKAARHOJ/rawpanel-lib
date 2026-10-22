@@ -3667,6 +3667,7 @@ func (x *HWCExtended) GetValue() uint32 {
 //
 // Controllers that don't support it ignore it and show HWCMode/HWCColor, so clients should
 // keep those set to a sensible whole component state.
+// Controllers that support it announce RawPanelSupport.Segments.
 //
 // In ASCII each LED is "mode,color", with mode and color as the values of HWC# and HWCc#
 // (color left out when not set), separated by "|". An empty value clears it.
@@ -6461,6 +6462,7 @@ type RawPanelSupport struct {
 	TouchUI         bool `protobuf:"varint,25,opt,name=TouchUI,proto3" json:"TouchUI,omitempty"`                 // Whether TouchUI widget configuration (SetTouchUI et al.) is supported
 	JogConfig       bool `protobuf:"varint,26,opt,name=JogConfig,proto3" json:"JogConfig,omitempty"`             // Whether the HWCJog message is supported (otherwise only the legacy bit-packed HWCExtended(JOG) encoding)
 	TextScroll      bool `protobuf:"varint,27,opt,name=TextScroll,proto3" json:"TextScroll,omitempty"`           // Whether text scrolling on displays is supported
+	Segments        bool `protobuf:"varint,28,opt,name=Segments,proto3" json:"Segments,omitempty"`               // Whether individual LEDs of multi LED components can be set with HWCSegments (HWCs#)
 	unknownFields   protoimpl.UnknownFields
 	sizeCache       protoimpl.SizeCache
 }
@@ -6610,6 +6612,13 @@ func (x *RawPanelSupport) GetJogConfig() bool {
 func (x *RawPanelSupport) GetTextScroll() bool {
 	if x != nil {
 		return x.TextScroll
+	}
+	return false
+}
+
+func (x *RawPanelSupport) GetSegments() bool {
+	if x != nil {
+		return x.Segments
 	}
 	return false
 }
@@ -9272,7 +9281,7 @@ const file_ibeam_rawpanel_proto_ibeam_rawpanel_proto_rawDesc = "" +
 	"\bPHYSICAL\x10\x02\x12\r\n" +
 	"\tEMULATION\x10\x03\x12\t\n" +
 	"\x05TOUCH\x10\x04\x12\r\n" +
-	"\tCOMPOSITE\x10\x05\"\xc2\x04\n" +
+	"\tCOMPOSITE\x10\x05\"\xde\x04\n" +
 	"\x0fRawPanelSupport\x12\x14\n" +
 	"\x05ASCII\x18\n" +
 	" \x01(\bR\x05ASCII\x12\x16\n" +
@@ -9295,7 +9304,8 @@ const file_ibeam_rawpanel_proto_ibeam_rawpanel_proto_rawDesc = "" +
 	"\tJogConfig\x18\x1a \x01(\bR\tJogConfig\x12\x1e\n" +
 	"\n" +
 	"TextScroll\x18\x1b \x01(\bR\n" +
-	"TextScroll\"=\n" +
+	"TextScroll\x12\x1a\n" +
+	"\bSegments\x18\x1c \x01(\bR\bSegments\"=\n" +
 	"\rPanelTopology\x12\x18\n" +
 	"\aSvgbase\x18\x01 \x01(\tR\aSvgbase\x12\x12\n" +
 	"\x04Json\x18\x02 \x01(\tR\x04Json\"#\n" +

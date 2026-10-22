@@ -17,6 +17,7 @@ Components made of several LEDs (topology type with `ext: steps` and one `sub` e
 - A present but empty `HWCSegments` clears it, and the LEDs follow `HWCMode`/`HWCColor` again.
 - An `HWCExtended` interpretation (STRENGTH/STEPS/VU) takes precedence over it.
 - Requires the latest Hardware Manager (binary) or the latest UniSketch firmware (ASCII). Panels that don't know it ignore it, so clients keep `HWCMode`/`HWCColor` set to a sensible whole component state as a fallback.
+- Panels that support it announce the `Segments` support flag (`_support=...,Segments`, `RawPanelSupport.Segments`).
 
 New ASCII line:
 
