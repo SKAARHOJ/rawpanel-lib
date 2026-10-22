@@ -307,6 +307,15 @@ func TestInbound(t *testing.T) {
 		},
 
 		// TextScroll: loop mode, scroll title + textline1 (1 | 4 | 8 = 13)
+		// Formatting 7 (hidden text) keeps the value when a scale is shown, and drops it otherwise
+		{
+			[]string{"HWCt#7=42|7|||1|||||1|0|100|0|0"},
+			[]string{"HWCt#7=42|7|||1|||||1|0|100|0|0"},
+		},
+		{
+			[]string{"HWCt#7=42|7|||1"},
+			[]string{"HWCt#7=||||1"},
+		},
 		{
 			[]string{"HWCt#5=|||My Title||Long text here|||||||||13"},
 			[]string{"HWCt#5=|||My Title||Long text here|||||||||13"},

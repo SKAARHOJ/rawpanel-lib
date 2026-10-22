@@ -353,7 +353,9 @@ func RawPanelASCIIstringsToInboundMessages(rp20_ascii []string) []*rwp.InboundMe
 					if textStruct.TextStyling != nil && int(textStruct.TextStyling.UnformattedFontSize) > 0 {
 						textStruct.IntegerValue = 0
 					}
-					if textStruct.Formatting == 7 {
+					// Formatting 7 hides the text. The value is only kept when a scale is shown,
+					// which needs it for its value indicator (same rule as when writing ASCII).
+					if textStruct.Formatting == 7 && (textStruct.Scale == nil || textStruct.Scale.ScaleType == 0) {
 						textStruct.IntegerValue = 0
 					}
 
