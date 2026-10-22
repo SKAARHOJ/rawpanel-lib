@@ -44,3 +44,18 @@ New ASCII lines:
 - `_support=...,TouchUI` — capability flag
 
 Widget visibility (e.g. hidden behind a non-active tab) is reported via the existing `map=<hwc>:<value>` availability mechanism: bit 31 (`0x80000000`) of the value means "present but offscreen". Legacy semantics (0 = absent, non-zero = present) are unchanged; use the `HWCAvailability*` helper functions to interpret values.
+
+## State Feedback
+
+A client can ask a panel for the current state of its hardware components (`Command.SendStateFeedback` / ASCII `state`). The panel answers with `OutboundMessage.StateFeedback`, a list of `HWCCurrentState`: input state (`Pressed` + `Edge`, `AbsoluteValue`, `Speed`) and output state (`HWCMode`, `HWCColor`, `HWCExtended`). The input fields are `optional`: unset means "not reported", so `Up`, `Abs:0` and `Speed:0` are real values. Panels that support it set the `StateFeedback` support flag. In `gorwp`, see `RequestStateFeedback`, `BindStateFeedback` and `State.GetHWCCurrentState`.
+
+Over ASCII, each value is its own line, so one component can be reported over several lines. There is no end-of-reply marker.
+
+New ASCII lines:
+
+- `state` — request state feedback (inbound)
+- `HWCstate#xx[.mask]=Down|Up|Abs:yy|Speed:yy` — current input state, with the same mask (edge) and values as the `HWC#` trigger event (outbound)
+- `HWCMode#xx=yy`, `HWCColor#xx=yy`, `HWCExtended#xx=yy` — current output state, encoded like `HWC#`, `HWCc#` and `HWCx#`. `HWCColor#xx=0` means no color set (default color) (outbound)
+- `_support=...,StateFeedback` — capability flag
+
+Currently implemented by the Link IO firmwares (SmartTally, UniSketch Panel, ETH-GPI, TallyBox, ETH-SDI).
