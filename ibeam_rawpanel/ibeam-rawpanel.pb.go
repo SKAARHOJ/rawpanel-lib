@@ -3255,10 +3255,11 @@ func (x *HWCState) GetHWCSegments() *HWCSegments {
 type HWCCurrentState struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	HWCID uint32                 `protobuf:"varint,1,opt,name=HWCID,proto3" json:"HWCID,omitempty"`
-	// Input state (current physical position)
-	Pressed       bool               `protobuf:"varint,2,opt,name=Pressed,proto3" json:"Pressed,omitempty"`
-	AbsoluteValue uint32             `protobuf:"varint,3,opt,name=AbsoluteValue,proto3" json:"AbsoluteValue,omitempty"`
-	Speed         int32              `protobuf:"varint,4,opt,name=Speed,proto3" json:"Speed,omitempty"`
+	// Input state (current physical position). `optional` so a reported zero
+	// ("Up", "Abs:0", "Speed:0") can be told apart from "not reported".
+	Pressed       *bool              `protobuf:"varint,2,opt,name=Pressed,proto3,oneof" json:"Pressed,omitempty"`
+	AbsoluteValue *uint32            `protobuf:"varint,3,opt,name=AbsoluteValue,proto3,oneof" json:"AbsoluteValue,omitempty"`
+	Speed         *int32             `protobuf:"varint,4,opt,name=Speed,proto3,oneof" json:"Speed,omitempty"`
 	Edge          BinaryEvent_EdgeID `protobuf:"varint,8,opt,name=Edge,proto3,enum=ibeam_rawpanel.BinaryEvent_EdgeID" json:"Edge,omitempty"` // Edge of the button press (top, left, bottom, right, encoder)
 	// Output state (current feedback being displayed)
 	HWCMode       *HWCMode     `protobuf:"bytes,5,opt,name=HWCMode,proto3" json:"HWCMode,omitempty"`
@@ -3306,22 +3307,22 @@ func (x *HWCCurrentState) GetHWCID() uint32 {
 }
 
 func (x *HWCCurrentState) GetPressed() bool {
-	if x != nil {
-		return x.Pressed
+	if x != nil && x.Pressed != nil {
+		return *x.Pressed
 	}
 	return false
 }
 
 func (x *HWCCurrentState) GetAbsoluteValue() uint32 {
-	if x != nil {
-		return x.AbsoluteValue
+	if x != nil && x.AbsoluteValue != nil {
+		return *x.AbsoluteValue
 	}
 	return 0
 }
 
 func (x *HWCCurrentState) GetSpeed() int32 {
-	if x != nil {
-		return x.Speed
+	if x != nil && x.Speed != nil {
+		return *x.Speed
 	}
 	return 0
 }
@@ -8597,16 +8598,20 @@ const file_ibeam_rawpanel_proto_ibeam_rawpanel_proto_rawDesc = "" +
 	"HWCOverlay\x12.\n" +
 	"\x06HWCJog\x18\v \x01(\v2\x16.ibeam_rawpanel.HWCJogR\x06HWCJog\x127\n" +
 	"\tHWCDomain\x18\f \x01(\v2\x19.ibeam_rawpanel.HWCDomainR\tHWCDomain\x12=\n" +
-	"\vHWCSegments\x18\r \x01(\v2\x1b.ibeam_rawpanel.HWCSegmentsR\vHWCSegments\"\xdd\x02\n" +
+	"\vHWCSegments\x18\r \x01(\v2\x1b.ibeam_rawpanel.HWCSegmentsR\vHWCSegments\"\x94\x03\n" +
 	"\x0fHWCCurrentState\x12\x14\n" +
-	"\x05HWCID\x18\x01 \x01(\rR\x05HWCID\x12\x18\n" +
-	"\aPressed\x18\x02 \x01(\bR\aPressed\x12$\n" +
-	"\rAbsoluteValue\x18\x03 \x01(\rR\rAbsoluteValue\x12\x14\n" +
-	"\x05Speed\x18\x04 \x01(\x05R\x05Speed\x126\n" +
+	"\x05HWCID\x18\x01 \x01(\rR\x05HWCID\x12\x1d\n" +
+	"\aPressed\x18\x02 \x01(\bH\x00R\aPressed\x88\x01\x01\x12)\n" +
+	"\rAbsoluteValue\x18\x03 \x01(\rH\x01R\rAbsoluteValue\x88\x01\x01\x12\x19\n" +
+	"\x05Speed\x18\x04 \x01(\x05H\x02R\x05Speed\x88\x01\x01\x126\n" +
 	"\x04Edge\x18\b \x01(\x0e2\".ibeam_rawpanel.BinaryEvent.EdgeIDR\x04Edge\x121\n" +
 	"\aHWCMode\x18\x05 \x01(\v2\x17.ibeam_rawpanel.HWCModeR\aHWCMode\x124\n" +
 	"\bHWCColor\x18\x06 \x01(\v2\x18.ibeam_rawpanel.HWCColorR\bHWCColor\x12=\n" +
-	"\vHWCExtended\x18\a \x01(\v2\x1b.ibeam_rawpanel.HWCExtendedR\vHWCExtended\"\xab\x03\n" +
+	"\vHWCExtended\x18\a \x01(\v2\x1b.ibeam_rawpanel.HWCExtendedR\vHWCExtendedB\n" +
+	"\n" +
+	"\b_PressedB\x10\n" +
+	"\x0e_AbsoluteValueB\b\n" +
+	"\x06_Speed\"\xab\x03\n" +
 	"\n" +
 	"Processors\x12:\n" +
 	"\aGfxConv\x18\x01 \x01(\v2 .ibeam_rawpanel.ProcGfxConverterR\aGfxConv\x12>\n" +
@@ -9613,6 +9618,7 @@ func file_ibeam_rawpanel_proto_ibeam_rawpanel_proto_init() {
 		return
 	}
 	file_ibeam_rawpanel_proto_ibeam_rawpanel_proto_msgTypes[10].OneofWrappers = []any{}
+	file_ibeam_rawpanel_proto_ibeam_rawpanel_proto_msgTypes[14].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{

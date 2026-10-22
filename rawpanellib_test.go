@@ -116,6 +116,45 @@ func TestOutbound(t *testing.T) {
 			[]string{"HWCExtended#3=5120"},
 		},
 
+		// StateFeedback lines as sent by Link IO firmwares (standalone-firmware/LinkIO Platform):
+		// zero values must survive the round-trip.
+		{
+			[]string{"HWCstate#9=Abs:0"}, // ETH-GPI analog input at minimum
+			[]string{"HWCstate#9=Abs:0"},
+		},
+		{
+			[]string{"HWCstate#3=Speed:0"},
+			[]string{"HWCstate#3=Speed:0"},
+		},
+		{
+			[]string{"HWCstate#3=Speed:-7"},
+			[]string{"HWCstate#3=Speed:-7"},
+		},
+		{
+			[]string{"HWCstate#4.16=Up"}, // UniSketch encoder push released
+			[]string{"HWCstate#4.16=Up"},
+		},
+		{
+			[]string{"HWCMode#1=0"},
+			[]string{"HWCMode#1=0"},
+		},
+		{
+			[]string{"HWCMode#1=1796"}, // ON + blink pattern 7
+			[]string{"HWCMode#1=1796"},
+		},
+		{
+			[]string{"HWCColor#2=0"}, // never set: default color, written the way HWCc# writes it
+			[]string{"HWCColor#2=128"},
+		},
+		{
+			[]string{"HWCColor#2=227"}, // RGB
+			[]string{"HWCColor#2=227"},
+		},
+		{
+			[]string{"HWCExtended#3=0"},
+			[]string{"HWCExtended#3=0"},
+		},
+
 		// Support with StateFeedback
 		{
 			[]string{"_support=ASCII,StateFeedback"},

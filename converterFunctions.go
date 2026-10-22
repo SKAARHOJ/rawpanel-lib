@@ -1647,16 +1647,13 @@ func RawPanelASCIIstringsToOutboundMessages(rp20_ascii []string) []*rwp.Outbound
 					HWCID: hwcID,
 				}
 				switch eventType {
-				case "Down":
-					stateRec.Pressed = true
-					stateRec.Edge = rwp.BinaryEvent_EdgeID(edge)
-				case "Up":
-					// Pressed defaults to false
+				case "Down", "Up":
+					stateRec.Pressed = proto.Bool(eventType == "Down")
 					stateRec.Edge = rwp.BinaryEvent_EdgeID(edge)
 				case "Abs":
-					stateRec.AbsoluteValue = uint32(su.Intval(matches[6]))
+					stateRec.AbsoluteValue = proto.Uint32(uint32(su.Intval(matches[6])))
 				case "Speed":
-					stateRec.Speed = int32(su.Intval(matches[6]))
+					stateRec.Speed = proto.Int32(int32(su.Intval(matches[6])))
 				}
 				msg = &rwp.OutboundMessage{
 					StateFeedback: []*rwp.HWCCurrentState{stateRec},
@@ -1671,27 +1668,9 @@ func RawPanelASCIIstringsToOutboundMessages(rp20_ascii []string) []*rwp.Outbound
 				}
 				switch cmdType {
 				case "HWCMode":
-					stateRec.HWCMode = &rwp.HWCMode{
-						State:        rwp.HWCMode_StateE(value & 0xF),
-						Output:       (value & 0x20) == 0x20,
-						BlinkPattern: uint32((value >> 8) & 0xF),
-					}
+					stateRec.HWCMode = modeFromASCII(value)
 				case "HWCColor":
-					if (value & 0b11000000) == 0b11000000 {
-						stateRec.HWCColor = &rwp.HWCColor{
-							ColorRGB: &rwp.ColorRGB{
-								Red:   uint32(su.MapAndConstrainValue((value>>4)&0x3, 0, 0x3, 0, 0xFF)),
-								Green: uint32(su.MapAndConstrainValue((value>>2)&0x3, 0, 0x3, 0, 0xFF)),
-								Blue:  uint32(su.MapAndConstrainValue((value>>0)&0x3, 0, 0x3, 0, 0xFF)),
-							},
-						}
-					} else if (value & 0b10000000) == 0b10000000 {
-						stateRec.HWCColor = &rwp.HWCColor{
-							ColorIndex: &rwp.ColorIndex{
-								Index: rwp.ColorIndex_Colors(value & 0x1F),
-							},
-						}
-					}
+					stateRec.HWCColor = colorFromASCII(value)
 				case "HWCExtended":
 					stateRec.HWCExtended = &rwp.HWCExtended{
 						Interpretation: rwp.HWCExtended_InterpretationE((value >> 12) & 0xF),
@@ -2015,32 +1994,21 @@ func OutboundMessagesToRawPanelASCIIstrings(outboundMsgs []*rwp.OutboundMessage)
 
 		if len(outboundMsg.StateFeedback) > 0 {
 			for _, stateRec := range outboundMsg.StateFeedback {
-				edgeSuffix := su.Qstr(stateRec.Edge > 0, fmt.Sprintf(".%d", stateRec.Edge), "")
-				if stateRec.Pressed {
-					returnStrings = append(returnStrings, fmt.Sprintf("HWCstate#%d%s=Down", stateRec.HWCID, edgeSuffix))
-				} else if stateRec.AbsoluteValue == 0 && stateRec.Speed == 0 && stateRec.HWCMode == nil && stateRec.HWCColor == nil && stateRec.HWCExtended == nil {
-					returnStrings = append(returnStrings, fmt.Sprintf("HWCstate#%d%s=Up", stateRec.HWCID, edgeSuffix))
+				if stateRec.Pressed != nil {
+					edgeSuffix := su.Qstr(stateRec.Edge > 0, fmt.Sprintf(".%d", stateRec.Edge), "")
+					returnStrings = append(returnStrings, fmt.Sprintf("HWCstate#%d%s=%s", stateRec.HWCID, edgeSuffix, su.Qstr(*stateRec.Pressed, "Down", "Up")))
 				}
-				if stateRec.AbsoluteValue > 0 {
-					returnStrings = append(returnStrings, fmt.Sprintf("HWCstate#%d=Abs:%d", stateRec.HWCID, stateRec.AbsoluteValue))
+				if stateRec.AbsoluteValue != nil {
+					returnStrings = append(returnStrings, fmt.Sprintf("HWCstate#%d=Abs:%d", stateRec.HWCID, *stateRec.AbsoluteValue))
 				}
-				if stateRec.Speed != 0 {
-					returnStrings = append(returnStrings, fmt.Sprintf("HWCstate#%d=Speed:%d", stateRec.HWCID, stateRec.Speed))
+				if stateRec.Speed != nil {
+					returnStrings = append(returnStrings, fmt.Sprintf("HWCstate#%d=Speed:%d", stateRec.HWCID, *stateRec.Speed))
 				}
 				if stateRec.HWCMode != nil {
-					outputInteger := uint32(stateRec.HWCMode.State&0x7) | uint32((stateRec.HWCMode.BlinkPattern&0xF)<<8) | uint32(su.Qint(stateRec.HWCMode.Output, 0b100000, 0))
-					returnStrings = append(returnStrings, fmt.Sprintf("HWCMode#%d=%d", stateRec.HWCID, outputInteger))
+					returnStrings = append(returnStrings, fmt.Sprintf("HWCMode#%d=%d", stateRec.HWCID, modeToASCII(stateRec.HWCMode)))
 				}
 				if stateRec.HWCColor != nil {
-					if stateRec.HWCColor.ColorRGB != nil {
-						outputInteger := 0b11000000 |
-							((su.MapAndConstrainValue(int(stateRec.HWCColor.ColorRGB.Red), 0, 0xFF, 0, 0x3) & 0x3) << 4) |
-							((su.MapAndConstrainValue(int(stateRec.HWCColor.ColorRGB.Green), 0, 0xFF, 0, 0x3) & 0x3) << 2) |
-							((su.MapAndConstrainValue(int(stateRec.HWCColor.ColorRGB.Blue), 0, 0xFF, 0, 0x3) & 0x3) << 0)
-						returnStrings = append(returnStrings, fmt.Sprintf("HWCColor#%d=%d", stateRec.HWCID, outputInteger))
-					} else if stateRec.HWCColor.ColorIndex != nil {
-						outputInteger := 0b10000000 |
-							uint32(stateRec.HWCColor.ColorIndex.Index&0x1F)
+					if outputInteger, ok := colorToASCII(stateRec.HWCColor); ok {
 						returnStrings = append(returnStrings, fmt.Sprintf("HWCColor#%d=%d", stateRec.HWCID, outputInteger))
 					}
 				}
