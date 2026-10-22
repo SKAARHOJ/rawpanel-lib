@@ -1142,7 +1142,7 @@ var regex_stateInput = regexp.MustCompile("^HWCstate#([0-9]+)(|\\.([0-9]+))=(Dow
 var regex_stateOutput = regexp.MustCompile("^(HWCMode|HWCColor|HWCExtended)#([0-9]+)=(.*)$")
 var regex_map = regexp.MustCompile("^map=([0-9]+):([0-9]+)$")
 var regex_genericSingle_inbound = regexp.MustCompile("^(_model|_serial|_version|_platform|_bluePillReady|_name|_panelType|_support|_isSleeping|_sleepTimer|_panelTopology_svgbase|_panelTopology_HWC|_burninProfile|_networkConfig|_calibrationProfile|_defaultCalibrationProfile|_serverModeLockToIP|_serverModeMaxClients|_heartBeatTimer|DimmedGain|_connections|_bootsCount|_totalUptimeMin|_sessionUptimeMin|_screenSaverOnMin|_touchUICapabilities|_touchUIConfig|_touchUIActivePage|ErrorMsg|Msg|EnvironmentalHealth|SysStat)=(.+)$")
-var regex_cmd_inbound = regexp.MustCompile("^HWC#([0-9]+)(|.([0-9]+))=(Down|Up|Press|Abs|Speed|Enc)(|:([-0-9,]+))$")
+var regex_cmd_inbound = regexp.MustCompile("^HWC#([0-9]+)(|.([0-9]+))=(Down|Up|Press|Abs|Speed|Enc|Raw)(|:([-0-9,]+))$")
 
 // Text events carry free text, so their value is the whole rest of the line and needs no escaping.
 // They get their own regex rather than joining the alternation above: widening that value class from
@@ -1286,7 +1286,7 @@ func RawPanelASCIIstringsToOutboundMessages(rp20_ascii []string) []*rwp.Outbound
 					}
 					msg = &rwp.OutboundMessage{Events: []*rwp.HWCEvent{event}}
 				case "Raw":
-					value := su.Intval(regex_cmd.FindStringSubmatch(inputString)[6])
+					value := su.Intval(regex_cmd_inbound.FindStringSubmatch(inputString)[6])
 					msg = &rwp.OutboundMessage{
 						Events: []*rwp.HWCEvent{
 							{
@@ -1411,6 +1411,8 @@ func RawPanelASCIIstringsToOutboundMessages(rp20_ascii []string) []*rwp.Outbound
 							supportObj.NetworkSettings = true
 						case "TouchUI":
 							supportObj.TouchUI = true
+						case "JogConfig":
+							supportObj.JogConfig = true
 						case "StateFeedback":
 							supportObj.StateFeedback = true
 						case "TextScroll":
@@ -1862,6 +1864,9 @@ func OutboundMessagesToRawPanelASCIIstrings(outboundMsgs []*rwp.OutboundMessage)
 				if outboundMsg.PanelInfo.RawPanelSupport.TouchUI {
 					support = append(support, "TouchUI")
 				}
+				if outboundMsg.PanelInfo.RawPanelSupport.JogConfig {
+					support = append(support, "JogConfig")
+				}
 				if outboundMsg.PanelInfo.RawPanelSupport.StateFeedback {
 					support = append(support, "StateFeedback")
 				}
@@ -1872,8 +1877,13 @@ func OutboundMessagesToRawPanelASCIIstrings(outboundMsgs []*rwp.OutboundMessage)
 			}
 		}
 		if outboundMsg.PanelTopology != nil {
-			returnStrings = append(returnStrings, "_panelTopology_svgbase="+stripLineBreaksSvg(outboundMsg.PanelTopology.Svgbase))
-			returnStrings = append(returnStrings, "_panelTopology_HWC="+stripLineBreaks(outboundMsg.PanelTopology.Json))
+			// Only the parts present: an empty line would read back as a blank SVG / topology
+			if outboundMsg.PanelTopology.Svgbase != "" {
+				returnStrings = append(returnStrings, "_panelTopology_svgbase="+stripLineBreaksSvg(outboundMsg.PanelTopology.Svgbase))
+			}
+			if outboundMsg.PanelTopology.Json != "" {
+				returnStrings = append(returnStrings, "_panelTopology_HWC="+stripLineBreaks(outboundMsg.PanelTopology.Json))
+			}
 		}
 		if outboundMsg.BurninProfile != nil {
 			returnStrings = append(returnStrings, "_burninProfile="+stripLineBreaks(outboundMsg.BurninProfile.Json))
@@ -2152,7 +2162,7 @@ func stripLineBreaksSvg(svg string) string {
 	for i := range parts {
 		parts[i] = strings.TrimSpace(parts[i])
 		if !strings.HasSuffix(parts[i], ">") {
-			parts[i] = " " // Add a single space at the end if it's not tags. This is to secure integrity of such as a SVG path defined over multiple lines which is sometimes the case....
+			parts[i] += " " // Add a single space at the end if it's not tags. This is to secure integrity of such as a SVG path defined over multiple lines which is sometimes the case....
 		}
 	}
 	return strings.Join(parts, "")

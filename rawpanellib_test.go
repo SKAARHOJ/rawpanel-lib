@@ -156,6 +156,18 @@ func TestOutbound(t *testing.T) {
 			[]string{"HWCExtended#3=0"},
 		},
 
+		// Raw analog event
+		{
+			[]string{"HWC#7=Raw:512"},
+			[]string{"HWC#7=Raw:512"},
+		},
+
+		// Support with JogConfig
+		{
+			[]string{"_support=ASCII,JogConfig"},
+			[]string{"_support=ASCII,JogConfig"},
+		},
+
 		// Support with StateFeedback
 		{
 			[]string{"_support=ASCII,StateFeedback"},
