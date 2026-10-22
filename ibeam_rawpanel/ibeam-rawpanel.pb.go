@@ -1668,7 +1668,7 @@ type TouchUIWidget_WidgetTypeE int32
 const (
 	TouchUIWidget_BUTTON TouchUIWidget_WidgetTypeE = 0 // momentary push button    -> emits Binary;   honors HWCMode/HWCColor/HWCText/HWCGfx
 	//   With Options.FourWay it is a 4-way pad: taps on the top/left/bottom/right edges emit
-	//   Binary with the matching Edge (TOP/LEFT/BOTTOM/RIGHT); a plain button emits Edge=NONE.
+	//   Binary with the matching Edge (TOP/LEFT/BOTTOM/RIGHT); a plain button emits Edge=UNKNOWN (0).
 	TouchUIWidget_TOGGLE TouchUIWidget_WidgetTypeE = 1 // latching on/off          -> emits Binary;   honors HWCMode/HWCColor/HWCText
 	TouchUIWidget_SLIDER TouchUIWidget_WidgetTypeE = 2 // linear fader, 0..1000    -> emits Absolute; honors HWCExtended(FADER)/HWCText
 	TouchUIWidget_KNOB   TouchUIWidget_WidgetTypeE = 3 // rotary fader (analog dial, absolute 0..1000) -> emits Absolute; honors HWCExtended(FADER)/HWCText
@@ -3177,14 +3177,13 @@ type HWCState struct {
 	HWCText             *HWCText               `protobuf:"bytes,5,opt,name=HWCText,proto3" json:"HWCText,omitempty"`         // HWCt#xx=yy
 	HWCGfx              *HWCGfx                `protobuf:"bytes,6,opt,name=HWCGfx,proto3" json:"HWCGfx,omitempty"`           // HWCg#xx=yy   + HWCgRGB#xx=yy+ HWCgGray#xx=yy
 	PublishRawADCValues *PublishRawADCValues   `protobuf:"bytes,7,opt,name=PublishRawADCValues,proto3" json:"PublishRawADCValues,omitempty"`
-	// 8 was temporarily used for HWCGfxConverter which has never been used by anyone, but we avoid it...
-	Processors    *Processors  `protobuf:"bytes,9,opt,name=Processors,proto3" json:"Processors,omitempty"`
-	HWCOverlay    *HWCOverlay  `protobuf:"bytes,10,opt,name=HWCOverlay,proto3" json:"HWCOverlay,omitempty"`   // "HWCo#xx={json}" - dynamic overlay boxes (e.g. tracking rectangles on a TouchUI VIDEO widget)
-	HWCJog        *HWCJog      `protobuf:"bytes,11,opt,name=HWCJog,proto3" json:"HWCJog,omitempty"`           // HWCj#xx=yy - complete configuration of a haptic jog wheel
-	HWCDomain     *HWCDomain   `protobuf:"bytes,12,opt,name=HWCDomain,proto3" json:"HWCDomain,omitempty"`     // "HWCd#xx={json}" - runtime domain (choice list / value range) of a TouchUI widget
-	HWCSegments   *HWCSegments `protobuf:"bytes,13,opt,name=HWCSegments,proto3" json:"HWCSegments,omitempty"` // HWCs#xx=yy - individual state of each LED of a multi LED component
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	Processors          *Processors            `protobuf:"bytes,9,opt,name=Processors,proto3" json:"Processors,omitempty"`
+	HWCOverlay          *HWCOverlay            `protobuf:"bytes,10,opt,name=HWCOverlay,proto3" json:"HWCOverlay,omitempty"`   // "HWCo#xx={json}" - dynamic overlay boxes (e.g. tracking rectangles on a TouchUI VIDEO widget)
+	HWCJog              *HWCJog                `protobuf:"bytes,11,opt,name=HWCJog,proto3" json:"HWCJog,omitempty"`           // HWCj#xx=yy - complete configuration of a haptic jog wheel
+	HWCDomain           *HWCDomain             `protobuf:"bytes,12,opt,name=HWCDomain,proto3" json:"HWCDomain,omitempty"`     // "HWCd#xx={json}" - runtime domain (choice list / value range) of a TouchUI widget
+	HWCSegments         *HWCSegments           `protobuf:"bytes,13,opt,name=HWCSegments,proto3" json:"HWCSegments,omitempty"` // HWCs#xx=yy - individual state of each LED of a multi LED component
+	unknownFields       protoimpl.UnknownFields
+	sizeCache           protoimpl.SizeCache
 }
 
 func (x *HWCState) Reset() {
@@ -3308,8 +3307,8 @@ type HWCCurrentState struct {
 	// ("Up", "Abs:0", "Speed:0") can be told apart from "not reported".
 	Pressed       *bool              `protobuf:"varint,2,opt,name=Pressed,proto3,oneof" json:"Pressed,omitempty"`
 	AbsoluteValue *uint32            `protobuf:"varint,3,opt,name=AbsoluteValue,proto3,oneof" json:"AbsoluteValue,omitempty"`
-	Speed         *int32             `protobuf:"varint,4,opt,name=Speed,proto3,oneof" json:"Speed,omitempty"`
-	Edge          BinaryEvent_EdgeID `protobuf:"varint,8,opt,name=Edge,proto3,enum=ibeam_rawpanel.BinaryEvent_EdgeID" json:"Edge,omitempty"` // Edge of the button press (top, left, bottom, right, encoder)
+	Speed         *int32             `protobuf:"zigzag32,4,opt,name=Speed,proto3,oneof" json:"Speed,omitempty"`
+	Edge          BinaryEvent_EdgeID `protobuf:"varint,8,opt,name=Edge,proto3,enum=ibeam_rawpanel.BinaryEvent_EdgeID" json:"Edge,omitempty"` // Edge of the button press (top, left, bottom, right, encoder). Only meaningful when Pressed is set
 	// Output state (current feedback being displayed)
 	HWCMode       *HWCMode     `protobuf:"bytes,5,opt,name=HWCMode,proto3" json:"HWCMode,omitempty"`
 	HWCColor      *HWCColor    `protobuf:"bytes,6,opt,name=HWCColor,proto3" json:"HWCColor,omitempty"`
@@ -5616,7 +5615,7 @@ type HWCEvent struct {
 	Speed    *SpeedEvent    `protobuf:"bytes,5,opt,name=Speed,proto3" json:"Speed,omitempty"`
 	// Vector events carries multiple values, for example a X/Y of a joystick that goes together or X/Y movement on a track pad or track ball.
 	// A vector event may be sent along with a normal one-dimensional event - typically the first axis of something like a joystick.
-	// BinaryVectorEvent BinaryVector = 8;
+	// BinaryVectorEvent BinaryVector = 14;
 	// PulsedVectorEvent PulsedVector = 9;
 	AbsoluteVector *AbsoluteVectorEvent `protobuf:"bytes,10,opt,name=AbsoluteVector,proto3" json:"AbsoluteVector,omitempty"` // e.g. a TouchUI XYPAD position [x, y]
 	SpeedVector    *SpeedVectorEvent    `protobuf:"bytes,11,opt,name=SpeedVector,proto3" json:"SpeedVector,omitempty"`       // e.g. a TouchUI XYPAD relative movement [dx, dy]
@@ -7256,7 +7255,9 @@ func (x *TouchUIPage) GetWidgets() []*TouchUIWidget {
 //
 //	bit5 = Text (a string value, e.g. an editable LABEL commit)
 //
-// StateMask: bit0 = HWCMode, bit1 = HWCColor, bit2 = HWCText, bit3 = HWCExtended, bit4 = HWCGfx, bit5 = HWCOverlay
+// StateMask: bit0 = HWCMode, bit1 = HWCColor, bit2 = HWCText, bit3 = HWCExtended, bit4 = HWCGfx, bit5 = HWCOverlay,
+//
+//	bit6 = HWCDomain
 type TouchUIWidget struct {
 	state protoimpl.MessageState    `protogen:"open.v1"`
 	HWCID uint32                    `protobuf:"varint,1,opt,name=HWCID,proto3" json:"HWCID,omitempty"` // Client-assigned HWC id. MUST NOT collide with the panel's native HWC ids.
@@ -8739,7 +8740,7 @@ const file_ibeam_rawpanel_proto_ibeam_rawpanel_proto_rawDesc = "" +
 	"\bON_1CORE\x10\x01\x12\r\n" +
 	"\tON_2CORES\x10\x02\x12\r\n" +
 	"\tON_3CORES\x10\x03\x12\r\n" +
-	"\tON_4CORES\x10\x04\"\xa4\x05\n" +
+	"\tON_4CORES\x10\x04\"\xaa\x05\n" +
 	"\bHWCState\x12\x16\n" +
 	"\x06HWCIDs\x18\x01 \x03(\rR\x06HWCIDs\x121\n" +
 	"\aHWCMode\x18\x02 \x01(\v2\x17.ibeam_rawpanel.HWCModeR\aHWCMode\x124\n" +
@@ -8757,12 +8758,12 @@ const file_ibeam_rawpanel_proto_ibeam_rawpanel_proto_rawDesc = "" +
 	"HWCOverlay\x12.\n" +
 	"\x06HWCJog\x18\v \x01(\v2\x16.ibeam_rawpanel.HWCJogR\x06HWCJog\x127\n" +
 	"\tHWCDomain\x18\f \x01(\v2\x19.ibeam_rawpanel.HWCDomainR\tHWCDomain\x12=\n" +
-	"\vHWCSegments\x18\r \x01(\v2\x1b.ibeam_rawpanel.HWCSegmentsR\vHWCSegments\"\x94\x03\n" +
+	"\vHWCSegments\x18\r \x01(\v2\x1b.ibeam_rawpanel.HWCSegmentsR\vHWCSegmentsJ\x04\b\b\x10\t\"\x94\x03\n" +
 	"\x0fHWCCurrentState\x12\x14\n" +
 	"\x05HWCID\x18\x01 \x01(\rR\x05HWCID\x12\x1d\n" +
 	"\aPressed\x18\x02 \x01(\bH\x00R\aPressed\x88\x01\x01\x12)\n" +
 	"\rAbsoluteValue\x18\x03 \x01(\rH\x01R\rAbsoluteValue\x88\x01\x01\x12\x19\n" +
-	"\x05Speed\x18\x04 \x01(\x05H\x02R\x05Speed\x88\x01\x01\x126\n" +
+	"\x05Speed\x18\x04 \x01(\x11H\x02R\x05Speed\x88\x01\x01\x126\n" +
 	"\x04Edge\x18\b \x01(\x0e2\".ibeam_rawpanel.BinaryEvent.EdgeIDR\x04Edge\x121\n" +
 	"\aHWCMode\x18\x05 \x01(\v2\x17.ibeam_rawpanel.HWCModeR\aHWCMode\x124\n" +
 	"\bHWCColor\x18\x06 \x01(\v2\x18.ibeam_rawpanel.HWCColorR\bHWCColor\x12=\n" +
@@ -9174,7 +9175,7 @@ const file_ibeam_rawpanel_proto_ibeam_rawpanel_proto_rawDesc = "" +
 	"\rSessionUptime\x18\x03 \x01(\rR\rSessionUptime\x12*\n" +
 	"\x10ScreenSaveOnTime\x18\x04 \x01(\rR\x10ScreenSaveOnTime\"!\n" +
 	"\tBusStatus\x12\x14\n" +
-	"\x05Fault\x18\x01 \x01(\bR\x05Fault\"\x93\x04\n" +
+	"\x05Fault\x18\x01 \x01(\bR\x05Fault\"\x99\x04\n" +
 	"\bHWCEvent\x12\x14\n" +
 	"\x05HWCID\x18\x01 \x01(\rR\x05HWCID\x12\x1c\n" +
 	"\tTimestamp\x18\x06 \x01(\rR\tTimestamp\x123\n" +
@@ -9186,7 +9187,7 @@ const file_ibeam_rawpanel_proto_ibeam_rawpanel_proto_rawDesc = "" +
 	" \x01(\v2#.ibeam_rawpanel.AbsoluteVectorEventR\x0eAbsoluteVector\x12B\n" +
 	"\vSpeedVector\x18\v \x01(\v2 .ibeam_rawpanel.SpeedVectorEventR\vSpeedVector\x12-\n" +
 	"\x04Text\x18\r \x01(\v2\x19.ibeam_rawpanel.TextEventR\x04Text\x12<\n" +
-	"\tRawAnalog\x18\a \x01(\v2\x1e.ibeam_rawpanel.RawAnalogEventR\tRawAnalog\"\xad\x01\n" +
+	"\tRawAnalog\x18\a \x01(\v2\x1e.ibeam_rawpanel.RawAnalogEventR\tRawAnalogJ\x04\b\b\x10\t\"\xad\x01\n" +
 	"\vBinaryEvent\x12\x18\n" +
 	"\aPressed\x18\x01 \x01(\bR\aPressed\x126\n" +
 	"\x04Edge\x18\x02 \x01(\x0e2\".ibeam_rawpanel.BinaryEvent.EdgeIDR\x04Edge\"L\n" +
