@@ -78,6 +78,50 @@ func TestOutbound(t *testing.T) {
 			[]string{"EnvironmentalHealth=Blocked"},
 		},
 
+		// HWCStates
+		{
+			[]string{"HWCstate#1=Down"},
+			[]string{"HWCstate#1=Down"},
+		},
+		{
+			[]string{"HWCstate#1=Up"},
+			[]string{"HWCstate#1=Up"},
+		},
+		{
+			[]string{"HWCstate#1.4=Down"},
+			[]string{"HWCstate#1.4=Down"},
+		},
+		{
+			[]string{"HWCstate#2.8=Up"},
+			[]string{"HWCstate#2.8=Up"},
+		},
+		{
+			[]string{"HWCstate#5=Abs:500"},
+			[]string{"HWCstate#5=Abs:500"},
+		},
+		{
+			[]string{"HWCstate#3=Speed:42"},
+			[]string{"HWCstate#3=Speed:42"},
+		},
+		{
+			[]string{"HWCMode#1=32"},
+			[]string{"HWCMode#1=32"},
+		},
+		{
+			[]string{"HWCColor#2=132"},
+			[]string{"HWCColor#2=132"},
+		},
+		{
+			[]string{"HWCExtended#3=5120"},
+			[]string{"HWCExtended#3=5120"},
+		},
+
+		// Support with StateFeedback
+		{
+			[]string{"_support=ASCII,StateFeedback"},
+			[]string{"_support=ASCII,StateFeedback"},
+		},
+
 		// Register
 		{
 			[]string{"Mem=33", "MemA=12", "MemBB=355", "MemZ3Z=33"},
@@ -187,6 +231,10 @@ func TestInbound(t *testing.T) {
 		{
 			[]string{"CalibrationProfile?"},
 			[]string{"CalibrationProfile?"},
+		},
+		{
+			[]string{"state"},
+			[]string{"state"},
 		},
 		{
 			[]string{"SetCalibrationProfile= (JSON) "},

@@ -177,6 +177,12 @@ func RawPanelASCIIstringsToInboundMessages(rp20_ascii []string) []*rwp.InboundMe
 					Reboot: true,
 				},
 			}
+		case "state":
+			msg = &rwp.InboundMessage{
+				Command: &rwp.Command{
+					SendStateFeedback: true,
+				},
+			}
 		default:
 			if len(inputString) > 0 && inputString[0:1] == "{" { // JSON input, events
 				//fmt.Println(inputString)
@@ -794,6 +800,9 @@ func InboundMessagesToRawPanelASCIIstrings(inboundMsgs []*rwp.InboundMessage) []
 			if inboundMsg.Command.Reboot {
 				returnStrings = append(returnStrings, "Reboot")
 			}
+			if inboundMsg.Command.SendStateFeedback {
+				returnStrings = append(returnStrings, "state")
+			}
 			if b := inboundMsg.Command.PanelBrightness; b != nil {
 				if b.Screen != nil {
 					// Only emit the three-value form when a screen level is actually
@@ -1095,6 +1104,8 @@ func InboundMessagesToRawPanelASCIIstrings(inboundMsgs []*rwp.InboundMessage) []
 	return returnStrings
 }
 
+var regex_stateInput = regexp.MustCompile("^HWCstate#([0-9]+)(|\\.([0-9]+))=(Down|Up|Abs|Speed)(|:([-0-9]+))$")
+var regex_stateOutput = regexp.MustCompile("^(HWCMode|HWCColor|HWCExtended)#([0-9]+)=(.*)$")
 var regex_map = regexp.MustCompile("^map=([0-9]+):([0-9]+)$")
 var regex_genericSingle_inbound = regexp.MustCompile("^(_model|_serial|_version|_platform|_bluePillReady|_name|_panelType|_support|_isSleeping|_sleepTimer|_panelTopology_svgbase|_panelTopology_HWC|_burninProfile|_networkConfig|_calibrationProfile|_defaultCalibrationProfile|_serverModeLockToIP|_serverModeMaxClients|_heartBeatTimer|DimmedGain|_connections|_bootsCount|_totalUptimeMin|_sessionUptimeMin|_screenSaverOnMin|_touchUICapabilities|_touchUIConfig|_touchUIActivePage|ErrorMsg|Msg|EnvironmentalHealth|SysStat)=(.+)$")
 var regex_cmd_inbound = regexp.MustCompile("^HWC#([0-9]+)(|.([0-9]+))=(Down|Up|Press|Abs|Speed|Enc)(|:([-0-9,]+))$")
@@ -1366,6 +1377,8 @@ func RawPanelASCIIstringsToOutboundMessages(rp20_ascii []string) []*rwp.Outbound
 							supportObj.NetworkSettings = true
 						case "TouchUI":
 							supportObj.TouchUI = true
+						case "StateFeedback":
+							supportObj.StateFeedback = true
 						}
 					}
 					msg = &rwp.OutboundMessage{
@@ -1625,6 +1638,69 @@ func RawPanelASCIIstringsToOutboundMessages(rp20_ascii []string) []*rwp.Outbound
 						},
 					}
 				}
+			} else if regex_stateInput.MatchString(inputString) {
+				matches := regex_stateInput.FindStringSubmatch(inputString)
+				hwcID := uint32(su.Intval(matches[1]))
+				edge := su.Intval(matches[3])
+				eventType := matches[4]
+				stateRec := &rwp.HWCCurrentState{
+					HWCID: hwcID,
+				}
+				switch eventType {
+				case "Down":
+					stateRec.Pressed = true
+					stateRec.Edge = rwp.BinaryEvent_EdgeID(edge)
+				case "Up":
+					// Pressed defaults to false
+					stateRec.Edge = rwp.BinaryEvent_EdgeID(edge)
+				case "Abs":
+					stateRec.AbsoluteValue = uint32(su.Intval(matches[6]))
+				case "Speed":
+					stateRec.Speed = int32(su.Intval(matches[6]))
+				}
+				msg = &rwp.OutboundMessage{
+					StateFeedback: []*rwp.HWCCurrentState{stateRec},
+				}
+			} else if regex_stateOutput.MatchString(inputString) {
+				matches := regex_stateOutput.FindStringSubmatch(inputString)
+				cmdType := matches[1]
+				hwcID := uint32(su.Intval(matches[2]))
+				value, _ := strconv.Atoi(matches[3])
+				stateRec := &rwp.HWCCurrentState{
+					HWCID: hwcID,
+				}
+				switch cmdType {
+				case "HWCMode":
+					stateRec.HWCMode = &rwp.HWCMode{
+						State:        rwp.HWCMode_StateE(value & 0xF),
+						Output:       (value & 0x20) == 0x20,
+						BlinkPattern: uint32((value >> 8) & 0xF),
+					}
+				case "HWCColor":
+					if (value & 0b11000000) == 0b11000000 {
+						stateRec.HWCColor = &rwp.HWCColor{
+							ColorRGB: &rwp.ColorRGB{
+								Red:   uint32(su.MapAndConstrainValue((value>>4)&0x3, 0, 0x3, 0, 0xFF)),
+								Green: uint32(su.MapAndConstrainValue((value>>2)&0x3, 0, 0x3, 0, 0xFF)),
+								Blue:  uint32(su.MapAndConstrainValue((value>>0)&0x3, 0, 0x3, 0, 0xFF)),
+							},
+						}
+					} else if (value & 0b10000000) == 0b10000000 {
+						stateRec.HWCColor = &rwp.HWCColor{
+							ColorIndex: &rwp.ColorIndex{
+								Index: rwp.ColorIndex_Colors(value & 0x1F),
+							},
+						}
+					}
+				case "HWCExtended":
+					stateRec.HWCExtended = &rwp.HWCExtended{
+						Interpretation: rwp.HWCExtended_InterpretationE((value >> 12) & 0xF),
+						Value:          uint32(value & 0xFFF),
+					}
+				}
+				msg = &rwp.OutboundMessage{
+					StateFeedback: []*rwp.HWCCurrentState{stateRec},
+				}
 			} else {
 				msg = &rwp.OutboundMessage{} //  == nack?
 			}
@@ -1770,6 +1846,9 @@ func OutboundMessagesToRawPanelASCIIstrings(outboundMsgs []*rwp.OutboundMessage)
 				}
 				if outboundMsg.PanelInfo.RawPanelSupport.TouchUI {
 					support = append(support, "TouchUI")
+				}
+				if outboundMsg.PanelInfo.RawPanelSupport.StateFeedback {
+					support = append(support, "StateFeedback")
 				}
 				returnStrings = append(returnStrings, "_support="+strings.Join(support, ","))
 			}
@@ -1930,6 +2009,44 @@ func OutboundMessagesToRawPanelASCIIstrings(outboundMsgs []*rwp.OutboundMessage)
 				}
 				if eventRec.RawAnalog != nil {
 					returnStrings = append(returnStrings, fmt.Sprintf("HWC#%d=Raw:%d", eventRec.HWCID, eventRec.RawAnalog.Value))
+				}
+			}
+		}
+
+		if len(outboundMsg.StateFeedback) > 0 {
+			for _, stateRec := range outboundMsg.StateFeedback {
+				edgeSuffix := su.Qstr(stateRec.Edge > 0, fmt.Sprintf(".%d", stateRec.Edge), "")
+				if stateRec.Pressed {
+					returnStrings = append(returnStrings, fmt.Sprintf("HWCstate#%d%s=Down", stateRec.HWCID, edgeSuffix))
+				} else if stateRec.AbsoluteValue == 0 && stateRec.Speed == 0 && stateRec.HWCMode == nil && stateRec.HWCColor == nil && stateRec.HWCExtended == nil {
+					returnStrings = append(returnStrings, fmt.Sprintf("HWCstate#%d%s=Up", stateRec.HWCID, edgeSuffix))
+				}
+				if stateRec.AbsoluteValue > 0 {
+					returnStrings = append(returnStrings, fmt.Sprintf("HWCstate#%d=Abs:%d", stateRec.HWCID, stateRec.AbsoluteValue))
+				}
+				if stateRec.Speed != 0 {
+					returnStrings = append(returnStrings, fmt.Sprintf("HWCstate#%d=Speed:%d", stateRec.HWCID, stateRec.Speed))
+				}
+				if stateRec.HWCMode != nil {
+					outputInteger := uint32(stateRec.HWCMode.State&0x7) | uint32((stateRec.HWCMode.BlinkPattern&0xF)<<8) | uint32(su.Qint(stateRec.HWCMode.Output, 0b100000, 0))
+					returnStrings = append(returnStrings, fmt.Sprintf("HWCMode#%d=%d", stateRec.HWCID, outputInteger))
+				}
+				if stateRec.HWCColor != nil {
+					if stateRec.HWCColor.ColorRGB != nil {
+						outputInteger := 0b11000000 |
+							((su.MapAndConstrainValue(int(stateRec.HWCColor.ColorRGB.Red), 0, 0xFF, 0, 0x3) & 0x3) << 4) |
+							((su.MapAndConstrainValue(int(stateRec.HWCColor.ColorRGB.Green), 0, 0xFF, 0, 0x3) & 0x3) << 2) |
+							((su.MapAndConstrainValue(int(stateRec.HWCColor.ColorRGB.Blue), 0, 0xFF, 0, 0x3) & 0x3) << 0)
+						returnStrings = append(returnStrings, fmt.Sprintf("HWCColor#%d=%d", stateRec.HWCID, outputInteger))
+					} else if stateRec.HWCColor.ColorIndex != nil {
+						outputInteger := 0b10000000 |
+							uint32(stateRec.HWCColor.ColorIndex.Index&0x1F)
+						returnStrings = append(returnStrings, fmt.Sprintf("HWCColor#%d=%d", stateRec.HWCID, outputInteger))
+					}
+				}
+				if stateRec.HWCExtended != nil {
+					outputInteger := uint32(stateRec.HWCExtended.Value&0xFFF) | uint32((stateRec.HWCExtended.Interpretation&0xF)<<12)
+					returnStrings = append(returnStrings, fmt.Sprintf("HWCExtended#%d=%d", stateRec.HWCID, outputInteger))
 				}
 			}
 		}
