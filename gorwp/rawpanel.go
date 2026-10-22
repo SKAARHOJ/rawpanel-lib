@@ -55,6 +55,7 @@ type RawPanel struct {
 	visibilityBindings map[uint32]VisibilityFunc
 	touchUIConfigFunc  TouchUIConfigFunc     // Called when the panel reports its active TouchUI config
 	touchUIPageFunc    TouchUIActivePageFunc // Called when the panel reports the page it displays
+	stateFeedbackFunc  StateFeedbackFunc     // Called for each state feedback record (see RequestStateFeedback)
 
 	// State
 	State RawPanelState
@@ -94,6 +95,7 @@ func Connect(panelIPAndPort string, ctx context.Context, cancel context.CancelFu
 		binaryPanel: binaryPanel,
 	}
 	newRawPanel.State.hwcAvailability = make(map[uint32]uint32)
+	newRawPanel.State.hwcCurrentState = make(map[uint32]*rwp.HWCCurrentState)
 
 	// Start listening:
 	go newRawPanel.listen(ctx)
@@ -361,6 +363,11 @@ func (rp *RawPanel) procesMessagesFromPanel(messagesFromPanel []*rwp.OutboundMes
 				log.Debugln("Received Topology SVG")
 			}
 			rp.State.Unlock()
+		}
+
+		// State feedback (response to RequestStateFeedback):
+		if len(msg.StateFeedback) > 0 {
+			rp.processStateFeedback(msg.StateFeedback)
 		}
 
 		// Events:

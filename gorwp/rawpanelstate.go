@@ -10,6 +10,8 @@ import (
 	"maps"
 	"sync"
 
+	"google.golang.org/protobuf/proto"
+
 	helpers "github.com/SKAARHOJ/rawpanel-lib"
 	rwp "github.com/SKAARHOJ/rawpanel-lib/ibeam_rawpanel"
 	topology "github.com/SKAARHOJ/rawpanel-lib/topology"
@@ -19,17 +21,18 @@ import (
 type RawPanelState struct {
 	sync.RWMutex // Mutex for accessing the state variables abov
 
-	topologyJSON        string                   // Incoming JSON stored here as string
-	topologySVG         string                   // Incoming SVG stored here as string
-	topology            *topology.Topology       // Parsed JSON topology stored here
-	model               string                   // Model name
-	serial              string                   // Serial number
-	name                string                   // Name of controller
-	hwcAvailability     map[uint32]uint32        // Enabled/mapped hardware components. See HWCAvailability* helpers for value semantics (incl. offscreen bit)
-	rawPanelSupport     *rwp.RawPanelSupport     // Support flags from panel info
-	touchUICapabilities *rwp.TouchUICapabilities // TouchUI capabilities (response to RequestTouchUICapabilities)
-	touchUIConfig       *rwp.TouchUIConfig       // Currently active TouchUI config (response to RequestTouchUIConfig)
-	touchUIActivePage   uint32                   // TouchUI page/tab the panel is displaying now. 0 = not reported yet
+	topologyJSON        string                          // Incoming JSON stored here as string
+	topologySVG         string                          // Incoming SVG stored here as string
+	topology            *topology.Topology              // Parsed JSON topology stored here
+	model               string                          // Model name
+	serial              string                          // Serial number
+	name                string                          // Name of controller
+	hwcAvailability     map[uint32]uint32               // Enabled/mapped hardware components. See HWCAvailability* helpers for value semantics (incl. offscreen bit)
+	rawPanelSupport     *rwp.RawPanelSupport            // Support flags from panel info
+	touchUICapabilities *rwp.TouchUICapabilities        // TouchUI capabilities (response to RequestTouchUICapabilities)
+	touchUIConfig       *rwp.TouchUIConfig              // Currently active TouchUI config (response to RequestTouchUIConfig)
+	touchUIActivePage   uint32                          // TouchUI page/tab the panel is displaying now. 0 = not reported yet
+	hwcCurrentState     map[uint32]*rwp.HWCCurrentState // Merged state feedback per HWC (response to RequestStateFeedback)
 }
 
 func (rps *RawPanelState) GetName() string {
@@ -85,6 +88,25 @@ func (rps *RawPanelState) SupportsTouchUI() bool {
 	rps.RLock()
 	defer rps.RUnlock()
 	return rps.rawPanelSupport != nil && rps.rawPanelSupport.TouchUI
+}
+
+// Returns whether the panel reports support for state feedback (see RequestStateFeedback)
+func (rps *RawPanelState) SupportsStateFeedback() bool {
+	rps.RLock()
+	defer rps.RUnlock()
+	return rps.rawPanelSupport != nil && rps.rawPanelSupport.StateFeedback
+}
+
+// Returns a copy of the last state reported for an HWC via state feedback (see
+// RequestStateFeedback), or nil if nothing has been reported for it. Input fields
+// (Pressed, AbsoluteValue, Speed) are nil when not reported.
+func (rps *RawPanelState) GetHWCCurrentState(hwc uint32) *rwp.HWCCurrentState {
+	rps.RLock()
+	defer rps.RUnlock()
+	if st, exists := rps.hwcCurrentState[hwc]; exists {
+		return proto.Clone(st).(*rwp.HWCCurrentState)
+	}
+	return nil
 }
 
 // Returns a copy of the HWC availability map. See the HWCAvailability* helpers in the
