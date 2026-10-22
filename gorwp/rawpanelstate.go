@@ -97,6 +97,20 @@ func (rps *RawPanelState) SupportsStateFeedback() bool {
 	return rps.rawPanelSupport != nil && rps.rawPanelSupport.StateFeedback
 }
 
+// Returns whether the panel reports support for text scrolling (HWCText.TextScroll)
+func (rps *RawPanelState) SupportsTextScroll() bool {
+	rps.RLock()
+	defer rps.RUnlock()
+	return rps.rawPanelSupport != nil && rps.rawPanelSupport.TextScroll
+}
+
+// Returns whether the panel reports support for individual LEDs (HWCSegments)
+func (rps *RawPanelState) SupportsSegments() bool {
+	rps.RLock()
+	defer rps.RUnlock()
+	return rps.rawPanelSupport != nil && rps.rawPanelSupport.Segments
+}
+
 // Returns a copy of the last state reported for an HWC via state feedback (see
 // RequestStateFeedback), or nil if nothing has been reported for it. Input fields
 // (Pressed, AbsoluteValue, Speed) are nil when not reported.

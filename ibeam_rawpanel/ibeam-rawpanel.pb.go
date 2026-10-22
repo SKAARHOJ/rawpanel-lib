@@ -8315,7 +8315,8 @@ func (x *HWCText_ScaleM) GetLimitHigh() int32 {
 }
 
 // Text scrolling configuration (ASCII Index 14)
-// Optional for panels: only panels announcing RawPanelSupport.TextScroll will scroll the text. Others ignore it and render the text as usual.
+// Optional for panels: only panels announcing RawPanelSupport.TextScroll will scroll the text. Send it only to those:
+// UniSketch and Link IO panels read ASCII index 14 as the legacy image index.
 type HWCText_TextScrollM struct {
 	state           protoimpl.MessageState          `protogen:"open.v1"`
 	ScrollMode      HWCText_TextScrollM_ScrollModeE `protobuf:"varint,1,opt,name=ScrollMode,proto3,enum=ibeam_rawpanel.HWCText_TextScrollM_ScrollModeE" json:"ScrollMode,omitempty"`

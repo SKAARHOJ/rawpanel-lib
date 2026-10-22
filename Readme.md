@@ -27,7 +27,7 @@ New ASCII line:
 
 `HWCText.TextScroll` makes text that does not fit on a display scroll. Title, text line 1 and text line 2 can scroll independently, in a loop or back and forth (bounce). Scrolling is by whole characters, so the text formatting is kept.
 
-- Optional for panels: only panels announcing the `TextScroll` support flag scroll the text. Others ignore it and show the text as usual, so clients need no fallback.
+- Optional for panels: only panels announcing the `TextScroll` support flag scroll the text. Only send it to those panels: UniSketch and Link IO panels read ASCII index 14 as the legacy image index and may show a stray icon. `gorwp`'s `SetRWPTextScroll` leaves the scroll settings out for panels without the flag.
 - `AdaptiveSpeed` gives each field its own speed, so all scrolling fields start and finish together.
 - In `gorwp`, see `SetRWPTextScroll`.
 

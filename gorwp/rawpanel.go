@@ -495,9 +495,13 @@ func (rp *RawPanel) SetRWPTextByStruct(hwc uint32, txtStruct *rwp.HWCText) {
 // Sets the text of a display like SetRWPText, with text scrolling for fields too long to fit.
 // Scroll settings belong to the text, so they are sent together with it (a text message replaces
 // the whole display content). See rwp.HWCText_TextScrollM for the options; nil disables scrolling.
-// Scrolling is optional for panels: only those announcing RawPanelSupport.TextScroll will scroll,
-// others show the text as usual.
+// Scrolling is optional for panels: only those announcing RawPanelSupport.TextScroll will scroll.
+// The scroll settings are left out for other panels, because UniSketch and Link IO panels read the
+// same ASCII field (index 14) as an image index.
 func (rp *RawPanel) SetRWPTextScroll(hwc uint32, title string, text1 string, text2 string, headerBar bool, scroll *rwp.HWCText_TextScrollM) {
+	if !rp.State.SupportsTextScroll() {
+		scroll = nil
+	}
 	txtStruct := &rwp.HWCText{
 		Title:          title,
 		Formatting:     7,
