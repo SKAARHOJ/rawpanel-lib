@@ -400,8 +400,8 @@ func TestInbound(t *testing.T) {
 // JSON (from browser) -> json.Unmarshal -> protobuf -> InboundMessagesToRawPanelASCIIstrings
 func TestInboundFromJSON(t *testing.T) {
 	var tests = []struct {
-		name     string
-		json     string
+		name      string
+		json      string
 		wantASCII string
 	}{
 		{

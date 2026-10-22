@@ -5,6 +5,7 @@ This provides basic event handler based support for talking to a SKAARHOJ Raw Pa
 - Reacting to button, encoder, fader, and joystick events
 - Setting feedback such as LED color, display contents.
 - Sending a TouchUI widget configuration to touch-capable panels (`SetTouchUI`), receiving widget events through the normal `Bind*` functions and reacting to widget visibility changes (`BindVisibility`). See `examples/touchui/` for a complete example.
+- Scrolling text that doesn't fit on a display (`SetRWPTextScroll`), on panels that support it. Other panels show the text as usual.
 - Asking the panel for the current state of its components (`RequestStateFeedback`), on panels that report `State.SupportsStateFeedback()`. Replies are merged per component into `State.GetHWCCurrentState(hwc)` and passed to the callback set with `BindStateFeedback`.
 
 

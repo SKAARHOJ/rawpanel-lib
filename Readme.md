@@ -22,6 +22,26 @@ New ASCII line:
 
 - `HWCs#xx=mode,color|mode,color|...` — one entry per LED, with `mode` and `color` as the values of `HWC#` and `HWCc#` (`,color` left out when not set). `HWCs#xx=` with an empty value clears it. Example, a 6 LED strip with two red, one blinking green and three dimmed white LEDs: `HWCs#30=4,132|4,132|772,143|5,130|5,130|5,130`
 
+## Text scrolling (TextScroll)
+
+`HWCText.TextScroll` makes text that does not fit on a display scroll. Title, text line 1 and text line 2 can scroll independently, in a loop or back and forth (bounce). Scrolling is by whole characters, so the text formatting is kept.
+
+- Optional for panels: only panels announcing the `TextScroll` support flag scroll the text. Others ignore it and show the text as usual, so clients need no fallback.
+- `AdaptiveSpeed` gives each field its own speed, so all scrolling fields start and finish together.
+- In `gorwp`, see `SetRWPTextScroll`.
+
+New ASCII:
+
+- `HWCt#xx=...` index 14 (after the scale fields) is a bit-packed value; `0` or empty = no scrolling:
+  - bits 0-1: mode (0 = off, 1 = loop, 2 = bounce)
+  - bit 2 / 3 / 4: scroll title / text line 1 / text line 2
+  - bits 5-6: speed (0 = default, 1 = slow, 2 = normal, 3 = fast)
+  - bits 7-8: pause at the ends (0 = default, 1 = short, 2 = medium, 3 = long)
+  - bit 9: adaptive speed
+
+  Example: `HWCt#3=|||Title|1|T1|T2||||||||541` scrolls all three fields in a loop with adaptive speed (541 = 512 + 16 + 8 + 4 + 1).
+- `_support=...,TextScroll` — capability flag
+
 ## TouchUI
 
 Panels with touch surfaces can accept a TouchUI widget configuration from the client (`Command.SetTouchUI` / ASCII `SetTouchUI={json}`). The config declares pages (tabs) of widgets (buttons, toggles, sliders, knobs, meters, labels, image tiles, video regions, encoder pads, dropdowns, XY pads, compressor and equalizer curves) with layout and options — see the `TouchUI*` messages in `ibeam-rawpanel-proto/ibeam-rawpanel.proto`.
