@@ -492,20 +492,20 @@ func (rp *RawPanel) SetRWPTextByStruct(hwc uint32, txtStruct *rwp.HWCText) {
 	}
 }
 
-// Sets text scrolling on a display. scrollMode: 1=loop, 2=marquee, 3=bounce.
-// scrollTitle/scrollText1/scrollText2 control which fields scroll.
-// speed: 0=default, 1=slow, 2=normal, 3=fast. pauseDwell: 0=default, 1=short, 2=medium, 3=long.
-func (rp *RawPanel) SetRWPTextScroll(hwc uint32, scrollMode rwp.HWCText_TextScrollM_ScrollModeE, scrollTitle bool, scrollText1 bool, scrollText2 bool, speed uint32, pauseDwell uint32) {
+// Sets the text of a display like SetRWPText, with text scrolling for fields too long to fit.
+// Scroll settings belong to the text, so they are sent together with it (a text message replaces
+// the whole display content). See rwp.HWCText_TextScrollM for the options; nil disables scrolling.
+// Scrolling is optional for panels: only those announcing RawPanelSupport.TextScroll will scroll,
+// others show the text as usual.
+func (rp *RawPanel) SetRWPTextScroll(hwc uint32, title string, text1 string, text2 string, headerBar bool, scroll *rwp.HWCText_TextScrollM) {
 	txtStruct := &rwp.HWCText{
-		Formatting: 7,
-		TextScroll: &rwp.HWCText_TextScrollM{
-			ScrollMode:      scrollMode,
-			ScrollTitle:     scrollTitle,
-			ScrollTextline1: scrollText1,
-			ScrollTextline2: scrollText2,
-			ScrollSpeed:     speed,
-			PauseDwell:      pauseDwell,
-		},
+		Title:          title,
+		Formatting:     7,
+		Textline1:      text1,
+		Textline2:      text2,
+		SolidHeaderBar: headerBar,
+		PairMode:       rwp.HWCText_PairModeE(su.Qint(text2 != "", 1, 0)),
+		TextScroll:     scroll,
 	}
 	rp.SetRWPTextByStruct(hwc, txtStruct)
 }

@@ -4156,11 +4156,11 @@ type HWCText struct {
 	IntegerValue2   int32                  `protobuf:"zigzag32,11,opt,name=IntegerValue2,proto3" json:"IntegerValue2,omitempty"`                                      // Index 7
 	PairMode        HWCText_PairModeE      `protobuf:"varint,12,opt,name=PairMode,proto3,enum=ibeam_rawpanel.HWCText_PairModeE" json:"PairMode,omitempty"`            // Index 8
 	Scale           *HWCText_ScaleM        `protobuf:"bytes,13,opt,name=Scale,proto3" json:"Scale,omitempty"`                                                         // Index 9-13
-	TextScroll      *HWCText_TextScrollM   `protobuf:"bytes,18,opt,name=TextScroll,proto3" json:"TextScroll,omitempty"`                                               // Protobuf field 18 (next available)
-	TextStyling     *HWCText_TextStyle     `protobuf:"bytes,14,opt,name=TextStyling,proto3" json:"TextStyling,omitempty"`                                             // Index 15-17
-	Inverted        bool                   `protobuf:"varint,15,opt,name=Inverted,proto3" json:"Inverted,omitempty"`                                                  // Index 18
-	PixelColor      *Color                 `protobuf:"bytes,16,opt,name=PixelColor,proto3" json:"PixelColor,omitempty"`                                               // Index 19
-	BackgroundColor *Color                 `protobuf:"bytes,17,opt,name=BackgroundColor,proto3" json:"BackgroundColor,omitempty"`                                     // Index 20
+	TextScroll      *HWCText_TextScrollM   `protobuf:"bytes,18,opt,name=TextScroll,proto3" json:"TextScroll,omitempty"`
+	TextStyling     *HWCText_TextStyle     `protobuf:"bytes,14,opt,name=TextStyling,proto3" json:"TextStyling,omitempty"`         // Index 15-17
+	Inverted        bool                   `protobuf:"varint,15,opt,name=Inverted,proto3" json:"Inverted,omitempty"`              // Index 18
+	PixelColor      *Color                 `protobuf:"bytes,16,opt,name=PixelColor,proto3" json:"PixelColor,omitempty"`           // Index 19
+	BackgroundColor *Color                 `protobuf:"bytes,17,opt,name=BackgroundColor,proto3" json:"BackgroundColor,omitempty"` // Index 20
 	unknownFields   protoimpl.UnknownFields
 	sizeCache       protoimpl.SizeCache
 }
@@ -8305,6 +8305,7 @@ func (x *HWCText_ScaleM) GetLimitHigh() int32 {
 }
 
 // Text scrolling configuration (ASCII Index 14)
+// Optional for panels: only panels announcing RawPanelSupport.TextScroll will scroll the text. Others ignore it and render the text as usual.
 type HWCText_TextScrollM struct {
 	state           protoimpl.MessageState          `protogen:"open.v1"`
 	ScrollMode      HWCText_TextScrollM_ScrollModeE `protobuf:"varint,1,opt,name=ScrollMode,proto3,enum=ibeam_rawpanel.HWCText_TextScrollM_ScrollModeE" json:"ScrollMode,omitempty"`
