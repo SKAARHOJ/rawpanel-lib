@@ -1904,10 +1904,10 @@ type VideoFeed struct {
 	FeedIndex uint32                 `protobuf:"varint,1,opt,name=feed_index,json=feedIndex,proto3" json:"feed_index,omitempty"` // 1-based
 	Source    string                 `protobuf:"bytes,2,opt,name=source,proto3" json:"source,omitempty"`                         // /dev/videoN | yuyv:<dev> | mjpg:<dev> | http://...(MJPEG)
 	// | rtsp://... | rtsps://... (H.264/H.265, codec probed)
+	// | srt://host:port | srt://:port?mode=listener (MPEG-TS over SRT, codec probed)
 	// | h264:udp://... | h265:udp://... (raw Annex-B, codec prefix required)
 	// | h264:rtp://... | h265:rtp://... (RTP, opened via a synthesized SDP)
 	// | test:bars | test:motion (built-in pattern, needs no hardware)
-	// NOT srt://: the panel's ffmpeg is built without libsrt.
 	Width         uint32                 `protobuf:"varint,3,opt,name=width,proto3" json:"width,omitempty"` // capture hints (0 = source default)
 	Height        uint32                 `protobuf:"varint,4,opt,name=height,proto3" json:"height,omitempty"`
 	HiddenPolicy  VideoFeed_HiddenPolicy `protobuf:"varint,5,opt,name=hidden_policy,json=hiddenPolicy,proto3,enum=touchmanager.VideoFeed_HiddenPolicy" json:"hidden_policy,omitempty"`
@@ -2435,11 +2435,12 @@ func (x *TextState) GetBgRgb() uint32 {
 	return 0
 }
 
-// HWCExtended digest for sliders/meters/knobs.
+// HWCExtended digest for sliders/meters/knobs, and the XY pad cursor.
 type ValueState struct {
 	state          protoimpl.MessageState `protogen:"open.v1"`
 	Interpretation uint32                 `protobuf:"varint,1,opt,name=interpretation,proto3" json:"interpretation,omitempty"` // HWCExtended.InterpretationE numeric value
 	Value          int32                  `protobuf:"zigzag32,2,opt,name=value,proto3" json:"value,omitempty"`                 // 0..1000 unless widget min/max says otherwise
+	ValueY         int32                  `protobuf:"zigzag32,3,opt,name=value_y,json=valueY,proto3" json:"value_y,omitempty"` // interpretation XY (8) only: the Y axis, 0..1000 (value is X)
 	unknownFields  protoimpl.UnknownFields
 	sizeCache      protoimpl.SizeCache
 }
@@ -2484,6 +2485,13 @@ func (x *ValueState) GetInterpretation() uint32 {
 func (x *ValueState) GetValue() int32 {
 	if x != nil {
 		return x.Value
+	}
+	return 0
+}
+
+func (x *ValueState) GetValueY() int32 {
+	if x != nil {
+		return x.ValueY
 	}
 	return 0
 }
@@ -4246,11 +4254,12 @@ const file_touchmanager_proto_rawDesc = "" +
 	"\x05line2\x18\x03 \x01(\tR\x05line2\x12!\n" +
 	"\fsolid_header\x18\x04 \x01(\bR\vsolidHeader\x12\x1b\n" +
 	"\tpixel_rgb\x18\x05 \x01(\rR\bpixelRgb\x12\x15\n" +
-	"\x06bg_rgb\x18\x06 \x01(\rR\x05bgRgb\"J\n" +
+	"\x06bg_rgb\x18\x06 \x01(\rR\x05bgRgb\"c\n" +
 	"\n" +
 	"ValueState\x12&\n" +
 	"\x0einterpretation\x18\x01 \x01(\rR\x0einterpretation\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\x11R\x05value\"w\n" +
+	"\x05value\x18\x02 \x01(\x11R\x05value\x12\x17\n" +
+	"\avalue_y\x18\x03 \x01(\x11R\x06valueY\"w\n" +
 	"\vDomainState\x12\x18\n" +
 	"\achoices\x18\x01 \x01(\tR\achoices\x12\x16\n" +
 	"\x06values\x18\x02 \x01(\tR\x06values\x12\x10\n" +

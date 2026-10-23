@@ -432,7 +432,8 @@ func touchUITypeDef(t rwp.TouchUIWidget_WidgetTypeE, opts *rwp.TouchUIWidgetOpti
 			subRect(105, -15, 30, 30, 3, touchUIStyleHandle),    // the chevron
 		}
 	case rwp.TouchUIWidget_XYPAD:
-		def.In = "xy" // 2D absolute (or relative) vector input
+		def.In = "xy"  // 2D absolute (or relative) vector input
+		def.Ext = "xy" // cursor feedback: HWCExtended XY places it, like a motorized fader follows its value
 		def.Desc = "TouchUI XY pad"
 		def.W = 2*touchUICellTenthMM - touchUICellGapTenthMM
 		def.H = 2*touchUICellTenthMM - touchUICellGapTenthMM

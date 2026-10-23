@@ -346,6 +346,7 @@ const (
 	HWCExtended_FADER    HWCExtended_InterpretationE = 5
 	HWCExtended_BUZZER   HWCExtended_InterpretationE = 6
 	HWCExtended_JOG      HWCExtended_InterpretationE = 7
+	HWCExtended_XY       HWCExtended_InterpretationE = 8 // 2D position (TouchUI XYPAD cursor): Value is X, ValueY is Y, each 0..1000 in the XYPAD axes
 )
 
 // Enum value maps for HWCExtended_InterpretationE.
@@ -358,6 +359,7 @@ var (
 		5: "FADER",
 		6: "BUZZER",
 		7: "JOG",
+		8: "XY",
 	}
 	HWCExtended_InterpretationE_value = map[string]int32{
 		"NONE":     0,
@@ -367,6 +369,7 @@ var (
 		"FADER":    5,
 		"BUZZER":   6,
 		"JOG":      7,
+		"XY":       8,
 	}
 )
 
@@ -1667,7 +1670,8 @@ const (
 	// deliberate "fire this again" gesture, not a no-op.
 	TouchUIWidget_XYPAD TouchUIWidget_WidgetTypeE = 10 // 2D touch surface         -> emits AbsoluteVector[x,y] (position, each 0..1000) or, with Options.Relative,
 	// SpeedVector[dx,dy], or, with Options.Joystick, SpeedVector[x-500,y-500] (deflection from the
-	// centre); plus Binary on touch/release. Honors HWCOverlay (cursor/target markers) / HWCGfx (background).
+	// centre); plus Binary on touch/release. Honors HWCExtended XY (cursor position, ignored while a finger
+	// is on the pad; FADER moves X only) / HWCOverlay (cursor/target markers) / HWCGfx (background).
 	// Axes: X is 0 at the LEFT edge, Y is 0 at the BOTTOM edge - Y is inverted relative to screen
 	// scanout, matching a vertical SLIDER and a joystick, so the geometric centre is exactly
 	// (500,500). Relative mode uses the same signs (+dy is upward) and the same 0..1000-per-edge
@@ -3450,6 +3454,7 @@ type HWCExtended struct {
 	state          protoimpl.MessageState      `protogen:"open.v1"`
 	Interpretation HWCExtended_InterpretationE `protobuf:"varint,2,opt,name=Interpretation,proto3,enum=ibeam_rawpanel.HWCExtended_InterpretationE" json:"Interpretation,omitempty"` // Value type
 	Value          uint32                      `protobuf:"varint,3,opt,name=Value,proto3" json:"Value,omitempty"`                                                                   // Value, 10 bits
+	ValueY         uint32                      `protobuf:"varint,4,opt,name=ValueY,proto3" json:"ValueY,omitempty"`                                                                 // Interpretation XY only: the Y axis, 10 bits. In ASCII it rides bits 16-27 of the HWCx# integer
 	unknownFields  protoimpl.UnknownFields
 	sizeCache      protoimpl.SizeCache
 }
@@ -3494,6 +3499,13 @@ func (x *HWCExtended) GetInterpretation() HWCExtended_InterpretationE {
 func (x *HWCExtended) GetValue() uint32 {
 	if x != nil {
 		return x.Value
+	}
+	return 0
+}
+
+func (x *HWCExtended) GetValueY() uint32 {
+	if x != nil {
+		return x.ValueY
 	}
 	return 0
 }
@@ -8498,10 +8510,11 @@ const file_ibeam_rawpanel_proto_ibeam_rawpanel_proto_rawDesc = "" +
 	"\bON_GREEN\x10\x03\x12\x06\n" +
 	"\x02ON\x10\x04\x12\n" +
 	"\n" +
-	"\x06DIMMED\x10\x05\"\xd6\x01\n" +
+	"\x06DIMMED\x10\x05\"\xf6\x01\n" +
 	"\vHWCExtended\x12S\n" +
 	"\x0eInterpretation\x18\x02 \x01(\x0e2+.ibeam_rawpanel.HWCExtended.InterpretationER\x0eInterpretation\x12\x14\n" +
-	"\x05Value\x18\x03 \x01(\rR\x05Value\"\\\n" +
+	"\x05Value\x18\x03 \x01(\rR\x05Value\x12\x16\n" +
+	"\x06ValueY\x18\x04 \x01(\rR\x06ValueY\"d\n" +
 	"\x0fInterpretationE\x12\b\n" +
 	"\x04NONE\x10\x00\x12\f\n" +
 	"\bSTRENGTH\x10\x01\x12\t\n" +
@@ -8510,7 +8523,8 @@ const file_ibeam_rawpanel_proto_ibeam_rawpanel_proto_rawDesc = "" +
 	"\x05FADER\x10\x05\x12\n" +
 	"\n" +
 	"\x06BUZZER\x10\x06\x12\a\n" +
-	"\x03JOG\x10\a\"\xc2\x01\n" +
+	"\x03JOG\x10\a\x12\x06\n" +
+	"\x02XY\x10\b\"\xc2\x01\n" +
 	"\vHWCSegments\x12?\n" +
 	"\bSegments\x18\x01 \x03(\v2#.ibeam_rawpanel.HWCSegments.SegmentR\bSegments\x1ar\n" +
 	"\aSegment\x121\n" +

@@ -114,8 +114,10 @@ func Capabilities(screenW, screenH, gridRows, gridCols uint32, orientation rwp.T
 				Type: rwp.TouchUIWidget_XYPAD,
 				// Vector rather than Absolute|Speed: every mode rides a *Vector event and
 				// Options.Relative/Joystick pick which one. Binary is the touch/release pair.
+				// Extended is the cursor: XY places both axes, FADER only X.
 				EventMask: helpers.TouchUIEventVector | helpers.TouchUIEventBinary,
-				StateMask: helpers.TouchUIStateOverlay | helpers.TouchUIStateGfx | helpers.TouchUIStateColor,
+				StateMask: helpers.TouchUIStateExtended | helpers.TouchUIStateOverlay | helpers.TouchUIStateGfx |
+					helpers.TouchUIStateColor,
 			},
 			{
 				Type: rwp.TouchUIWidget_COMPRESSOR,

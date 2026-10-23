@@ -182,6 +182,22 @@ func TestStateToFrames(t *testing.T) {
 	}
 }
 
+// The XY pad cursor travels as one HWCExtended: both axes must reach the renderer together.
+func TestStateToFramesXYCursor(t *testing.T) {
+	state := &rwp.HWCState{
+		HWCIDs:      []uint32{125},
+		HWCExtended: &rwp.HWCExtended{Interpretation: rwp.HWCExtended_XY, Value: 250, ValueY: 900},
+	}
+	frames := StateToFrames(125, state, 5)
+	if len(frames) != 1 {
+		t.Fatalf("expected 1 WidgetState frame, got %d", len(frames))
+	}
+	value := frames[0].GetState().GetValue()
+	if value.GetInterpretation() != uint32(rwp.HWCExtended_XY) || value.GetValue() != 250 || value.GetValueY() != 900 {
+		t.Errorf("XY digest wrong: %+v", value)
+	}
+}
+
 func TestGfxScaling(t *testing.T) {
 	// The budget is bytes, not a shape: 640x100 is 64000 pixels, inside the 65536
 	// the 131072-byte cap buys, so it must now survive at full size. The old fixed

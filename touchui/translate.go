@@ -428,6 +428,7 @@ func StateToFrames(hwc uint32, state *rwp.HWCState, epoch uint32) []*gen.ServerM
 		ws.Value = &gen.ValueState{
 			Interpretation: uint32(x.GetInterpretation()),
 			Value:          int32(x.GetValue()),
+			ValueY:         int32(x.GetValueY()),
 		}
 		touched = true
 	}
