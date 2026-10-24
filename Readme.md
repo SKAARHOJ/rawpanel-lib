@@ -79,3 +79,21 @@ New ASCII lines:
 - `_support=...,StateFeedback` — capability flag
 
 Currently implemented by the Link IO firmwares (SmartTally, UniSketch Panel, ETH-GPI, TallyBox, ETH-SDI).
+
+## mDNS identity (rwpmdns)
+
+Raw Panel announcers register `_skaarhoj-rwp._tcp` with a flat hostname and put serial and model in TXT records. Consumers read identity from TXT, not from the hostname.
+
+```go
+import "github.com/SKAARHOJ/rawpanel-lib/rwpmdns"
+
+// Announcer (instance name stays "MODEL [SERIAL]")
+zeroconf.RegisterProxy(model+" ["+serial+"]", "_skaarhoj-rwp._tcp", "local.", port,
+    rwpmdns.SoftwareHostname(serial), nil,
+    rwpmdns.RWPText(serial, model, productName, deviceName, "rwp2.0A/B", false), nil)
+
+// Consumer: TXT -> instance name -> old SERIAL.MODEL.skaarhoj.local hostname
+id := rwpmdns.Resolve(rwpmdns.ParseTXT(entry.Text), entry.Instance, entry.HostName)
+```
+
+Hostnames: hardware `sk-<serial>.local`, software `xp-<slug(serial)>.local`. `SerialFromHostname` reads the serial from those for display only; it is never a key for stored data.

@@ -39,6 +39,7 @@ go build ./tools/rwp-converter/
 - **Root package (`rawpanellib`)** — Core library: TCP connection management (`connecttopanel.go`), ASCII↔Protobuf conversion (`converterFunctions.go`), image/graphics helpers (`rawpanelhelpers.go`)
 - **`gorwp/`** — High-level event-driven API. Main type `RawPanel` with `Connect()`, event binding (`BindBinary`, `BindPulsed`, `BindAbsolute`, `BindIntensity`, `BindVisibility`), and output methods (`SetLEDColor`, `DrawImage`, `SetRWPText`, `SetTouchUI`). See `gorwp/README.md` for usage examples
 - **`topology/`** — Panel topology parsing and SVG icon rendering. Defines hardware component (HWC) types and their capabilities
+- **`rwpmdns/`** — mDNS naming rules (no dependencies): `xp-<serial>` hostnames and TXT records for Raw Panel announcers, and `Resolve` for consumers to read serial/model from TXT → instance name → old `SERIAL.MODEL.skaarhoj.local` hostname
 - **`ibeam_rawpanel/`** — Auto-generated protobuf Go code (do not edit manually)
 - **`ibeam-rawpanel-proto/`** — Protobuf schema definition (`ibeam-rawpanel.proto`)
 - **`ibeam_lib_monogfx/`** — Monochrome graphics rendering library with font support
