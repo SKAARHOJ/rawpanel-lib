@@ -1033,7 +1033,7 @@ func InboundMessagesToRawPanelASCIIstrings(inboundMsgs []*rwp.InboundMessage) []
 							if !su.IsIntIn(int(stateRec.HWCText.Formatting), []int{7, 10, 11}) {
 								stringSlice[0] = strconv.Itoa(int(stateRec.HWCText.IntegerValue))
 							} else if su.IsIntIn(int(stateRec.HWCText.Formatting), []int{10, 11}) {
-								stringSlice[0] = strconv.Itoa(int(stateRec.HWCText.TextStyling.UnformattedFontSize))
+								stringSlice[0] = strconv.Itoa(int(stateRec.HWCText.GetTextStyling().GetUnformattedFontSize()))
 							} else { // Formatting == 7
 								// Only clear IntegerValue if Scale is not being used
 								// When Scale.ScaleType > 0, IntegerValue is needed for the value indicator bar
