@@ -98,3 +98,7 @@ id := rwpmdns.Resolve(rwpmdns.ParseTXT(entry.Text), entry.Instance, entry.HostNa
 ```
 
 Hostnames: hardware `sk-<serial>.local`, software `xp-<slug(serial)>.local`. `SerialFromHostname` reads the serial from those for display only; it is never a key for stored data.
+
+## TODO
+
+- Panels can't confirm `SleepMode=`, `SleepScreenSaver=` and `PanelBrightness=` like they do `SleepTimer=`: `OutboundMessage` has no fields for them. Add them to `ibeam-rawpanel.proto` (ibeam-rawpanel-proto submodule) and to the outbound ASCII converter, then reply with them in the panels (xpanel-streamdeck has placeholders in `protocol.go`).
