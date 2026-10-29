@@ -30,6 +30,7 @@ New ASCII line:
 - Optional for panels: only panels announcing the `TextScroll` support flag scroll the text. Only send it to those panels: UniSketch and Link IO panels read ASCII index 14 as the legacy image index and may show a stray icon. `gorwp`'s `SetRWPTextScroll` leaves the scroll settings out for panels without the flag.
 - `AdaptiveSpeed` gives each field its own speed, so all scrolling fields start and finish together.
 - In `gorwp`, see `SetRWPTextScroll`.
+- Panel side: `TextScroller` (textscroll.go) holds the scroll animation for a panel's displays. Call `Set` when text arrives, `Clear` for graphics, `Tick` every `TextScrollTickInterval` (redraw the returned displays) and `Apply` on the text right before `WriteDisplayTileNew`, with the same size arguments. Re-sending identical text keeps the animation running. Speeds: slow 500 ms, normal 300 ms, fast 100 ms per character; dwell: short 0.8 s, medium 1.5 s, long 3 s.
 
 New ASCII:
 
