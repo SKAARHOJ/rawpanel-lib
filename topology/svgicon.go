@@ -71,6 +71,11 @@ func GenerateCompositeSVGdoc(topologyJSON string, topologySVG string, theMap map
 			curve = typeDef.Disp.Curve
 		}
 
+		labelX, labelY := HWcDef.X, HWcDef.Y // Where text labels and HWC ids go
+		if curve != nil {
+			labelX, labelY = curve.Center(HWcDef.X, HWcDef.Y)
+		}
+
 		var newHWc *xml.Node
 		if curve != nil { // Curved display: draw an annular sector bent around the component's center point
 			newHWc = svgDoc.Root.CreateNode("path")
@@ -136,8 +141,8 @@ func GenerateCompositeSVGdoc(topologyJSON string, topologySVG string, theMap map
 			}
 			for a := 0; a < cnt; a++ {
 				textElForHWC := svgDoc.Root.CreateNode("text")
-				textElForHWC.SetAttributeValue("x", strconv.Itoa(HWcDef.X))
-				textElForHWC.SetAttributeValue("y", strconv.Itoa(HWcDef.Y+27+a*30-(cnt*30/2)))
+				textElForHWC.SetAttributeValue("x", strconv.Itoa(labelX))
+				textElForHWC.SetAttributeValue("y", strconv.Itoa(labelY+27+a*30-(cnt*30/2)))
 				textElForHWC.SetAttributeValue("text-anchor", "middle")
 				textElForHWC.SetAttributeValue("fill", su.Qstr(isIn("invtxt", renderOptions), su.Qstr(showLabels, "#FFF", "#666"), su.Qstr(showLabels, "#000", "#999")))
 				textElForHWC.SetAttributeValue("font-weight", "bold")
@@ -147,7 +152,7 @@ func GenerateCompositeSVGdoc(topologyJSON string, topologySVG string, theMap map
 
 				rotate := typeDef.Rotate
 				//if isIn("txt90", renderOptions) {
-				if typeDef.H > typeDef.W*2 {
+				if typeDef.H > typeDef.W*2 && curve == nil {
 					rotate -= 90
 				}
 				if rotate != 0 {
@@ -160,14 +165,14 @@ func GenerateCompositeSVGdoc(topologyJSON string, topologySVG string, theMap map
 		if showType {
 			// If type number was printed as label, we will add a small text with the original label too:
 			textForTypeNumber := svgDoc.Root.CreateNode("text")
-			textForTypeNumber.SetAttributeValue("x", strconv.Itoa(HWcDef.X))
-			textForTypeNumber.SetAttributeValue("y", strconv.Itoa(HWcDef.Y-su.Qint(typeDef.H > 0, typeDef.H, typeDef.W)/2-2))
+			textForTypeNumber.SetAttributeValue("x", strconv.Itoa(labelX))
+			textForTypeNumber.SetAttributeValue("y", strconv.Itoa(labelY-su.Qint(curve != nil, 25, su.Qint(typeDef.H > 0, typeDef.H, typeDef.W)/2+2)))
 			textForTypeNumber.SetAttributeValue("text-anchor", "middle")
 			textForTypeNumber.SetAttributeValue("fill", "#333")
 			textForTypeNumber.SetAttributeValue("font-size", "20")
 			textForTypeNumber.SetAttributeValue("font-family", "sans-serif")
 			textForTypeNumber.SetAttributeValue("pointer-events", "none")
-			if typeDef.Rotate != 0 {
+			if typeDef.Rotate != 0 && curve == nil {
 				textForTypeNumber.SetAttributeValue("transform", fmt.Sprintf("rotate(%03f %d %d)", typeDef.Rotate, HWcDef.X, HWcDef.Y))
 			}
 			textForTypeNumber.Text = "[TYPE=" + strconv.Itoa(int(HWcDef.Type)) + "]"
@@ -175,8 +180,8 @@ func GenerateCompositeSVGdoc(topologyJSON string, topologySVG string, theMap map
 
 		if showDisplaySize && typeDef.Disp != nil {
 			textForDisplaySize := svgDoc.Root.CreateNode("text")
-			dispLabelX := HWcDef.X
-			dispLabelY := HWcDef.Y - su.Qint(typeDef.H > 0, typeDef.H, typeDef.W)/2 - 2
+			dispLabelX := labelX
+			dispLabelY := labelY - su.Qint(curve != nil, -30, su.Qint(typeDef.H > 0, typeDef.H, typeDef.W)/2+2)
 			if typeDef.Disp.Subidx >= 0 && len(typeDef.Sub) > typeDef.Disp.Subidx {
 				dispLabelX = HWcDef.X + typeDef.Sub[typeDef.Disp.Subidx].X + typeDef.Sub[typeDef.Disp.Subidx].W/2
 				dispLabelY = HWcDef.Y + typeDef.Sub[typeDef.Disp.Subidx].Y + typeDef.Sub[typeDef.Disp.Subidx].H/2
@@ -197,7 +202,7 @@ func GenerateCompositeSVGdoc(topologyJSON string, topologySVG string, theMap map
 			if typeDef.Disp.Type != "" {
 				dispLabelSuffix = " " + typeDef.Disp.Type
 			}
-			if typeDef.Rotate != 0 {
+			if typeDef.Rotate != 0 && curve == nil {
 				textForDisplaySize.SetAttributeValue("transform", fmt.Sprintf("rotate(%03f %d %d)", typeDef.Rotate, HWcDef.X, HWcDef.Y))
 			}
 			textForDisplaySize.Text = strconv.Itoa(typeDef.Disp.W) + "x" + strconv.Itoa(typeDef.Disp.H) + dispLabelSuffix
@@ -205,9 +210,9 @@ func GenerateCompositeSVGdoc(topologyJSON string, topologySVG string, theMap map
 
 		if showHWCID || isIn("hwcid", renderOptions) {
 			numberForHWC := svgDoc.Root.CreateNode("text")
-			numberForHWC.SetAttributeValue("x", strconv.Itoa(HWcDef.X-su.Qint(typeDef.H > 0, typeDef.W/2-4, 0)))
-			numberForHWC.SetAttributeValue("y", strconv.Itoa(HWcDef.Y-su.Qint(typeDef.H > 0, typeDef.H, typeDef.W)/2+20))
-			if typeDef.H == 0 { // Circle: Center it...
+			numberForHWC.SetAttributeValue("x", strconv.Itoa(labelX-su.Qint(typeDef.H > 0 && curve == nil, typeDef.W/2-4, 0)))
+			numberForHWC.SetAttributeValue("y", strconv.Itoa(labelY-su.Qint(curve != nil, -7, su.Qint(typeDef.H > 0, typeDef.H, typeDef.W)/2-20)))
+			if typeDef.H == 0 || curve != nil { // Circle or curved display: Center it...
 				numberForHWC.SetAttributeValue("text-anchor", "middle")
 			}
 			numberForHWC.SetAttributeValue("fill", su.Qstr(showHWCID, "#000", "#999"))
@@ -218,7 +223,7 @@ func GenerateCompositeSVGdoc(topologyJSON string, topologySVG string, theMap map
 			//numberForHWC.SetAttributeValue("stroke", "#dddddd")
 			//numberForHWC.SetAttributeValue("stroke-width", "6px")
 			//numberForHWC.SetAttributeValue("paint-order", "stroke")
-			if typeDef.Rotate != 0 {
+			if typeDef.Rotate != 0 && curve == nil {
 				numberForHWC.SetAttributeValue("transform", fmt.Sprintf("rotate(%03f %d %d)", typeDef.Rotate, HWcDef.X, HWcDef.Y))
 			}
 			numberForHWC.Text = strconv.Itoa(int(HWcDef.Id))
