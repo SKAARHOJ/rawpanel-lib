@@ -79,7 +79,7 @@ func GenerateCompositeSVGdoc(topologyJSON string, topologySVG string, theMap map
 		var newHWc *xml.Node
 		if curve != nil { // Curved display: draw an annular sector bent around the component's center point
 			newHWc = svgDoc.Root.CreateNode("path")
-			newHWc.SetAttributeValue("d", annularSectorPath(HWcDef.X, HWcDef.Y, curve.InnerR, curve.OuterR, curve.StartAngle, curve.EndAngle))
+			newHWc.SetAttributeValue("d", curve.SectorPath(HWcDef.X, HWcDef.Y)) // The outline (shrunk by InsetR)
 		} else {
 			newHWc = svgDoc.Root.CreateNode(su.Qstr(typeDef.H > 0, "rect", "circle"))
 			if typeDef.H > 0 { // Rectangle

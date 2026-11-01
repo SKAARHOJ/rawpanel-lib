@@ -113,6 +113,16 @@ type TopologyHWcTypeDef_DisplayCurve struct {
 	SwapAxes   bool    `json:"swapAxes,omitempty"`   // If true, bitmap W runs along the arc (angular) and H across the band (radial). Default: H along the arc, W across the band.
 	FlipRadial bool    `json:"flipRadial,omitempty"` // Swap which bitmap edge maps to inner vs outer radius
 	FlipAngle  bool    `json:"flipAngle,omitempty"`  // Swap which bitmap edge maps to start vs end angle
+
+	// InsetR shrinks the component's outline (as drawn in topology drawings, and what is clicked or
+	// grabbed in design tools) by this much at both the inner and the outer radius. Tiles that share a
+	// display (a full bar, its halves and quarters) all render edge to edge on InnerR..OuterR like the
+	// real display does, but get different outlines so each stays selectable. Like the "d" sub element
+	// that gives a flat tile its exact display area while W/H give the component's own size.
+	InsetR int `json:"insetR,omitempty"`
+	// InsetAngle shrinks the outline the same way at both ends of the arc, in degrees, for tiles that
+	// sit next to each other along the arc.
+	InsetAngle float64 `json:"insetAngle,omitempty"`
 }
 
 // Returns the hardware component ids of the topology (should range successively from 1 to the number of components on the panel) and there should really be no duplicates inside.

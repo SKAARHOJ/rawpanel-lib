@@ -16,14 +16,25 @@ import (
 // curveSamples is the supersampling factor per axis used by WarpToCurve.
 const curveSamples = 3
 
-// SectorPath returns an SVG path "d" string outlining the curved display, centered
-// on the component at (cx, cy). Coordinates are in topology units (1/10 mm).
+// SectorPath returns an SVG path "d" string for the component's outline, centered on
+// the component at (cx, cy): the band shrunk by InsetR at both radii and by InsetAngle at
+// both ends. Coordinates are in topology units (1/10 mm). Display content goes on the full
+// band (see Bounds, WarpToCurve).
 func (c *TopologyHWcTypeDef_DisplayCurve) SectorPath(cx, cy int) string {
-	return annularSectorPath(cx, cy, c.InnerR, c.OuterR, c.StartAngle, c.EndAngle)
+	inset := c.InsetR
+	if inset < 0 || 2*inset >= c.OuterR-c.InnerR {
+		inset = 0
+	}
+	start, span := c.angles()
+	insetAngle := c.InsetAngle
+	if insetAngle < 0 || 2*insetAngle >= span {
+		insetAngle = 0
+	}
+	return annularSectorPath(cx, cy, c.InnerR+inset, c.OuterR-inset, start+insetAngle, start+span-insetAngle)
 }
 
-// Bounds returns the bounding box of the curved display in topology units for a
-// component centered at (cx, cy). The box is rounded outwards to whole units.
+// Bounds returns the bounding box of the curved display (the full band, the insets do not
+// apply) in topology units for a component centered at (cx, cy). The box is rounded outwards to whole units.
 func (c *TopologyHWcTypeDef_DisplayCurve) Bounds(cx, cy int) image.Rectangle {
 	a0, a1 := c.angles()
 	ri, ro := float64(c.InnerR), float64(c.OuterR)

@@ -66,3 +66,27 @@ func TestWarpToCurveOrientation(t *testing.T) {
 		t.Errorf("corner outside the band = %v, want transparent", got)
 	}
 }
+
+func TestCurveInsetOnlyShrinksTheOutline(t *testing.T) {
+	c := &TopologyHWcTypeDef_DisplayCurve{InnerR: 100, OuterR: 200, StartAngle: -20, EndAngle: 20}
+	full := c.Bounds(0, 0)
+	flat := c.SectorPath(0, 0)
+	c.InsetR = 20
+	if c.Bounds(0, 0) != full {
+		t.Errorf("InsetR changed the display bounds: %v, want %v", c.Bounds(0, 0), full)
+	}
+	if c.SectorPath(0, 0) != annularSectorPath(0, 0, 120, 180, -20, 20) || c.SectorPath(0, 0) == flat {
+		t.Errorf("outline with InsetR = %q, want the band 120..180", c.SectorPath(0, 0))
+	}
+}
+
+func TestCurveInsetAngle(t *testing.T) {
+	c := &TopologyHWcTypeDef_DisplayCurve{InnerR: 100, OuterR: 200, StartAngle: 55, EndAngle: 78.5, InsetR: 10, InsetAngle: 1.5}
+	if got, want := c.SectorPath(0, 0), annularSectorPath(0, 0, 110, 190, 56.5, 77); got != want {
+		t.Errorf("outline = %q, want %q", got, want)
+	}
+	full := (&TopologyHWcTypeDef_DisplayCurve{InnerR: 100, OuterR: 200, StartAngle: 55, EndAngle: 78.5}).Bounds(0, 0)
+	if c.Bounds(0, 0) != full {
+		t.Errorf("InsetAngle changed the display bounds")
+	}
+}
