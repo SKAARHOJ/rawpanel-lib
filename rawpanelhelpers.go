@@ -1165,9 +1165,15 @@ func RwpImgToImage(rwpImg *rwp.HWCGfx, width int, height int) image.Image {
 
 	wInBytes := int(math.Ceil(float64(rwpImgW) / 8))
 
-	// Iterate over all the bytes of the raw panel image:
-	for y := 0; y < rwpImgH; y++ {
-		for x := 0; x < rwpImgW; x++ {
+	// Only the part of the image that lands on the output is drawn (it's centered, so a larger image is cropped).
+	// The size comes from the image header, so it can be anything: an image that claims 60000x60000 would
+	// otherwise take seconds to go through, however little data it has.
+	yFrom, yTo := max(0, -hOffset), min(rwpImgH, height-hOffset)
+	xFrom, xTo := max(0, -wOffset), min(rwpImgW, width-wOffset)
+
+	// Iterate over the pixels of the raw panel image that are visible:
+	for y := yFrom; y < yTo; y++ {
+		for x := xFrom; x < xTo; x++ {
 
 			switch rwpImg.ImageType {
 			case rwp.HWCGfx_RGB16bit:
