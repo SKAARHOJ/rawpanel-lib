@@ -1,7 +1,7 @@
 github.com/SKAARHOJ/ibeam-lib-utils v1.0.0 h1:NEviBDHVAQveCbdaXVyD1oIkIRP5xb+BhFK5ImHzHos=
 github.com/SKAARHOJ/ibeam-lib-utils v1.0.0/go.mod h1:mKwkqhL2nKgvFfTOpTQ3vJDU7hEaeeY1bdqub0qdPGI=
-github.com/SKAARHOJ/rawpanel-processors v1.1.1 h1:woMJaiERjaTXsuaa82Y3uhzhjHds3bsnEmZQM+Mgha8=
-github.com/SKAARHOJ/rawpanel-processors v1.1.1/go.mod h1:Pq6YVaRI2VCSTjCij/tRljjbDya7EwtvZ4s82xt9po4=
+github.com/SKAARHOJ/rawpanel-processors v1.2.0 h1:9iFQThTeJG74T7XAYP4AALftIXDWDszKXNw0y+jDCcM=
+github.com/SKAARHOJ/rawpanel-processors v1.2.0/go.mod h1:tz2zV3sgWtaz1AVS+sg1HLJ6cOgJZwjRUQMNXJKAQn4=
 github.com/antchfx/xpath v0.0.0-20170515025933-1f3266e77307/go.mod h1:Yee4kTMuNiPYJ7nSNorELQMr1J33uOpXDMByNYhvtNk=
 github.com/antchfx/xpath v1.3.9 h1:muXJSod6jRzhsiUjvduNSxsRSptFZ2GOJ1oMD1QkPSA=
 github.com/antchfx/xpath v1.3.9/go.mod h1:i54GszH55fYfBmoZXapTHN8T8tkcHfRgLyVwwqzXNcs=
