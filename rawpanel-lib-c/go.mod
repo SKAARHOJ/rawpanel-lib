@@ -3,8 +3,8 @@ module github.com/SKAARHOJ/rawpanel-lib/rawpanel-lib-c
 go 1.26.0
 
 require (
-	github.com/SKAARHOJ/rawpanel-lib v1.9.0
-	github.com/SKAARHOJ/rawpanel-processors v1.1.1
+	github.com/SKAARHOJ/rawpanel-lib v1.11.0
+	github.com/SKAARHOJ/rawpanel-processors v1.2.0
 	github.com/s00500/env_logger v0.1.33
 	google.golang.org/protobuf v1.36.12
 )
